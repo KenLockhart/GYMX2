@@ -17,7 +17,9 @@ export default async function LoginPage({
       <LoginForm
         next={next}
         initialError={
-          error === "link" ? "That link has expired or was already used. Please try again." : undefined
+          error === "link"
+            ? "That link has expired or was already used. If you were confirming your email, try logging in."
+            : undefined
         }
       />
       <div className="mt-6 space-y-2 text-sm text-muted">

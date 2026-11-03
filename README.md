@@ -42,6 +42,10 @@ npm run test:db
 
 `npm run test:db` checks the database security rules and needs `supabase start` running.
 
+## Keep account emails working
+
+Email links must use the templates in `supabase/templates`, or they only work in the browser that asked for them. The live project doesn't read those files. In the Supabase dashboard, go to Authentication > Emails and paste `confirmation.html` into "Confirm sign up" and `recovery.html` into "Reset password". Do this again whenever those files change.
+
 ## Make someone the first admin
 
 New accounts are always members, and only an admin can change a role. To create the first admin, sign up on the site, then run this in the Supabase dashboard's SQL Editor with your own email:

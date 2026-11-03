@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { profileSchema, safeRedirectPath, setRoleSchema, signUpSchema } from "./validation";
+import {
+  emailLinkTypeSchema,
+  profileSchema,
+  safeRedirectPath,
+  setRoleSchema,
+  signUpSchema,
+} from "./validation";
 
 const profile = {
   display_name: "Sam",
@@ -23,6 +29,16 @@ describe("safeRedirectPath", () => {
       expect(safeRedirectPath(path)).toBe("/dashboard");
     },
   );
+});
+
+describe("emailLinkTypeSchema", () => {
+  it.each(["email", "recovery"])("accepts %s", (type) => {
+    expect(emailLinkTypeSchema.safeParse(type).success).toBe(true);
+  });
+
+  it.each(["invite", "magiclink", "", null])("rejects %s", (type) => {
+    expect(emailLinkTypeSchema.safeParse(type).success).toBe(false);
+  });
 });
 
 describe("signUpSchema", () => {

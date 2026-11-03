@@ -61,6 +61,8 @@ export const setRoleSchema = z.object({
   role: z.enum(["member", "coach", "admin"]),
 });
 
+export const emailLinkTypeSchema = z.enum(["email", "recovery"]);
+
 // Only same-site paths are allowed, so a crafted link can't send someone to another site after login.
 export function safeRedirectPath(path: unknown, fallback = "/dashboard") {
   if (typeof path !== "string" || !path.startsWith("/")) return fallback;
