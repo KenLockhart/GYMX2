@@ -1,0 +1,26 @@
+export type UserRole = "member" | "coach" | "admin";
+
+export type Profile = {
+  id: string;
+  role: UserRole;
+  display_name: string;
+  bio: string;
+  coach_requested: boolean;
+  instagram_url: string | null;
+  tiktok_url: string | null;
+  youtube_url: string | null;
+  x_url: string | null;
+  website_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminUser = Pick<
+  Profile,
+  "id" | "display_name" | "role" | "coach_requested" | "created_at"
+> & { email: string };
+
+export type ActionState = {
+  error?: string;
+  message?: string;
+};
