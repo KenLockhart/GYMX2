@@ -6,8 +6,8 @@ import type { UserRole } from "@/lib/types";
 export const metadata: Metadata = { title: "Dashboard" };
 
 const roleIntro: Record<UserRole, string> = {
-  member: "You're in. Set up your profile so coaches can get to know you.",
-  coach: "You're set up as a coach. Add your bio and social links so members can find you.",
+  member: "You're in. Join a coach to start getting Tasks, and keep daily notes in your Memos.",
+  coach: "You're set up as a coach. Upload videos to your library, then give Tasks to your members.",
   admin: "You manage GYMX2. Review coach requests and member roles from the admin area.",
 };
 
@@ -29,7 +29,30 @@ export default async function DashboardPage() {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <Link href="/profile" className="btn-primary">
+        {profile.role === "member" && (
+          <>
+            <Link href="/tasks" className="btn-primary">
+              See your Tasks
+            </Link>
+            <Link href="/coaches" className="btn-secondary">
+              Find a coach
+            </Link>
+          </>
+        )}
+        {profile.role === "coach" && (
+          <>
+            <Link href="/tasks/new" className="btn-primary">
+              Give a Task
+            </Link>
+            <Link href="/library/upload" className="btn-secondary">
+              Upload a video
+            </Link>
+          </>
+        )}
+        <Link
+          href="/profile"
+          className={profile.role === "admin" ? "btn-primary" : "btn-secondary"}
+        >
           Edit your profile
         </Link>
         {profile.role === "admin" && (

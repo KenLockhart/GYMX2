@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   emailLinkTypeSchema,
+  memoSchema,
   profileSchema,
   safeRedirectPath,
   setRoleSchema,
   signUpSchema,
+  taskSchema,
+  videoSchema,
 } from "./validation";
 
 const profile = {
@@ -76,6 +79,52 @@ describe("profileSchema", () => {
       expect(profileSchema.safeParse({ ...profile, instagram_url: url }).success).toBe(false);
     },
   );
+});
+
+describe("videoSchema", () => {
+  it("requires a title", () => {
+    expect(videoSchema.safeParse({ title: "   ", description: "" }).success).toBe(false);
+  });
+});
+
+describe("taskSchema", () => {
+  const valid = {
+    video_id: "2f1b6c1e-8f4a-4d7e-9a57-1c1d2e3f4a5b",
+    title: "Squats",
+    instructions: "",
+    due_on: "",
+    member_ids: ["3f1b6c1e-8f4a-4d7e-9a57-1c1d2e3f4a5b"],
+  };
+
+  it("stores an empty due date as null", () => {
+    expect(taskSchema.parse(valid).due_on).toBeNull();
+  });
+
+  it("keeps a real due date", () => {
+    expect(taskSchema.parse({ ...valid, due_on: "2026-12-01" }).due_on).toBe("2026-12-01");
+  });
+
+  it.each(["tomorrow", "2026-13-40"])("rejects the due date %s", (due_on) => {
+    expect(taskSchema.safeParse({ ...valid, due_on }).success).toBe(false);
+  });
+
+  it("requires a member", () => {
+    expect(taskSchema.safeParse({ ...valid, member_ids: [] }).success).toBe(false);
+  });
+});
+
+describe("memoSchema", () => {
+  const valid = { id: "", memo_date: "2026-11-03", body: " Felt good ", shared_with_coaches: false };
+
+  it("trims the note and treats an empty id as a new Memo", () => {
+    const result = memoSchema.parse(valid);
+    expect(result.body).toBe("Felt good");
+    expect(result.id).toBeNull();
+  });
+
+  it("rejects an empty note", () => {
+    expect(memoSchema.safeParse({ ...valid, body: "  " }).success).toBe(false);
+  });
 });
 
 describe("setRoleSchema", () => {

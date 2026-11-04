@@ -26,6 +26,12 @@ export async function requireAccount() {
   return account;
 }
 
+export async function requireCoach() {
+  const account = await requireAccount();
+  if (account.profile.role !== "coach") redirect("/dashboard");
+  return account;
+}
+
 export async function requireAdmin() {
   const account = await requireAccount();
   if (account.profile.role !== "admin") redirect("/dashboard");
