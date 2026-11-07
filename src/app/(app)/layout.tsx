@@ -15,6 +15,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/dashboard" className="hover:text-accent">
               Dashboard
             </Link>
+            <Link href="/tasks" className="hover:text-accent">
+              Tasks
+            </Link>
+            <Link href="/library" className="hover:text-accent">
+              Library
+            </Link>
+            {profile.role === "member" && (
+              <Link href="/coaches" className="hover:text-accent">
+                Coaches
+              </Link>
+            )}
+            {profile.role === "coach" && (
+              <Link href="/members" className="hover:text-accent">
+                Members
+              </Link>
+            )}
+            <Link href="/memos" className="hover:text-accent">
+              Memos
+            </Link>
             <Link href="/profile" className="hover:text-accent">
               Profile
             </Link>

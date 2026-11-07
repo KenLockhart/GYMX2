@@ -63,6 +63,35 @@ export const setRoleSchema = z.object({
 
 export const emailLinkTypeSchema = z.enum(["email", "recovery"]);
 
+const taskOrVideoTitle = z
+  .string()
+  .trim()
+  .min(1, "Enter a title.")
+  .max(120, "Use 120 characters or fewer for the title.");
+const isoDate = z.iso.date("Choose a valid date.");
+
+export const videoSchema = z.object({
+  title: taskOrVideoTitle,
+  description: z.string().trim().max(2000, "Use 2,000 characters or fewer for the description."),
+});
+
+export const taskSchema = z.object({
+  video_id: z.uuid("Choose a video."),
+  title: taskOrVideoTitle,
+  instructions: z.string().trim().max(2000, "Use 2,000 characters or fewer for the instructions."),
+  due_on: z.union([z.literal("").transform(() => null), isoDate]),
+  member_ids: z.array(z.uuid()).min(1, "Choose at least one member.").max(200),
+});
+
+export const memoSchema = z.object({
+  id: z.union([z.literal("").transform(() => null), z.uuid()]),
+  memo_date: isoDate,
+  body: z.string().trim().min(1, "Write a note first.").max(5000, "Use 5,000 characters or fewer."),
+  shared_with_coaches: z.boolean(),
+});
+
+export const idSchema = z.uuid();
+
 // Only same-site paths are allowed, so a crafted link can't send someone to another site after login.
 export function safeRedirectPath(path: unknown, fallback = "/dashboard") {
   if (typeof path !== "string" || !path.startsWith("/")) return fallback;

@@ -20,6 +20,26 @@ export type AdminUser = Pick<
   "id" | "display_name" | "role" | "coach_requested" | "created_at"
 > & { email: string };
 
+export type VideoStatus = "uploading" | "processing" | "ready" | "failed";
+
+export type Video = {
+  id: string;
+  coach_id: string;
+  title: string;
+  description: string;
+  status: VideoStatus;
+  duration_seconds: number | null;
+  created_at: string;
+};
+
+export type Memo = {
+  id: string;
+  user_id: string;
+  memo_date: string;
+  body: string;
+  shared_with_coaches: boolean;
+};
+
 export type ActionState = {
   error?: string;
   message?: string;

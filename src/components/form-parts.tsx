@@ -11,11 +11,13 @@ const FormContext = createContext<{ state: ActionState; pending: boolean }>({
 export function ActionForm({
   action,
   initialState = {},
+  confirmMessage,
   className,
   children,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   initialState?: ActionState;
+  confirmMessage?: string;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -28,6 +30,7 @@ export function ActionForm({
       onSubmit={(event) => {
         // A plain form action makes React clear the fields, losing what was typed if the server rejects it.
         event.preventDefault();
+        if (confirmMessage && !window.confirm(confirmMessage)) return;
         const formData = new FormData(event.currentTarget);
         startTransition(() => formAction(formData));
       }}

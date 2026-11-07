@@ -2,8 +2,16 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "./env";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/profile", "/admin"];
-const SIGNED_OUT_ONLY_PATHS = ["/login", "/signup"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/profile",
+  "/admin",
+  "/tasks",
+  "/library",
+  "/coaches",
+  "/members",
+  "/memos",
+];
 
 function matchesPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -33,15 +41,12 @@ export async function updateSession(request: NextRequest) {
   const signedIn = Boolean(data?.claims);
   const { pathname, search } = request.nextUrl;
 
-  let redirectTo: URL | null = null;
-  if (!signedIn && PROTECTED_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) {
-    redirectTo = new URL("/login", request.url);
-    redirectTo.searchParams.set("next", `${pathname}${search}`);
-  } else if (signedIn && SIGNED_OUT_ONLY_PATHS.includes(pathname)) {
-    redirectTo = new URL("/dashboard", request.url);
+  if (signedIn || !PROTECTED_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) {
+    return response;
   }
 
-  if (!redirectTo) return response;
+  const redirectTo = new URL("/login", request.url);
+  redirectTo.searchParams.set("next", `${pathname}${search}`);
 
   // A refreshed session must survive the redirect.
   const redirect = NextResponse.redirect(redirectTo);

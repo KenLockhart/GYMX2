@@ -2,13 +2,17 @@
 
 GYMX2 connects people who train with the coaches and fitness creators they want to follow.
 
-This repository currently contains Phase 1: accounts, member, coach and admin roles, profiles with social links, and an admin area.
+This repository currently contains:
+
+- Phase 1: accounts, member, coach and admin roles, profiles with social links, and an admin area.
+- Phase 2: joining coaches, a video library, Tasks and Memos.
 
 ## Built with
 
 - [Next.js](https://nextjs.org) and TypeScript
 - [Supabase](https://supabase.com) for the database and logins
 - [Vercel](https://vercel.com) for hosting
+- [Cloudflare Stream](https://www.cloudflare.com/products/cloudflare-stream/) for video
 
 ## Run it on your computer
 
@@ -44,7 +48,11 @@ npm run test:db
 
 ## Keep account emails working
 
-Email links must use the templates in `supabase/templates`, or they only work in the browser that asked for them. The live project doesn't read those files. In the Supabase dashboard, go to Authentication > Emails and paste `confirmation.html` into "Confirm sign up" and `recovery.html` into "Reset password". Do this again whenever those files change.
+Email links must use the templates in `supabase/templates`, or they only work in the browser that asked for them. The live project doesn't read those files. Supabase only allows template changes once custom email sending (SMTP) is set up. After that, in the Supabase dashboard, go to Authentication > Emails and paste `confirmation.html` into "Confirm sign up" and `recovery.html` into "Reset password". Do this again whenever those files change.
+
+## Turn on video
+
+Videos are stored and played by Cloudflare Stream. Add the values listed in `.env.example` to `.env.local` on your computer and to the project's environment variables in Vercel. `CLOUDFLARE_STREAM_TOKEN` and `SUPABASE_SECRET_KEY` are secrets: never commit them or share them. The rest of the site works without Cloudflare, but coaches can't upload and videos won't play.
 
 ## Make someone the first admin
 
