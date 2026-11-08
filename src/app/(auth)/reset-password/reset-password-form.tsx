@@ -1,6 +1,11 @@
 "use client";
 
-import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
+import {
+  ActionForm,
+  Field,
+  FormStatus,
+  SubmitButton,
+} from "@/components/form-parts";
 import { updatePassword } from "../actions";
 
 export function ResetPasswordForm() {

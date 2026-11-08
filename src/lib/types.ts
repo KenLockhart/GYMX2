@@ -21,6 +21,8 @@ export type Profile = {
   focus: "mind" | "body" | "spirit" | null;
   onboarded_at: string | null;
   specialties: string[];
+  public_slug: string | null;
+  public_page: boolean;
   created_at: string;
   updated_at: string;
 };

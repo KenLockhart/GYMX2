@@ -20,7 +20,10 @@ function text(formData: FormData, name: string) {
   return typeof value === "string" ? value : "";
 }
 
-export async function signIn(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function signIn(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const parsed = signInSchema.safeParse({
     email: text(formData, "email"),
     password: text(formData, "password"),
@@ -29,12 +32,19 @@ export async function signIn(_: ActionState, formData: FormData): Promise<Action
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: "That email and password didn't match, or the email isn't confirmed yet." };
+  if (error)
+    return {
+      error:
+        "That email and password didn't match, or the email isn't confirmed yet.",
+    };
 
   redirect(safeRedirectPath(text(formData, "next")));
 }
 
-export async function signUp(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function signUp(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const parsed = signUpSchema.safeParse({
     display_name: text(formData, "display_name"),
     email: text(formData, "email"),
@@ -50,10 +60,14 @@ export async function signUp(_: ActionState, formData: FormData): Promise<Action
     password,
     options: {
       data: { display_name, coach_requested: String(coach_requested) },
-      emailRedirectTo: `${getSiteUrl()}/auth/confirm?next=/dashboard`,
+      emailRedirectTo: `${getSiteUrl()}/auth/confirm?next=${encodeURIComponent(safeRedirectPath(text(formData, "next")))}`,
     },
   });
-  if (error) return { error: "We couldn't create that account. Check your details or try logging in." };
+  if (error)
+    return {
+      error:
+        "We couldn't create that account. Check your details or try logging in.",
+    };
 
   // Came through an affiliate link? Credit them. (An email that already has an account comes back
   // with no identities, and isn't a new sign-up.)
@@ -78,7 +92,10 @@ export async function signOut() {
   redirect("/");
 }
 
-export async function requestPasswordReset(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function requestPasswordReset(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const parsed = emailSchema.safeParse({ email: text(formData, "email") });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -88,16 +105,27 @@ export async function requestPasswordReset(_: ActionState, formData: FormData): 
   });
 
   // The same reply either way, so this form can't reveal who has an account.
-  return { message: "If that email has an account, a reset link is on its way." };
+  return {
+    message: "If that email has an account, a reset link is on its way.",
+  };
 }
 
-export async function updatePassword(_: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = newPasswordSchema.safeParse({ password: text(formData, "password") });
+export async function updatePassword(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = newPasswordSchema.safeParse({
+    password: text(formData, "password"),
+  });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser(parsed.data);
-  if (error) return { error: "We couldn't update your password. Request a new reset link and try again." };
+  if (error)
+    return {
+      error:
+        "We couldn't update your password. Request a new reset link and try again.",
+    };
 
   redirect("/dashboard");
 }
