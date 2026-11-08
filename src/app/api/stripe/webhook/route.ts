@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { recordPurchase } from "@/lib/purchases";
+import { recordMembershipInvoice, syncSubscription, syncSubscriptionById } from "@/lib/membership-server";
 import { recordRefundFromCharge } from "@/lib/refunds";
 import { getStripe } from "@/lib/stripe";
 
@@ -15,6 +16,30 @@ export async function POST(request: NextRequest) {
     event = getStripe().webhooks.constructEvent(await request.text(), signature, secret);
   } catch {
     return new NextResponse("Invalid signature", { status: 400 });
+  }
+
+  // Memberships: keep each subscription's status in step, and record every paid invoice.
+  try {
+    if (
+      event.type === "customer.subscription.created" ||
+      event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.deleted"
+    ) {
+      await syncSubscription(event.data.object);
+      return NextResponse.json({ received: true });
+    }
+    if (event.type === "invoice.paid") {
+      const saved = await recordMembershipInvoice(event.data.object);
+      return saved ? NextResponse.json({ received: true }) : new NextResponse("Could not record invoice", { status: 500 });
+    }
+    if (event.type === "checkout.session.completed" && event.data.object.mode === "subscription") {
+      const subscription = event.data.object.subscription;
+      if (typeof subscription === "string") await syncSubscriptionById(subscription);
+      return NextResponse.json({ received: true });
+    }
+  } catch (error) {
+    console.error(error);
+    return new NextResponse("Could not update membership", { status: 500 });
   }
 
   if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {

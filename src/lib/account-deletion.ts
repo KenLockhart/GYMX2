@@ -2,6 +2,7 @@ import "server-only";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email";
 import { accountDeletedEmail } from "@/lib/email-templates";
+import { cancelAllMemberships } from "@/lib/membership-server";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { deleteVideo, isStreamConfigured } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -21,6 +22,16 @@ export async function deletionBlocker(person: { id: string; role: UserRole }) {
       .eq("seller_id", person.id);
     if ((count ?? 0) > 0) {
       return "You've sold items in the Armory, so we close coach accounts by hand to settle your buyers and payouts. Email support@gymx2.com and we'll take care of it.";
+    }
+  }
+  if (person.role === "coach") {
+    const { count: subscribers } = await createAdminClient()
+      .from("subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("coach_id", person.id)
+      .in("status", ["trialing", "active", "past_due"]);
+    if ((subscribers ?? 0) > 0) {
+      return "You have members on paid plans. Email support@gymx2.com so we can wind their memberships down before closing your account.";
     }
   }
   // Affiliates with commissions still owed are paid out first, by a person.
@@ -79,6 +90,7 @@ export async function deleteAccount(person: { id: string; email: string; name: s
   for (const [label, step] of [
     ["files", () => removeStoredFiles(person.id)],
     ["videos", () => removeVideos(person.id)],
+    ["memberships", () => cancelAllMemberships(person.id)],
     ["payout account", () => removePayoutAccount(person.id)],
   ] as const) {
     try {

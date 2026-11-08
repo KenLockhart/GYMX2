@@ -46,9 +46,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </Link>
             )}
             {profile.role === "coach" && (
-              <Link href="/members" className="hover:text-accent">
-                Members
-              </Link>
+              <>
+                <Link href="/members" className="hover:text-accent">
+                  Members
+                </Link>
+                <Link href="/plans" className="hover:text-accent">
+                  Memberships
+                </Link>
+              </>
             )}
             {profile.role === "admin" ? (
               <Link href="/admin/messages" className="hover:text-accent">

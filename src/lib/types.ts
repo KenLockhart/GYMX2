@@ -12,6 +12,7 @@ export type Profile = {
   x_url: string | null;
   website_url: string | null;
   email_updates: boolean;
+  join_mode: "free" | "paid" | "both";
   created_at: string;
   updated_at: string;
 };

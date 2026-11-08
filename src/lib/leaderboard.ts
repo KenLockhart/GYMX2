@@ -21,6 +21,7 @@ export type ActivityRows = {
     amount_cents: number;
     fee_cents: number;
     refunded_at: string | null;
+    kind?: string;
   }[];
 };
 
@@ -122,10 +123,14 @@ export function buildLeaderboards(rows: ActivityRows, limit = 10) {
     .sort((a, b) => b.cents - a.cents || b.sales - a.sales)
     .slice(0, limit);
 
-  const itemTotals = new Map<string, { id: string | null; title: string; sold: number; cents: number }>();
+  const itemTotals = new Map<
+    string,
+    { id: string | null; title: string; sold: number; cents: number; membership: boolean }
+  >();
   for (const sale of paid) {
-    const key = sale.item_id ?? `removed:${sale.item_title}`;
-    const row = itemTotals.get(key) ?? { id: sale.item_id, title: sale.item_title, sold: 0, cents: 0 };
+    const membership = sale.kind === "membership";
+    const key = sale.item_id ?? `${membership ? "membership" : "removed"}:${sale.item_title}`;
+    const row = itemTotals.get(key) ?? { id: sale.item_id, title: sale.item_title, sold: 0, cents: 0, membership };
     row.sold += 1;
     row.cents += sale.amount_cents;
     itemTotals.set(key, row);

@@ -8,7 +8,7 @@ import type { CheckoutState } from "@/lib/types";
 
 // Stripe.js is loaded once per page, the first time someone opens checkout.
 let stripePromise: Promise<Stripe | null> | null = null;
-function getStripeJs(publishableKey: string) {
+export function getStripeJs(publishableKey: string) {
   stripePromise ??= loadStripe(publishableKey);
   return stripePromise;
 }

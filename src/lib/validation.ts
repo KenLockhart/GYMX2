@@ -280,3 +280,18 @@ export const programSettingsSchema = z.object({
     .max(10000)
     .transform((dollars) => Math.round(dollars * 100)),
 });
+
+export const planSchema = z.object({
+  id: z.union([z.literal("").transform(() => null), z.uuid()]),
+  name: z.string().trim().min(1, "Name the plan.").max(60, "Use 60 characters or fewer for the name."),
+  description: z.string().trim().max(1000, "Use 1,000 characters or fewer."),
+  price: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/[$,\s]/g, ""))
+    .refine((value) => /^\d+(\.\d{1,2})?$/.test(value), { error: "Enter a monthly price like 29 or 29.99." })
+    .transform((value) => Math.round(Number(value) * 100))
+    .refine((cents) => cents >= 100 && cents <= 100000, { error: "Use a monthly price from $1 to $1,000." }),
+  trial: z.boolean(),
+  active: z.boolean(),
+});

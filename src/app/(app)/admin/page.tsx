@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { summarizeOverview, weekAgoIso, type OverviewSale } from "@/lib/admin-overview";
+import {
+  summarizeOverview,
+  weekAgoIso,
+  type OverviewSale,
+} from "@/lib/admin-overview";
 import { formatMoney } from "@/lib/armory";
 import { requireAdmin } from "@/lib/auth";
 import { groupForReview } from "@/lib/messages";
+import { hasAccess, monthlyRecurringCents } from "@/lib/memberships";
 import { createClient } from "@/lib/supabase/server";
 import type { AdminUser } from "@/lib/types";
 import { RoleForm } from "./role-form";
@@ -16,22 +21,27 @@ export default async function AdminPage() {
   // Admins can read every user, sale and message, so the overview needs no special access.
   const supabase = await createClient();
   const weekAgo = weekAgoIso();
-  const [{ data, error }, { data: salesData }, { data: messageData }] =
-    await Promise.all([
-      supabase.rpc("admin_list_users"),
-      supabase
-        .from("purchases")
-        .select(
-          "amount_cents, fee_cents, created_at, refunded_at, fulfillment_status",
-        )
-        .order("created_at", { ascending: false })
-        .limit(2000),
-      supabase
-        .from("messages")
-        .select("coach_id, member_id, sender_id, body, created_at")
-        .gte("created_at", weekAgo)
-        .limit(2000),
-    ]);
+  const [
+    { data, error },
+    { data: salesData },
+    { data: messageData },
+    { data: subscriptionData },
+  ] = await Promise.all([
+    supabase.rpc("admin_list_users"),
+    supabase
+      .from("purchases")
+      .select(
+        "amount_cents, fee_cents, created_at, refunded_at, fulfillment_status",
+      )
+      .order("created_at", { ascending: false })
+      .limit(2000),
+    supabase
+      .from("messages")
+      .select("coach_id, member_id, sender_id, body, created_at")
+      .gte("created_at", weekAgo)
+      .limit(2000),
+    supabase.from("subscriptions").select("status, price_cents").limit(10000),
+  ]);
   // Coach requests first, then newest sign-ups.
   const users = ((data ?? []) as AdminUser[]).toSorted(
     (a, b) =>
@@ -66,6 +76,16 @@ export default async function AdminPage() {
       label: "Sales this week",
       value: formatMoney(overview.weekSalesCents),
       detail: `${overview.weekSalesCount} ${overview.weekSalesCount === 1 ? "sale" : "sales"} · GYMX2 kept ${formatMoney(overview.weekKeptCents)}`,
+      href: "/armory/sales",
+    },
+    {
+      label: "Memberships",
+      value: formatMoney(
+        monthlyRecurringCents(
+          (subscriptionData ?? []) as { status: string; price_cents: number }[],
+        ),
+      ),
+      detail: `${((subscriptionData ?? []) as { status: string }[]).filter((row) => hasAccess(row.status)).length} live · monthly revenue`,
       href: "/armory/sales",
     },
     {
@@ -115,7 +135,7 @@ export default async function AdminPage() {
 
       <section
         aria-label="Overview"
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"
       >
         {tiles.map((tile) => (
           <Link
