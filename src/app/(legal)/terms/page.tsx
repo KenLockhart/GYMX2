@@ -165,8 +165,8 @@ export default function TermsPage() {
       <p>
         We may update these terms. If a change is significant, we will tell you by email or on the site before it
         takes effect. Using GYMX2 after that means you accept the new terms. If you have a problem with GYMX2,
-        please email us first so we can try to sort it out. These terms are governed by the laws of the United
-        States and of the state where GYMX2 is based, except where your local law gives you rights that
+        please email us first so we can try to sort it out. These terms are governed by the laws of the State of
+        Florida and applicable United States federal law, except where your local law gives you rights that
         can&rsquo;t be waived.
       </p>
 
