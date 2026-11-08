@@ -109,6 +109,27 @@ export default async function ProfilePage() {
       )}
 
       <section
+        aria-labelledby="your-data"
+        className="space-y-2 border-t border-border pt-8"
+      >
+        <h2 id="your-data" className="text-2xl">
+          Your data
+        </h2>
+        <p className="max-w-xl text-sm text-muted">
+          Download a copy of everything GYMX2 keeps about you: your profile,
+          messages, tracking, check-ins, purchases and more, as a JSON file you
+          can open in any text editor.
+        </p>
+        <a
+          href="/api/me/export"
+          download
+          className="btn-secondary inline-block"
+        >
+          Download my data
+        </a>
+      </section>
+
+      <section
         aria-labelledby="delete-account"
         className="space-y-4 border-t border-border pt-8"
       >

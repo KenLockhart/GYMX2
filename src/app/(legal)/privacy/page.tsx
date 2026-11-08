@@ -191,11 +191,12 @@ export default function PrivacyPage() {
           Order emails always send.
         </li>
         <li>
-          You can ask for a copy of your information, ask us to correct or
-          delete it, or ask us to close your account by emailing{" "}
-          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Depending on
-          where you live, you may have further rights under local law, and we
-          will honor them.
+          You can download a copy of your information any time from your Profile
+          page, and delete your account there too. You can also ask us for a
+          copy, ask us to correct or delete it, or ask us to close your account
+          by emailing <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+          Depending on where you live, you may have further rights under local
+          law, and we will honor them.
         </li>
       </ul>
 
