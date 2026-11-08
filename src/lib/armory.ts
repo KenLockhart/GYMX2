@@ -8,7 +8,7 @@ export const ARMORY_CATEGORIES = [
 ] as const;
 
 export type ArmoryCategory = (typeof ARMORY_CATEGORIES)[number]["value"];
-export type ArmoryKind = "link" | "download";
+export type ArmoryKind = "link" | "download" | "paid";
 
 export function categoryLabel(category: string) {
   return ARMORY_CATEGORIES.find((item) => item.value === category)?.label ?? "Other";
@@ -79,4 +79,18 @@ export function publicImageUrl(supabaseUrl: string, path: string | null) {
 export function describeSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// GYMX2 keeps 10% of each coach sale. Sales of GYMX2's own items have no split.
+export const PLATFORM_FEE_PERCENT = 10;
+
+export function platformFeeCents(amountCents: number) {
+  return Math.round((amountCents * PLATFORM_FEE_PERCENT) / 100);
+}
+
+export const MIN_PAID_PRICE_CENTS = 100;
+
+// Money amounts in reports, where zero shows as $0.00 rather than "Free".
+export function formatMoney(cents: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }

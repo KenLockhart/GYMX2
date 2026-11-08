@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArmoryForm } from "@/components/armory-form";
 import { requireCoachOrAdmin } from "@/lib/auth";
+import { loadPayoutStatus } from "../payout-status";
 
 export const metadata: Metadata = { title: "Add to the Armory" };
 
 export default async function NewArmoryItemPage() {
   const { profile } = await requireCoachOrAdmin();
+  const payouts = await loadPayoutStatus(profile);
 
   return (
     <div className="space-y-6">
@@ -19,6 +21,7 @@ export default async function NewArmoryItemPage() {
       )}
       <ArmoryForm
         submitLabel="Add item"
+        payouts={payouts}
         initial={{
           id: "",
           kind: "link",

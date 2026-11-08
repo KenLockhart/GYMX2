@@ -3,19 +3,33 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
 import { requireAccount } from "@/lib/auth";
-import { categoryLabel, formatPrice, publicImageUrl } from "@/lib/armory";
+import { PLATFORM_FEE_PERCENT, categoryLabel, formatPrice, publicImageUrl } from "@/lib/armory";
+import { confirmCheckoutSession } from "@/lib/purchases";
+import { isStripeTestMode } from "@/lib/stripe";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmoryItem } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
 import { removeArmoryItem } from "../actions";
+import { buyArmoryItem } from "../payments";
 
 export const metadata: Metadata = { title: "The Armory" };
 
-export default async function ArmoryItemPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ArmoryItemPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { profile } = await requireAccount();
   const { id } = await params;
   if (!idSchema.safeParse(id).success) notFound();
+  const query = await searchParams;
+
+  // Back from Stripe: record the payment now, so the download works without waiting for the webhook.
+  const returnedSession = query.purchase === "done" && typeof query.session_id === "string" ? query.session_id : null;
+  if (returnedSession) await confirmCheckoutSession(returnedSession, profile.id);
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -27,6 +41,15 @@ export default async function ArmoryItemPage({ params }: { params: Promise<{ id:
   if (!item) notFound();
 
   const isOwner = item.coach_id === profile.id;
+  const [{ data: owned }, { count: salesCount }] = await Promise.all([
+    item.kind === "paid" && !isOwner
+      ? supabase.from("purchases").select("id").eq("item_id", item.id).eq("member_id", profile.id).limit(1)
+      : Promise.resolve({ data: [] }),
+    item.kind === "paid" && isOwner
+      ? supabase.from("purchases").select("id", { count: "exact", head: true }).eq("item_id", item.id)
+      : Promise.resolve({ count: null }),
+  ]);
+  const hasBought = Boolean(owned?.length);
   const canRemove = isOwner || profile.role === "admin";
   const image = publicImageUrl(getSupabaseEnv().url, item.image_path);
   const price = formatPrice(item.price_cents);
@@ -73,6 +96,53 @@ export default async function ArmoryItemPage({ params }: { params: Promise<{ id:
               </a>
               <p className="text-xs text-muted">Opens the seller&apos;s shop in a new tab. Payment happens there, not on GYMX2.</p>
             </div>
+          ) : item.kind === "paid" ? (
+            <div className="space-y-2">
+              {returnedSession && hasBought && (
+                <p role="status" className="rounded-lg border border-accent bg-surface p-3 text-sm">
+                  Thanks for your purchase! Your download is ready.
+                </p>
+              )}
+              {returnedSession && !hasBought && (
+                <p role="status" className="rounded-lg border border-border bg-surface p-3 text-sm">
+                  We&apos;re confirming your payment. Refresh this page in a moment.
+                </p>
+              )}
+              {hasBought || isOwner || profile.role === "admin" ? (
+                <>
+                  <p className="text-2xl font-semibold">
+                    {hasBought ? "You own this" : price}
+                  </p>
+                  <a href={`/armory/${item.id}/download`} className="btn-primary">
+                    Download
+                  </a>
+                  {item.file_name && <p className="text-xs text-muted">{item.file_name}</p>}
+                  {isOwner && (
+                    <p className="text-sm text-muted">
+                      {salesCount ?? 0} {salesCount === 1 ? "sale" : "sales"} ·{" "}
+                      <Link href="/armory/sales" className="text-link">
+                        See your sales
+                      </Link>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-2xl font-semibold">{price}</p>
+                  <ActionForm action={buyArmoryItem} className="space-y-2">
+                    <input type="hidden" name="item_id" value={item.id} />
+                    <SubmitButton pendingText="Opening checkout..." className="btn-primary">
+                      Buy for {price}
+                    </SubmitButton>
+                    <FormStatus />
+                  </ActionForm>
+                  <p className="text-xs text-muted">
+                    Secure card payment by Stripe. The download unlocks as soon as you pay.
+                    {isStripeTestMode() && " Test mode: use card 4242 4242 4242 4242, any future date and any CVC."}
+                  </p>
+                </>
+              )}
+            </div>
           ) : (
             <div className="space-y-2">
               <p className="text-2xl font-semibold">Free</p>
@@ -94,7 +164,11 @@ export default async function ArmoryItemPage({ params }: { params: Promise<{ id:
               )}
               <ActionForm
                 action={removeArmoryItem}
-                confirmMessage={`Remove "${item.title}" from the Armory? Its files will be deleted too.`}
+                confirmMessage={
+                  item.kind === "paid"
+                    ? `Remove "${item.title}"? Its files will be deleted, so past buyers won't be able to download it again.`
+                    : `Remove "${item.title}" from the Armory? Its files will be deleted too.`
+                }
                 className="space-y-2"
               >
                 <input type="hidden" name="item_id" value={item.id} />
@@ -103,6 +177,11 @@ export default async function ArmoryItemPage({ params }: { params: Promise<{ id:
                 </SubmitButton>
                 <FormStatus />
               </ActionForm>
+              {isOwner && item.kind === "paid" && item.coach?.role === "coach" && (
+                <p className="w-full text-xs text-muted">
+                  You get each sale minus GYMX2&apos;s {PLATFORM_FEE_PERCENT}% fee and Stripe&apos;s card fees.
+                </p>
+              )}
               {isOwner && (
                 <p className="w-full text-xs text-muted">
                   {item.visible_to_all ? "Everyone on GYMX2 can see this." : "Only members who joined you can see this."}
