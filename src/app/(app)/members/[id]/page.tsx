@@ -9,6 +9,8 @@ import { BadgeRow } from "@/components/game-parts";
 import { loadBadges } from "@/lib/achievements-data";
 import { PILLARS, type Pillar } from "@/lib/achievements";
 import { lastDays, nutritionAverages, pillarSummary, weightChange } from "@/lib/tracking";
+import { loadProgressPhotos } from "@/lib/photos";
+import { PhotoGallery } from "@/components/photo-gallery";
 
 export const metadata: Metadata = { title: "Member" };
 
@@ -52,6 +54,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       supabase.from("nutrition_logs").select("day, protein_g, calories, water_glasses").eq("user_id", id).gte("day", week[0]),
     ]);
   const shares = Boolean(sharing?.share_tracking);
+  const photos = shares ? await loadProgressPhotos(id, 24) : [];
   const pillarWeek = pillarSummary(
     (habitData ?? []) as { id: string; pillar: Pillar }[],
     (habitLogData ?? []) as { habit_id: string; day: string }[],
@@ -185,6 +188,12 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
               </p>
             </div>
           </dl>
+        )}
+        {shares && photos.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xl">Progress photos</h3>
+            <PhotoGallery photos={photos} />
+          </div>
         )}
       </section>
     </div>

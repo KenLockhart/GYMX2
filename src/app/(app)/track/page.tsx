@@ -8,7 +8,10 @@ import {
 } from "@/components/form-parts";
 import { PillarTag } from "@/components/game-parts";
 import { HabitGrid } from "@/components/habit-grid";
+import { PhotoGallery } from "@/components/photo-gallery";
+import { PhotoUpload } from "@/components/photo-upload";
 import { WeightChart } from "@/components/weight-chart";
+import { loadProgressPhotos } from "@/lib/photos";
 import { PILLARS, type Pillar } from "@/lib/achievements";
 import { requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +26,7 @@ import {
 } from "@/lib/tracking";
 import {
   addHabit,
+  deleteProgressPhoto,
   removeHabit,
   saveBodyLog,
   saveNutritionLog,
@@ -111,6 +115,7 @@ export default async function TrackPage() {
   const averages = nutritionAverages(nutritionLogs, week);
   const names = new Set(habits.map((habit) => habit.name.toLowerCase()));
   const dayLabels = week.map(weekdayLabel);
+  const photos = await loadProgressPhotos(profile.id);
 
   return (
     <div className="space-y-12">
@@ -398,6 +403,38 @@ export default async function TrackPage() {
             )}
           </div>
         </div>
+      </section>
+
+      {/* Progress photos */}
+      <section className="space-y-4" aria-labelledby="photos">
+        <div>
+          <h2 id="photos" className="text-3xl">
+            Progress photos
+          </h2>
+          <p className="text-sm text-muted">
+            Private by default. Same pose, same light, every few weeks shows change the scale can&apos;t.
+            {profile.share_tracking ? " Your coaches can see these." : ""}
+          </p>
+        </div>
+        <PhotoUpload today={today} />
+        {photos.length === 0 ? (
+          <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
+            No photos yet. Add a front photo to start; after your second, you&apos;ll see first and latest side by
+            side.
+          </p>
+        ) : (
+          <PhotoGallery
+            photos={photos}
+            renderDelete={(photo) => (
+              <ActionForm action={deleteProgressPhoto} confirmMessage="Delete this photo for good?">
+                <input type="hidden" name="photo_id" value={photo.id} />
+                <SubmitButton pendingText="Deleting..." className="text-xs text-muted hover:text-danger">
+                  Delete
+                </SubmitButton>
+              </ActionForm>
+            )}
+          />
+        )}
       </section>
 
       {/* Nutrition */}
