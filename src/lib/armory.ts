@@ -141,4 +141,19 @@ export const fulfillmentLabel: Record<string, string> = {
   not_needed: "Digital",
   to_ship: "To ship",
   shipped: "Shipped",
+  cancelled: "Cancelled",
 };
+
+// What a buyer sees for one of their orders.
+export function orderStatusLabel(order: {
+  fulfillment_status: string;
+  tracking_number: string | null;
+  refunded_at: string | null;
+}) {
+  if (order.refunded_at) return order.fulfillment_status === "shipped" ? "Shipped · Refunded" : "Refunded";
+  if (order.fulfillment_status === "shipped") {
+    return `Shipped${order.tracking_number ? ` · Tracking ${order.tracking_number}` : ""}`;
+  }
+  if (order.fulfillment_status === "to_ship") return "Preparing to ship";
+  return "Paid";
+}

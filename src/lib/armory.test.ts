@@ -7,6 +7,7 @@ import {
   addressLines,
   formatMoney,
   formatPrice,
+  orderStatusLabel,
   isCategory,
   parsePrice,
   parseSizes,
@@ -145,5 +146,19 @@ describe("categoriesFor", () => {
   it("offers Gear for gear and shop links", () => {
     expect(categoriesFor("product").map((c) => c.value)).toContain("gear");
     expect(categoriesFor("link").map((c) => c.value)).toContain("gear");
+  });
+});
+
+describe("orderStatusLabel", () => {
+  const order = { fulfillment_status: "to_ship", tracking_number: null, refunded_at: null };
+
+  it.each([
+    [order, "Preparing to ship"],
+    [{ ...order, fulfillment_status: "shipped", tracking_number: "1Z9" }, "Shipped · Tracking 1Z9"],
+    [{ ...order, fulfillment_status: "cancelled", refunded_at: "2026-11-08" }, "Refunded"],
+    [{ ...order, fulfillment_status: "shipped", refunded_at: "2026-11-08" }, "Shipped · Refunded"],
+    [{ ...order, fulfillment_status: "not_needed" }, "Paid"],
+  ])("labels %o", (input, label) => {
+    expect(orderStatusLabel(input)).toBe(label);
   });
 });

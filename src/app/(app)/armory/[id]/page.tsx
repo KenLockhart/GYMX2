@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
 import { requireAccount } from "@/lib/auth";
-import { PLATFORM_FEE_PERCENT, categoryLabel, formatMoney, formatPrice, publicImageUrl } from "@/lib/armory";
+import { PLATFORM_FEE_PERCENT, categoryLabel, orderStatusLabel, formatMoney, formatPrice, publicImageUrl } from "@/lib/armory";
 import { confirmCheckoutSession } from "@/lib/purchases";
 import { BuyPanel } from "@/components/buy-panel";
 import { isStripeTestMode, stripePublishableKey } from "@/lib/stripe";
@@ -46,7 +46,7 @@ export default async function ArmoryItemPage({
     isSold && !isOwner
       ? supabase
           .from("purchases")
-          .select("id, size, fulfillment_status, tracking_number, created_at")
+          .select("id, size, fulfillment_status, tracking_number, created_at, refunded_at")
           .eq("item_id", item.id)
           .eq("member_id", profile.id)
           .order("created_at", { ascending: false })
@@ -61,8 +61,10 @@ export default async function ArmoryItemPage({
     fulfillment_status: string;
     tracking_number: string | null;
     created_at: string;
+    refunded_at: string | null;
   }[];
-  const hasBought = myOrders.length > 0;
+  // A refunded purchase no longer counts: the download stops and the buyer can buy again.
+  const hasBought = myOrders.some((order) => !order.refunded_at);
   const canRemove = isOwner || profile.role === "admin";
   const image = publicImageUrl(getSupabaseEnv().url, item.image_path);
   const price = formatPrice(item.price_cents);
@@ -153,7 +155,7 @@ export default async function ArmoryItemPage({
                   </p>
                 </>
               )}
-              {hasBought && (
+              {myOrders.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-semibold">Your orders</p>
                   <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
@@ -168,9 +170,7 @@ export default async function ArmoryItemPage({
                           {order.size && ` · Size ${order.size}`}
                         </span>
                         <span className={order.fulfillment_status === "shipped" ? "text-success" : "text-muted"}>
-                          {order.fulfillment_status === "shipped"
-                            ? `Shipped${order.tracking_number ? ` · Tracking ${order.tracking_number}` : ""}`
-                            : "Preparing to ship"}
+                          {orderStatusLabel(order)}
                         </span>
                       </li>
                     ))}
