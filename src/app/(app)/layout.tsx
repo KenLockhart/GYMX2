@@ -57,6 +57,9 @@ export default async function AppLayout({
                 <Link href="/plans" className="hover:text-accent">
                   Memberships
                 </Link>
+                <Link href="/insights" className="hover:text-accent">
+                  Insights
+                </Link>
               </>
             )}
             {profile.role === "admin" ? (
