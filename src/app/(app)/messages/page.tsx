@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireAccount } from "@/lib/auth";
 import { preview, summarizeConversations } from "@/lib/messages";
 import { createClient } from "@/lib/supabase/server";
@@ -11,16 +12,7 @@ export const metadata: Metadata = { title: "Messages" };
 export default async function MessagesPage() {
   const { profile } = await requireAccount();
 
-  if (profile.role === "admin") {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-5xl">Messages</h1>
-        <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-          Messages are private between coaches and their members, so admins don&apos;t have an inbox.
-        </p>
-      </div>
-    );
-  }
+  if (profile.role === "admin") redirect("/admin/messages");
 
   const supabase = await createClient();
   const [{ contacts, error: contactError }, messageResult] = await Promise.all([
@@ -54,7 +46,9 @@ export default async function MessagesPage() {
       <div>
         <h1 className="text-5xl">Messages</h1>
         <p className="mt-2 max-w-xl text-muted">
-          {isCoach ? "Private conversations with your members." : "Private conversations with your coaches."}
+          {isCoach ? "Conversations with your members." : "Conversations with your coaches."} Only the
+          two of you and GYMX2 admins can read them. Admins may review conversations to keep coaches
+          and members safe.
         </p>
       </div>
 

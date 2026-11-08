@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Conversation" };
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const { profile } = await requireAccount();
-  if (profile.role === "admin") redirect("/messages");
+  if (profile.role === "admin") redirect("/admin/messages");
   const { id } = await params;
   if (!idSchema.safeParse(id).success) notFound();
 

@@ -48,3 +48,42 @@ export function preview(body: string, length = 80) {
   const oneLine = body.replace(/\s+/g, " ").trim();
   return oneLine.length > length ? `${oneLine.slice(0, length - 1)}…` : oneLine;
 }
+
+export type ReviewConversation = {
+  coach_id: string;
+  member_id: string;
+  coach_name: string;
+  member_name: string;
+  count: number;
+  last: Pick<Message, "body" | "created_at" | "sender_id">;
+};
+
+// For admin review: one row per coach and member pair, most recently active first.
+export function groupForReview(
+  messages: (Pick<Message, "coach_id" | "member_id" | "sender_id" | "body" | "created_at"> & {
+    coach?: { display_name: string } | null;
+    member?: { display_name: string } | null;
+  })[],
+): ReviewConversation[] {
+  const byPair = new Map<string, ReviewConversation>();
+  for (const message of messages) {
+    const key = `${message.coach_id}:${message.member_id}`;
+    const row = byPair.get(key);
+    if (!row) {
+      byPair.set(key, {
+        coach_id: message.coach_id,
+        member_id: message.member_id,
+        coach_name: message.coach?.display_name ?? "Unknown coach",
+        member_name: message.member?.display_name ?? "Unknown member",
+        count: 1,
+        last: { body: message.body, created_at: message.created_at, sender_id: message.sender_id },
+      });
+      continue;
+    }
+    row.count += 1;
+    if (message.created_at > row.last.created_at) {
+      row.last = { body: message.body, created_at: message.created_at, sender_id: message.sender_id };
+    }
+  }
+  return [...byPair.values()].sort((a, b) => b.last.created_at.localeCompare(a.last.created_at));
+}

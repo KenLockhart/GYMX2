@@ -47,7 +47,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Members
               </Link>
             )}
-            {profile.role !== "admin" && (
+            {profile.role === "admin" ? (
+              <Link href="/admin/messages" className="hover:text-accent">
+                Messages
+              </Link>
+            ) : (
               <Link href="/messages" className="inline-flex items-center gap-1.5 hover:text-accent">
                 Messages
                 {unread > 0 && (

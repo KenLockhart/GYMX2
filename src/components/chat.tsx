@@ -169,6 +169,7 @@ export function Chat({
               {error}
             </p>
           )}
+          <p className="text-xs text-muted">GYMX2 admins may review conversations to keep everyone safe.</p>
         </form>
       ) : (
         <p className="border-t border-border p-4 text-sm text-muted">

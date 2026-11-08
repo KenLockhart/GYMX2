@@ -1,5 +1,5 @@
 begin;
-select plan(17);
+select plan(18);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('40000000-0000-0000-0000-000000000001', 'msg-admin@example.test', '{"display_name":"Admin"}'),
@@ -101,7 +101,13 @@ reset role;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"40000000-0000-0000-0000-000000000001","role":"authenticated"}';
-select is((select count(*)::int from public.messages), 0, 'an admin cannot read private messages');
+select is((select count(*)::int from public.messages), 2, 'an admin can review the conversation');
+select throws_ok(
+  $$select public.send_message('40000000-0000-0000-0000-000000000004', 'Admin here')$$,
+  'P0001',
+  'You can only message your coaches and your members',
+  'an admin cannot send messages in someone else''s conversation'
+);
 reset role;
 
 -- History stays after leaving, but no new messages

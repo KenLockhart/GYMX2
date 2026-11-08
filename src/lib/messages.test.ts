@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { otherPerson, preview, summarizeConversations } from "./messages";
+import { groupForReview, otherPerson, preview, summarizeConversations } from "./messages";
 
 const me = "coach";
 const message = (overrides: Partial<{
@@ -78,5 +78,21 @@ describe("preview", () => {
 
   it("shortens long messages", () => {
     expect(preview("a".repeat(100), 10)).toBe(`${"a".repeat(9)}…`);
+  });
+});
+
+describe("groupForReview", () => {
+  const rows = groupForReview([
+    { ...message({ member_id: "ana", body: "Old", created_at: "2026-11-08T08:00:00Z" }), coach: { display_name: "Coach" }, member: { display_name: "Ana" } },
+    { ...message({ member_id: "ben", body: "Newest", created_at: "2026-11-08T12:00:00Z" }), coach: { display_name: "Coach" }, member: { display_name: "Ben" } },
+    { ...message({ member_id: "ana", body: "Later", created_at: "2026-11-08T09:00:00Z" }), coach: { display_name: "Coach" }, member: { display_name: "Ana" } },
+  ]);
+
+  it("makes one row per coach and member pair, most recent first", () => {
+    expect(rows.map((row) => row.member_name)).toEqual(["Ben", "Ana"]);
+  });
+
+  it("counts messages and keeps the latest", () => {
+    expect(rows[1]).toMatchObject({ count: 2, last: { body: "Later" } });
   });
 });
