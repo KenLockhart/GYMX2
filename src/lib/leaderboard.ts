@@ -11,6 +11,7 @@ export type ActivityRows = {
   sessions: { coach_id: string }[]; // sessions coaches scheduled
   messages: { sender_id: string }[];
   memos: { user_id: string }[];
+  habits: { user_id: string }[]; // daily habit check-ins
   videos: { coach_id: string }[];
   joins: { coach_id: string; member_id: string }[]; // members who joined a coach
   sales: {
@@ -26,7 +27,7 @@ export type ActivityRows = {
 };
 
 // How much each action counts toward an activity score. Shown on the page so the ranking is clear.
-export const MEMBER_POINTS = { tasks: 3, sessions: 2, messages: 1, memos: 1 } as const;
+export const MEMBER_POINTS = { tasks: 3, sessions: 2, messages: 1, memos: 1, habits: 1 } as const;
 export const COACH_POINTS = { videos: 3, newMembers: 3, sessions: 2, tasks: 1, messages: 1 } as const;
 
 function tally<T>(rows: T[], key: (row: T) => string | null) {
@@ -46,6 +47,7 @@ export function buildLeaderboards(rows: ActivityRows, limit = 10) {
   const going = tally(rows.going, (row) => row.member_id);
   const sent = tally(rows.messages, (row) => row.sender_id);
   const memos = tally(rows.memos, (row) => row.user_id);
+  const habits = tally(rows.habits, (row) => row.user_id);
   const videos = tally(rows.videos, (row) => row.coach_id);
   const scheduled = tally(rows.sessions, (row) => row.coach_id);
   const assigned = tally(rows.assigned, (row) => row.coach_id);
@@ -58,12 +60,14 @@ export function buildLeaderboards(rows: ActivityRows, limit = 10) {
         sessions: going.get(person.id) ?? 0,
         messages: sent.get(person.id) ?? 0,
         memos: memos.get(person.id) ?? 0,
+        habits: habits.get(person.id) ?? 0,
       };
       const score =
         stats.tasks * MEMBER_POINTS.tasks +
         stats.sessions * MEMBER_POINTS.sessions +
         stats.messages * MEMBER_POINTS.messages +
-        stats.memos * MEMBER_POINTS.memos;
+        stats.memos * MEMBER_POINTS.memos +
+        stats.habits * MEMBER_POINTS.habits;
       return { id: person.id, name: person.display_name, ...stats, score };
     })
     .filter((row) => row.score > 0)

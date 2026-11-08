@@ -18,6 +18,7 @@ const rows: ActivityRows = {
   sessions: [{ coach_id: "lia" }],
   messages: [{ sender_id: "ana" }, { sender_id: "ken" }, { sender_id: "admin" }],
   memos: [{ user_id: "cy" }],
+  habits: [],
   videos: [{ coach_id: "ken" }],
   joins: [{ coach_id: "lia", member_id: "ana" }],
   sales: [

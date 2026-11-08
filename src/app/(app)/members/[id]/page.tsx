@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Memo } from "@/lib/types";
 import { BadgeRow } from "@/components/game-parts";
 import { loadBadges } from "@/lib/achievements-data";
+import { PILLARS, type Pillar } from "@/lib/achievements";
+import { lastDays, nutritionAverages, pillarSummary, weightChange } from "@/lib/tracking";
 
 export const metadata: Metadata = { title: "Member" };
 
@@ -33,6 +35,35 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
   } | null)?.member;
   if (!member) notFound();
   const badges = (await loadBadges([id])).get(id) ?? [];
+
+  // Tracking shows only if the member chose to share it; row security enforces the same.
+  const week = lastDays(7);
+  const [{ data: sharing }, { data: habitData }, { data: habitLogData }, { data: bodyData }, { data: foodData }] =
+    await Promise.all([
+      supabase.from("profiles").select("share_tracking, protein_target_g, calorie_target").eq("id", id).maybeSingle(),
+      supabase.from("habits").select("id, pillar").eq("user_id", id).eq("active", true),
+      supabase.from("habit_logs").select("habit_id, day").eq("user_id", id).gte("day", week[0]),
+      supabase
+        .from("body_logs")
+        .select("day, weight_lb")
+        .eq("user_id", id)
+        .gte("day", lastDays(90)[0])
+        .order("day"),
+      supabase.from("nutrition_logs").select("day, protein_g, calories, water_glasses").eq("user_id", id).gte("day", week[0]),
+    ]);
+  const shares = Boolean(sharing?.share_tracking);
+  const pillarWeek = pillarSummary(
+    (habitData ?? []) as { id: string; pillar: Pillar }[],
+    (habitLogData ?? []) as { habit_id: string; day: string }[],
+    week,
+  );
+  const weighIns = ((bodyData ?? []) as { day: string; weight_lb: string | null }[]).filter((row) => row.weight_lb !== null);
+  const latestWeight = weighIns.at(-1);
+  const monthChange = weightChange(weighIns, lastDays(30)[0]);
+  const food = nutritionAverages(
+    (foodData ?? []) as { day: string; protein_g: number | null; calories: number | null; water_glasses: number | null }[],
+    week,
+  );
 
   const [assignmentResult, memoResult] = await Promise.all([
     supabase
@@ -116,6 +147,44 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
               </li>
             ))}
           </ul>
+        )}
+      </section>
+      <section className="space-y-3">
+        <h2 className="text-2xl">Tracking</h2>
+        {!shares ? (
+          <p className="rounded-lg border border-border bg-surface p-4 text-muted">
+            {member.display_name} hasn&apos;t shared their habits, body measurements or nutrition with coaches.
+          </p>
+        ) : (
+          <dl className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {PILLARS.map((pillar) => {
+              const row = pillarWeek[pillar.value];
+              return (
+                <div key={pillar.value} className="rounded-lg border border-border bg-surface p-3">
+                  <dt className="text-sm text-muted">{pillar.label} habits, 7 days</dt>
+                  <dd className="text-2xl font-semibold">
+                    {row.possible ? `${Math.round((row.done / row.possible) * 100)}%` : "–"}
+                  </dd>
+                </div>
+              );
+            })}
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <dt className="text-sm text-muted">Weight</dt>
+              <dd className="text-2xl font-semibold">{latestWeight ? `${latestWeight.weight_lb} lb` : "–"}</dd>
+              {monthChange !== null && (
+                <p className="text-xs text-muted">
+                  {monthChange === 0 ? "No change" : `${monthChange > 0 ? "+" : ""}${monthChange} lb`} in 30 days
+                </p>
+              )}
+            </div>
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <dt className="text-sm text-muted">Protein, 7-day average</dt>
+              <dd className="text-2xl font-semibold">{food.protein === null ? "–" : `${food.protein}g`}</dd>
+              <p className="text-xs text-muted">
+                {sharing?.protein_target_g ? `Target ${sharing.protein_target_g}g · ` : ""}logged {food.logged} of 7 days
+              </p>
+            </div>
+          </dl>
         )}
       </section>
     </div>

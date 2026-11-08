@@ -87,6 +87,11 @@ const member: MemberActivity = {
   messages: [at("2026-11-05")],
   purchases: 1,
   coaches: 1,
+  habits: [
+    { day: "2026-11-08", pillar: "mind" },
+    { day: "2026-11-08", pillar: "body" },
+    { day: "2026-11-08", pillar: "spirit" },
+  ],
 };
 
 describe("memberChallenges", () => {
@@ -106,13 +111,14 @@ describe("memberProgress", () => {
   const progress = memberProgress(member, now);
 
   it("scores points like the leaderboard", () => {
-    // 4 tasks x3 + 1 session x2 + 1 message + 3 memos = 18
-    expect(progress.points).toBe(18);
+    // 4 tasks x3 + 1 session x2 + 1 message + 3 memos + 3 habit check-ins = 21
+    expect(progress.points).toBe(21);
     expect(progress.level.name).toBe("Rookie");
   });
 
   it("tracks the streak across all kinds of activity", () => {
-    expect(progress.streak).toMatchObject({ current: 3, activeToday: true });
+    // Nov 8 (habits) through Nov 11.
+    expect(progress.streak).toMatchObject({ current: 4, activeToday: true });
   });
 
   it("awards the badges that were earned", () => {

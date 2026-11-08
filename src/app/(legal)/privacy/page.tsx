@@ -33,6 +33,13 @@ export default function PrivacyPage() {
           messages between coaches and members.
         </li>
         <li>
+          <strong>Tracking:</strong> the habits you check off, body measurements
+          (such as weight, body fat and waist) and nutrition notes you choose to
+          log. Only you can see them unless you turn on sharing with your
+          coaches. GYMX2 admins can&rsquo;t see them, and we use them only to
+          show you your progress.
+        </li>
+        <li>
           <strong>What you upload:</strong> videos, files and images, such as
           training videos and Armory items.
         </li>

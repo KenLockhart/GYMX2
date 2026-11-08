@@ -16,7 +16,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function loadMemberActivity(userId: string): Promise<MemberActivity> {
   const db = createAdminClient();
-  const [completions, memos, going, messages, purchases, coaches] =
+  const [completions, memos, going, messages, purchases, coaches, habits] =
     await Promise.all([
       db
         .from("task_assignments")
@@ -46,9 +46,17 @@ export async function loadMemberActivity(userId: string): Promise<MemberActivity
         .from("coach_members")
         .select("coach_id", { count: "exact", head: true })
         .eq("member_id", userId),
+      db
+        .from("habit_logs")
+        .select("day, habit:habits(pillar)")
+        .eq("user_id", userId)
+        .limit(10000),
     ]);
 
   return {
+    habits: (
+      (habits.data ?? []) as unknown as { day: string; habit: { pillar: string } | null }[]
+    ).flatMap((row) => (isPillar(row.habit?.pillar) ? [{ day: row.day, pillar: row.habit.pillar }] : [])),
     completions: (
       (completions.data ?? []) as unknown as {
         completed_at: string;

@@ -133,8 +133,8 @@ export default async function LeaderboardPage({
       <div className="grid gap-8 xl:grid-cols-2">
         <Board
           title="Most active members"
-          note={`Points: task done ${MEMBER_POINTS.tasks} · session RSVP ${MEMBER_POINTS.sessions} · message ${MEMBER_POINTS.messages} · memo ${MEMBER_POINTS.memos}`}
-          columns={["Tasks done", "Sessions", "Messages", "Memos", "Score"]}
+          note={`Points: task done ${MEMBER_POINTS.tasks} · session RSVP ${MEMBER_POINTS.sessions} · message ${MEMBER_POINTS.messages} · memo ${MEMBER_POINTS.memos} · habit ${MEMBER_POINTS.habits}`}
+          columns={["Tasks done", "Sessions", "Messages", "Memos", "Habits", "Score"]}
           rows={boards.members.map((row) => ({
             key: row.id,
             name: row.name,
@@ -143,6 +143,7 @@ export default async function LeaderboardPage({
               row.sessions,
               row.messages,
               row.memos,
+              row.habits,
               row.score,
             ],
           }))}
