@@ -24,6 +24,8 @@ import {
   todayKey,
   tomorrowKey,
 } from "@/lib/reminders";
+import { unlockedThrough } from "@/lib/programs";
+import { sendPush } from "@/lib/push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 
@@ -302,10 +304,79 @@ async function remindStreaks(now: Date) {
   return sent;
 }
 
+// Members with notifications on hear when today's program day unlocks (day 2 onward), once.
+async function pushProgramDays(now: Date) {
+  const db = createAdminClient();
+  const { data: devices } = await db
+    .from("push_subscriptions")
+    .select("user_id")
+    .limit(20000);
+  const userIds = [
+    ...new Set((devices ?? []).map((row) => row.user_id as string)),
+  ];
+  if (userIds.length === 0) return 0;
+
+  const today = todayKey(now);
+  let sent = 0;
+  for (let start = 0; start < userIds.length; start += 200) {
+    const { data } = await db
+      .from("program_enrollments")
+      .select(
+        "id, member_id, started_on, program:programs(id, title, program_days(id, day_number, title)), program_day_completions(day_id)",
+      )
+      .in("member_id", userIds.slice(start, start + 200))
+      .is("completed_at", null)
+      .limit(5000);
+    const rows = (data ?? []) as unknown as {
+      id: string;
+      member_id: string;
+      started_on: string;
+      program: {
+        id: string;
+        title: string;
+        program_days: { id: string; day_number: number; title: string }[];
+      } | null;
+      program_day_completions: { day_id: string }[];
+    }[];
+    for (const row of rows) {
+      const dayNumber = unlockedThrough(row.started_on, today);
+      const day = row.program?.program_days.find(
+        (item) => item.day_number === dayNumber,
+      );
+      if (
+        dayNumber < 2 ||
+        !day ||
+        row.program_day_completions.some((done) => done.day_id === day.id)
+      )
+        continue;
+      const { data: claimed } = await db
+        .from("reminder_log")
+        .upsert(
+          {
+            user_id: row.member_id,
+            kind: "program",
+            ref: `${row.id}:${dayNumber}`,
+          },
+          { onConflict: "user_id,kind,ref", ignoreDuplicates: true },
+        )
+        .select("user_id");
+      if (!claimed?.length) continue;
+      sent += await sendPush([row.member_id], {
+        title: `Day ${dayNumber} is ready`,
+        body: `${row.program?.title}: ${day.title}`,
+        url: `/programs/${row.program?.id}`,
+        tag: `program-${row.id}`,
+      });
+    }
+  }
+  return sent;
+}
+
 export async function runMorningReminders(now = new Date()) {
   const result = {
     sessions: await remindSessions(now),
     tasks: await remindTasks(now),
+    programDays: await pushProgramDays(now),
     weekly: 0,
   };
   if (isMonday(now)) result.weekly = await sendWeeklyDigests(now);

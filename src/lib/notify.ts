@@ -12,6 +12,7 @@ import {
   sessionEmail,
   type SessionChange,
 } from "@/lib/email-templates";
+import { sendPush } from "@/lib/push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 
@@ -131,8 +132,26 @@ export async function notifyNewMessage(messageId: string) {
     .eq("id", messageId)
     .maybeSingle<MessageRow>();
   if (!message) return;
-  await notifyRecipient(message);
+  await Promise.all([notifyRecipient(message), pushNewMessage(message)]);
   await alertAdminsIfFlagged(message);
+}
+
+// Every message pushes to the other person's devices; one notification per conversation, replaced
+// by the newest, so a quick back-and-forth doesn't stack up.
+function pushNewMessage(message: MessageRow) {
+  return safely("message push", async () => {
+    const recipientId =
+      message.sender_id === message.coach_id
+        ? message.member_id
+        : message.coach_id;
+    const sender = await loadRecipient(message.sender_id);
+    await sendPush([recipientId], {
+      title: sender?.name ?? "New message",
+      body: message.body,
+      url: `/messages/${message.sender_id}`,
+      tag: `message-${message.coach_id}-${message.member_id}`,
+    });
+  });
 }
 
 // Emails only the first unread message in a conversation, so a quick back-and-forth
@@ -212,6 +231,15 @@ function alertAdminsIfFlagged(message: MessageRow) {
       const person = await loadRecipient(row.id as string);
       if (person) await sendEmail(person.email, email);
     }
+    await sendPush(
+      (admins ?? []).map((row) => row.id as string),
+      {
+        title: "A message needs review",
+        body: `${coach?.name ?? "A coach"} and ${member?.name ?? "a member"}: ${describeFlags(flags).toLowerCase()}`,
+        url: `/admin/messages/${message.coach_id}/${message.member_id}`,
+        tag: `flag-${message.coach_id}-${message.member_id}`,
+      },
+    );
   });
 }
 
@@ -248,6 +276,17 @@ export function notifySession(
       const member = await loadRecipient(memberId);
       if (member?.wantsUpdates) await sendEmail(member.email, email);
     }
+    await sendPush(memberIds, {
+      title:
+        change === "invited"
+          ? `New session: ${session.title}`
+          : change === "updated"
+            ? `Session changed: ${session.title}`
+            : `Cancelled: ${session.title}`,
+      body: `${coach?.name ?? "Your coach"} · ${formatEmailSessionTime(session.starts_at, session.ends_at)}`,
+      url: change === "cancelled" ? "/calendar" : `/calendar/${session.id}`,
+      tag: `session-${session.id}`,
+    });
   });
 }
 
@@ -266,6 +305,17 @@ export function notifyLiveNow(sessionId: string) {
       member_id: string;
       response: string;
     }[];
+    await sendPush(
+      invites
+        .filter((invite) => invite.response !== "not_going")
+        .map((invite) => invite.member_id),
+      {
+        title: `${coach?.name ?? "Your coach"} is live`,
+        body: `${session.title as string}: tap to watch and chat.`,
+        url: `/calendar/${session.id as string}/live`,
+        tag: `live-${session.id as string}`,
+      },
+    );
     for (const invite of invites) {
       if (invite.response === "not_going") continue;
       const member = await loadRecipient(invite.member_id);
@@ -281,5 +331,37 @@ export function notifyLiveNow(sessionId: string) {
         }),
       );
     }
+  });
+}
+
+// A new group post pushes to everyone else in the coach's group, one notification per group.
+export function notifyGroupPost(post: {
+  coach_id: string;
+  sender_id: string;
+  body: string;
+}) {
+  return safely("group post", async () => {
+    const db = createAdminClient();
+    const [{ data: links }, sender, coach] = await Promise.all([
+      db
+        .from("coach_members")
+        .select("member_id")
+        .eq("coach_id", post.coach_id),
+      loadRecipient(post.sender_id),
+      loadRecipient(post.coach_id),
+    ]);
+    const everyone = [
+      post.coach_id,
+      ...(links ?? []).map((row) => row.member_id as string),
+    ];
+    await sendPush(
+      everyone.filter((id) => id !== post.sender_id),
+      {
+        title: `${coach?.name ?? "Your coach"}'s group`,
+        body: `${sender?.name ?? "Someone"}: ${post.body}`,
+        url: `/groups/${post.coach_id}`,
+        tag: `group-${post.coach_id}`,
+      },
+    );
   });
 }

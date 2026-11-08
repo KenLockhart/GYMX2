@@ -1,22 +1,55 @@
 "use client";
 
-import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
+import {
+  ActionForm,
+  Field,
+  FormStatus,
+  SubmitButton,
+} from "@/components/form-parts";
 import type { Profile } from "@/lib/types";
 import { updateProfile } from "./actions";
 
 const socialFields = [
-  { name: "instagram_url", label: "Instagram", placeholder: "https://instagram.com/yourname" },
-  { name: "tiktok_url", label: "TikTok", placeholder: "https://tiktok.com/@yourname" },
-  { name: "youtube_url", label: "YouTube", placeholder: "https://youtube.com/@yourname" },
+  {
+    name: "instagram_url",
+    label: "Instagram",
+    placeholder: "https://instagram.com/yourname",
+  },
+  {
+    name: "tiktok_url",
+    label: "TikTok",
+    placeholder: "https://tiktok.com/@yourname",
+  },
+  {
+    name: "youtube_url",
+    label: "YouTube",
+    placeholder: "https://youtube.com/@yourname",
+  },
   { name: "x_url", label: "X", placeholder: "https://x.com/yourname" },
-  { name: "website_url", label: "Website", placeholder: "https://yourwebsite.com" },
+  {
+    name: "website_url",
+    label: "Website",
+    placeholder: "https://yourwebsite.com",
+  },
 ] as const;
 
-export function ProfileForm({ profile, email }: { profile: Profile; email: string }) {
+export function ProfileForm({
+  profile,
+  email,
+}: {
+  profile: Profile;
+  email: string;
+}) {
   return (
     <ActionForm action={updateProfile} className="max-w-xl space-y-6">
       <section className="space-y-4">
-        <Field label="Name" name="display_name" defaultValue={profile.display_name} maxLength={80} required />
+        <Field
+          label="Name"
+          name="display_name"
+          defaultValue={profile.display_name}
+          maxLength={80}
+          required
+        />
         <Field label="Email" value={email} disabled readOnly />
         <label className="block space-y-1.5">
           <span className="text-sm font-medium">Bio</span>
@@ -56,7 +89,8 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
           <span>
             Email me about messages, sessions and reminders
             <span className="block text-muted">
-              Includes session and Task-due reminders, streak nudges and a Monday summary. We always email about your orders.
+              Includes session and Task-due reminders, streak nudges and a
+              Monday summary. We always email about your orders.
             </span>
           </span>
         </label>
@@ -72,7 +106,9 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
           />
           <span>
             I want to coach on GYMX2.
-            <span className="block text-muted">An admin reviews every coach request.</span>
+            <span className="block text-muted">
+              An admin reviews every coach request.
+            </span>
           </span>
         </label>
       )}

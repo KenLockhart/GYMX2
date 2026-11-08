@@ -148,6 +148,17 @@ export default function PrivacyPage() {
         </li>
       </ul>
 
+      <h2>Phone notifications</h2>
+      <p>
+        If you turn on notifications for a device, your browser gives us an
+        address to send them to. We use it only to send GYMX2 notifications
+        (such as new messages, group posts, live sessions and program days),
+        through your browser maker&rsquo;s push service (for example Apple,
+        Google or Mozilla). The notification text passes through that service
+        encrypted. Turn notifications off on your Profile page or in your device
+        settings at any time.
+      </p>
+
       <h2>Cookies</h2>
       <p>
         We use only the cookies needed to keep you signed in, keep the site
