@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PillarTag } from "@/components/game-parts";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
 import { requireAccount } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
@@ -14,6 +15,7 @@ type MemberAssignment = {
   completed_at: string | null;
   task: {
     title: string;
+    pillar: string | null;
     instructions: string;
     video_id: string;
     video: { title: string } | null;
@@ -24,6 +26,7 @@ type MemberAssignment = {
 type CoachTask = {
   id: string;
   title: string;
+  pillar: string | null;
   coach: { display_name: string } | null;
   video: { id: string; title: string } | null;
   task_assignments: {
@@ -50,7 +53,9 @@ function AssignmentCard({ assignment }: { assignment: MemberAssignment }) {
   return (
     <li className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <p className="font-semibold">{task.title}</p>
+        <p className="flex flex-wrap items-center gap-2 font-semibold">
+          {task.title} <PillarTag pillar={task.pillar} />
+        </p>
         <p className="mt-1 text-sm text-muted">
           {[
             task.coach?.display_name,
@@ -87,7 +92,7 @@ async function MemberTasks({ memberId }: { memberId: string }) {
   const { data, error } = await supabase
     .from("task_assignments")
     .select(
-      "id, due_on, completed_at, task:tasks(title, instructions, video_id, video:videos(title), coach:profiles!coach_id(display_name))",
+      "id, due_on, completed_at, task:tasks(title, pillar, instructions, video_id, video:videos(title), coach:profiles!coach_id(display_name))",
     )
     .eq("member_id", memberId)
     .order("due_on", { ascending: true, nullsFirst: false })
@@ -133,7 +138,7 @@ async function CoachTasks({ canManage }: { canManage: boolean }) {
   const { data, error } = await supabase
     .from("tasks")
     .select(
-      "id, title, coach:profiles!coach_id(display_name), video:videos(id, title), task_assignments(id, due_on, completed_at, member:profiles!member_id(display_name))",
+      "id, title, pillar, coach:profiles!coach_id(display_name), video:videos(id, title), task_assignments(id, due_on, completed_at, member:profiles!member_id(display_name))",
     )
     .order("created_at", { ascending: false });
   if (error) return loadError();
@@ -155,7 +160,9 @@ async function CoachTasks({ canManage }: { canManage: boolean }) {
           <li key={task.id} className="rounded-lg border border-border bg-surface p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className="font-semibold">{task.title}</p>
+                <p className="flex flex-wrap items-center gap-2 font-semibold">
+                  {task.title} <PillarTag pillar={task.pillar} />
+                </p>
                 <p className="mt-1 text-sm text-muted">
                   {[
                     !canManage && task.coach?.display_name,

@@ -82,6 +82,7 @@ export const taskSchema = z.object({
   instructions: z.string().trim().max(2000, "Use 2,000 characters or fewer for the instructions."),
   due_on: z.union([z.literal("").transform(() => null), isoDate]),
   member_ids: z.array(z.uuid()).min(1, "Choose at least one member.").max(200),
+  pillar: z.enum(["mind", "body", "spirit"], { error: "Choose Mind, Body or Spirit." }),
 });
 
 export const memoSchema = z.object({

@@ -5,6 +5,8 @@ import { requireCoach } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { Memo } from "@/lib/types";
+import { BadgeRow } from "@/components/game-parts";
+import { loadBadges } from "@/lib/achievements-data";
 
 export const metadata: Metadata = { title: "Member" };
 
@@ -30,6 +32,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
     member: { display_name: string; bio: string } | null;
   } | null)?.member;
   if (!member) notFound();
+  const badges = (await loadBadges([id])).get(id) ?? [];
 
   const [assignmentResult, memoResult] = await Promise.all([
     supabase
@@ -56,6 +59,9 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-5xl">{member.display_name}</h1>
+          <div className="mt-3">
+            <BadgeRow badges={badges} max={15} />
+          </div>
           {member.bio && <p className="mt-2 max-w-xl text-muted">{member.bio}</p>}
         </div>
         <Link href={`/messages/${id}`} className="btn-primary shrink-0">

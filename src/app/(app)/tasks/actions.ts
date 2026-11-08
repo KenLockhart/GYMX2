@@ -2,13 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { syncProgress, syncProgressQuietly } from "@/lib/achievements-data";
 import { requireAccount, requireCoach } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 import { idSchema, taskSchema } from "@/lib/validation";
 
 export async function createTask(_: ActionState, formData: FormData): Promise<ActionState> {
-  await requireCoach();
+  const { profile } = await requireCoach();
 
   const parsed = taskSchema.safeParse({
     video_id: formData.get("video_id"),
@@ -16,6 +18,7 @@ export async function createTask(_: ActionState, formData: FormData): Promise<Ac
     instructions: formData.get("instructions"),
     due_on: formData.get("due_on"),
     member_ids: formData.getAll("member_ids"),
+    pillar: formData.get("pillar"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -26,6 +29,7 @@ export async function createTask(_: ActionState, formData: FormData): Promise<Ac
     task_instructions: parsed.data.instructions,
     task_due_on: parsed.data.due_on,
     target_member_ids: parsed.data.member_ids,
+    task_pillar: parsed.data.pillar,
   });
   if (error) {
     return {
@@ -33,6 +37,7 @@ export async function createTask(_: ActionState, formData: FormData): Promise<Ac
     };
   }
 
+  after(() => syncProgressQuietly(profile));
   revalidatePath("/tasks");
   redirect("/tasks");
 }
@@ -51,7 +56,7 @@ export async function deleteTask(_: ActionState, formData: FormData): Promise<Ac
 }
 
 export async function setTaskCompleted(_: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAccount();
+  const { profile } = await requireAccount();
   const assignmentId = idSchema.safeParse(formData.get("assignment_id"));
   if (!assignmentId.success) return { error: "Choose a Task." };
 
@@ -63,5 +68,17 @@ export async function setTaskCompleted(_: ActionState, formData: FormData): Prom
   if (error) return { error: "We couldn't update that Task. Please try again." };
 
   revalidatePath("/tasks");
-  return {};
+  if (formData.get("is_done") !== "true") return {};
+
+  // Finishing a Task can earn a badge, so check now and celebrate it.
+  try {
+    const progress = await syncProgress(profile);
+    const fresh = progress?.badges.filter((badge) => progress.newKeys.includes(badge.key)) ?? [];
+    revalidatePath("/progress");
+    if (fresh.length) return { message: `New badge: ${fresh.map((badge) => `${badge.icon} ${badge.name}`).join(", ")}!` };
+    return { message: "Nice work! +3 points." };
+  } catch (error) {
+    console.error(error);
+    return {};
+  }
 }

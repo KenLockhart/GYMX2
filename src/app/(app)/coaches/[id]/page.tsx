@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
 import { joinCoach, leaveCoach } from "../actions";
+import { BadgeRow } from "@/components/game-parts";
+import { loadBadges } from "@/lib/achievements-data";
 
 export const metadata: Metadata = { title: "Coach" };
 
@@ -44,6 +46,7 @@ export default async function CoachPage({ params }: { params: Promise<{ id: stri
       .maybeSingle(),
   ]);
   const coach = coachResult.data;
+  const badges = coach ? ((await loadBadges([coach.id])).get(coach.id) ?? []) : [];
   if (!coach) notFound();
 
   const isMember = profile.role === "member";
@@ -64,6 +67,9 @@ export default async function CoachPage({ params }: { params: Promise<{ id: stri
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-accent">Coach</p>
           <h1 className="mt-1 text-5xl">{coach.display_name}</h1>
+          <div className="mt-3">
+            <BadgeRow badges={badges} max={12} />
+          </div>
           {coach.bio && <p className="mt-3 max-w-2xl whitespace-pre-line text-muted">{coach.bio}</p>}
         </div>
         {isMember && (

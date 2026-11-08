@@ -6,6 +6,8 @@ import { requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 import { joinCoach, leaveCoach } from "./actions";
+import { BadgeRow } from "@/components/game-parts";
+import { loadBadges } from "@/lib/achievements-data";
 
 export const metadata: Metadata = { title: "Coaches" };
 
@@ -24,6 +26,7 @@ export default async function CoachesPage() {
   ]);
   const coaches = (coachResult.data ?? []) as Pick<Profile, "id" | "display_name" | "bio">[];
   const joined = new Set((joinedResult.data ?? []).map((row) => row.coach_id as string));
+  const badges = await loadBadges(coaches.map((coach) => coach.id));
 
   return (
     <div className="space-y-6">
@@ -53,9 +56,12 @@ export default async function CoachesPage() {
                 className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <Link href={`/coaches/${coach.id}`} className="text-link font-semibold">
-                    {coach.display_name}
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/coaches/${coach.id}`} className="text-link font-semibold">
+                      {coach.display_name}
+                    </Link>
+                    <BadgeRow badges={badges.get(coach.id) ?? []} max={5} />
+                  </div>
                   {coach.bio && <p className="mt-1 text-sm text-muted">{coach.bio}</p>}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-start gap-2">

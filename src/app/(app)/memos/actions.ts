@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { syncProgressQuietly } from "@/lib/achievements-data";
 import { requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
@@ -25,6 +27,7 @@ export async function saveMemo(_: ActionState, formData: FormData): Promise<Acti
     : await supabase.from("memos").insert({ ...fields, user_id: profile.id });
   if (error) return { error: "We couldn't save that Memo. Please try again." };
 
+  after(() => syncProgressQuietly(profile));
   revalidatePath("/memos");
   redirect("/memos");
 }
