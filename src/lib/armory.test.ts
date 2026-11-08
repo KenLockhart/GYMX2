@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  categoriesFor,
   categoryLabel,
   describeSize,
   fileExtension,
@@ -132,5 +133,17 @@ describe("addressLines", () => {
 
   it("handles a missing address", () => {
     expect(addressLines(null)).toEqual([]);
+  });
+});
+
+describe("categoriesFor", () => {
+  it("keeps Gear out of digital items", () => {
+    expect(categoriesFor("paid").map((c) => c.value)).not.toContain("gear");
+    expect(categoriesFor("download").map((c) => c.value)).not.toContain("gear");
+  });
+
+  it("offers Gear for gear and shop links", () => {
+    expect(categoriesFor("product").map((c) => c.value)).toContain("gear");
+    expect(categoriesFor("link").map((c) => c.value)).toContain("gear");
   });
 });
