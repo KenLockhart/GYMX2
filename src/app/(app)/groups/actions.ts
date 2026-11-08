@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { requireAccount } from "@/lib/auth";
 import { GROUP_POST_MAX, type GroupPost } from "@/lib/groups";
+import { notifyGroupPost } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
 
@@ -42,6 +44,7 @@ export async function postGroupMessage(
           : "We couldn't post that. Please try again.",
     };
   }
+  after(() => notifyGroupPost(data));
   revalidatePath("/groups");
   return { post: data };
 }
