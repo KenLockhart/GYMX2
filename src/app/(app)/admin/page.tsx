@@ -98,6 +98,9 @@ export default async function AdminPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/admin/leaderboard" className="btn-secondary">
+            Leaderboard
+          </Link>
           <Link href="/admin/messages" className="btn-secondary">
             Review conversations
           </Link>
