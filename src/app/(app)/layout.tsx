@@ -4,7 +4,11 @@ import { BrandLink } from "@/components/brand-link";
 import { requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { profile } = await requireAccount();
 
   // Unread messages are ones the other person sent. Row security limits this to the viewer's conversations.
@@ -60,7 +64,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Messages
               </Link>
             ) : (
-              <Link href="/messages" className="inline-flex items-center gap-1.5 hover:text-accent">
+              <Link
+                href="/messages"
+                className="inline-flex items-center gap-1.5 hover:text-accent"
+              >
                 Messages
                 {unread > 0 && (
                   <span className="rounded-full bg-accent px-1.5 text-xs font-bold text-accent-foreground">
@@ -70,6 +77,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 )}
               </Link>
             )}
+            <Link href="/groups" className="hover:text-accent">
+              Groups
+            </Link>
+            <Link href="/programs" className="hover:text-accent">
+              Programs
+            </Link>
             <Link href="/memos" className="hover:text-accent">
               Memos
             </Link>
@@ -92,14 +105,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </Link>
             )}
             <form action={signOut}>
-              <button type="submit" className="cursor-pointer text-muted hover:text-foreground">
+              <button
+                type="submit"
+                className="cursor-pointer text-muted hover:text-foreground"
+              >
                 Log out
               </button>
             </form>
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+        {children}
+      </main>
     </div>
   );
 }

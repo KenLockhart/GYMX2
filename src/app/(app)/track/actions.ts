@@ -1,10 +1,14 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { isPillar } from "@/lib/achievements";
 import { syncProgressQuietly } from "@/lib/achievements-data";
+import { fileExtension } from "@/lib/armory";
 import { requireAccount } from "@/lib/auth";
+import { MAX_PHOTO_BYTES, PHOTO_POSES, PHOTO_TYPES } from "@/lib/photos";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_HABITS, isEditableDay, parseMeasure } from "@/lib/tracking";
 import type { ActionState } from "@/lib/types";
@@ -210,4 +214,50 @@ export async function saveTrackingSettings(
     return { error: "We couldn't save your settings. Please try again." };
   revalidatePath("/", "layout");
   return done("Saved.");
+}
+
+// Progress photos upload straight from the browser to private storage, using a one-time link.
+export async function prepareProgressPhoto(input: {
+  fileName: string;
+  size: number;
+}): Promise<{ error?: string; path?: string; token?: string }> {
+  const { profile } = await trackingAccount();
+  const extension = fileExtension(input.fileName);
+  if (!(extension in PHOTO_TYPES)) return { error: "Use a JPG, PNG or WebP photo." };
+  if (input.size > MAX_PHOTO_BYTES) return { error: "Photos can be up to 10 MB." };
+  const path = `${profile.id}/${randomUUID()}.${extension}`;
+  const { data, error } = await createAdminClient().storage.from("progress-photos").createSignedUploadUrl(path);
+  if (error || !data) return { error: "We couldn't start the upload. Please try again." };
+  return { path: data.path, token: data.token };
+}
+
+export async function saveProgressPhoto(input: { path: string; pose: string; day: string }): Promise<{ error?: string }> {
+  const { profile } = await trackingAccount();
+  if (!PHOTO_POSES.some((pose) => pose.value === input.pose)) return { error: "Choose front, side, back or other." };
+  if (!isEditableDay(input.day)) return { error: "You can add photos for the last 7 days." };
+  if (!input.path.startsWith(`${profile.id}/`)) return { error: "That upload didn't work. Please try again." };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("progress_photos")
+    .insert({ user_id: profile.id, path: input.path, pose: input.pose, day: input.day });
+  if (error) return { error: "We couldn't save that photo. Please try again." };
+  revalidatePath("/track");
+  return {};
+}
+
+export async function deleteProgressPhoto(_: ActionState, formData: FormData): Promise<ActionState> {
+  const { profile } = await trackingAccount();
+  const id = idSchema.safeParse(formData.get("photo_id"));
+  if (!id.success) return { error: "Choose a photo." };
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("progress_photos")
+    .delete()
+    .eq("id", id.data)
+    .eq("user_id", profile.id)
+    .select("path")
+    .maybeSingle();
+  if (!data) return { error: "We couldn't delete that photo." };
+  await createAdminClient().storage.from("progress-photos").remove([data.path as string]);
+  return done("Deleted.");
 }

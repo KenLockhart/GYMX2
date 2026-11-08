@@ -14,58 +14,93 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Reads one person's activity with the server key: only IDs and dates, never what they wrote.
 // Callers decide who may see the result (the person themselves, or an admin).
 
-export async function loadMemberActivity(userId: string): Promise<MemberActivity> {
+export async function loadMemberActivity(
+  userId: string,
+): Promise<MemberActivity> {
   const db = createAdminClient();
-  const [completions, memos, going, messages, purchases, coaches, habits] =
-    await Promise.all([
-      db
-        .from("task_assignments")
-        .select("completed_at, task:tasks(pillar)")
-        .eq("member_id", userId)
-        .not("completed_at", "is", null)
-        .limit(5000),
-      db.from("memos").select("memo_date").eq("user_id", userId).limit(5000),
-      db
-        .from("session_invites")
-        .select("responded_at")
-        .eq("member_id", userId)
-        .eq("response", "going")
-        .not("responded_at", "is", null)
-        .limit(5000),
-      db
-        .from("messages")
-        .select("created_at")
-        .eq("sender_id", userId)
-        .limit(5000),
-      db
-        .from("purchases")
-        .select("id", { count: "exact", head: true })
-        .eq("member_id", userId)
-        .is("refunded_at", null),
-      db
-        .from("coach_members")
-        .select("coach_id", { count: "exact", head: true })
-        .eq("member_id", userId),
-      db
-        .from("habit_logs")
-        .select("day, habit:habits(pillar)")
-        .eq("user_id", userId)
-        .limit(10000),
-    ]);
+  const [
+    completions,
+    memos,
+    going,
+    messages,
+    purchases,
+    coaches,
+    habits,
+    programDays,
+  ] = await Promise.all([
+    db
+      .from("task_assignments")
+      .select("completed_at, task:tasks(pillar)")
+      .eq("member_id", userId)
+      .not("completed_at", "is", null)
+      .limit(5000),
+    db.from("memos").select("memo_date").eq("user_id", userId).limit(5000),
+    db
+      .from("session_invites")
+      .select("responded_at")
+      .eq("member_id", userId)
+      .eq("response", "going")
+      .not("responded_at", "is", null)
+      .limit(5000),
+    db
+      .from("messages")
+      .select("created_at")
+      .eq("sender_id", userId)
+      .limit(5000),
+    db
+      .from("purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("member_id", userId)
+      .is("refunded_at", null),
+    db
+      .from("coach_members")
+      .select("coach_id", { count: "exact", head: true })
+      .eq("member_id", userId),
+    db
+      .from("habit_logs")
+      .select("day, habit:habits(pillar)")
+      .eq("user_id", userId)
+      .limit(10000),
+    db
+      .from("program_day_completions")
+      .select("completed_at, day:program_days(pillar)")
+      .eq("member_id", userId)
+      .limit(5000),
+  ]);
 
   return {
     habits: (
-      (habits.data ?? []) as unknown as { day: string; habit: { pillar: string } | null }[]
-    ).flatMap((row) => (isPillar(row.habit?.pillar) ? [{ day: row.day, pillar: row.habit.pillar }] : [])),
+      (habits.data ?? []) as unknown as {
+        day: string;
+        habit: { pillar: string } | null;
+      }[]
+    ).flatMap((row) =>
+      isPillar(row.habit?.pillar)
+        ? [{ day: row.day, pillar: row.habit.pillar }]
+        : [],
+    ),
     completions: (
       (completions.data ?? []) as unknown as {
         completed_at: string;
         task: { pillar: string | null } | null;
       }[]
-    ).map((row) => ({
-      at: row.completed_at,
-      pillar: isPillar(row.task?.pillar) ? row.task.pillar : null,
-    })),
+    )
+      .map((row) => ({
+        at: row.completed_at,
+        pillar: isPillar(row.task?.pillar) ? row.task.pillar : null,
+      }))
+      // Finished program days count like finished tasks.
+      .concat(
+        (
+          (programDays.data ?? []) as unknown as {
+            completed_at: string;
+            day: { pillar: string | null } | null;
+          }[]
+        ).map((row) => ({
+          at: row.completed_at,
+          pillar: isPillar(row.day?.pillar) ? row.day.pillar : null,
+        })),
+      ),
     memoDays: (memos.data ?? []).map((row) => row.memo_date as string),
     going: (going.data ?? []).map((row) => row.responded_at as string),
     messages: (messages.data ?? []).map((row) => row.created_at as string),
@@ -74,7 +109,9 @@ export async function loadMemberActivity(userId: string): Promise<MemberActivity
   };
 }
 
-export async function loadCoachActivity(userId: string): Promise<CoachActivity> {
+export async function loadCoachActivity(
+  userId: string,
+): Promise<CoachActivity> {
   const db = createAdminClient();
   const [videos, given, sessions, messages, members, sales] = await Promise.all(
     [
