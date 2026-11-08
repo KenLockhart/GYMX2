@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { requireAccount, requireCoach } from "@/lib/auth";
+import { syncProgressQuietly } from "@/lib/achievements-data";
 import { planSessionEmails } from "@/lib/calendar";
 import { notifySession, type SessionSnapshot } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
@@ -83,6 +84,7 @@ export async function saveSession(_: ActionState, formData: FormData): Promise<A
   after(async () => {
     await notifySession("invited", saved, plan.invited);
     await notifySession("updated", saved, plan.updated);
+    await syncProgressQuietly(profile);
   });
 
   revalidatePath("/calendar");
@@ -114,7 +116,7 @@ export async function cancelSession(_: ActionState, formData: FormData): Promise
 }
 
 export async function respondToSession(_: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAccount();
+  const { profile } = await requireAccount();
   const parsed = sessionResponseSchema.safeParse({
     session_id: formData.get("session_id"),
     response: formData.get("response"),
@@ -128,6 +130,7 @@ export async function respondToSession(_: ActionState, formData: FormData): Prom
   });
   if (error) return { error: sessionError(error) };
 
+  after(() => syncProgressQuietly(profile));
   revalidatePath("/calendar");
   revalidatePath(`/calendar/${parsed.data.session_id}`);
   return { message: parsed.data.response === "going" ? "See you there." : "Thanks for letting your coach know." };

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireCoach } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { BadgeRow } from "@/components/game-parts";
+import { loadBadges } from "@/lib/achievements-data";
 
 export const metadata: Metadata = { title: "Members" };
 
@@ -18,6 +20,7 @@ export default async function MembersPage() {
   }[])
     .flatMap((row) => (row.member ? [row.member] : []))
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  const badges = await loadBadges(members.map((member) => member.id));
 
   return (
     <div className="space-y-6">
@@ -39,9 +42,12 @@ export default async function MembersPage() {
           {members.map((member) => (
             <li key={member.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <Link href={`/members/${member.id}`} className="text-link font-semibold">
-                  {member.display_name}
-                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href={`/members/${member.id}`} className="text-link font-semibold">
+                    {member.display_name}
+                  </Link>
+                  <BadgeRow badges={badges.get(member.id) ?? []} max={5} />
+                </div>
                 {member.bio && <p className="mt-1 text-sm text-muted">{member.bio}</p>}
               </div>
               <Link href={`/messages/${member.id}`} className="btn-secondary shrink-0 px-3 py-2 text-sm">

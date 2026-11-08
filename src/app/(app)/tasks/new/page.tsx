@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
+import { PILLARS } from "@/lib/achievements";
 import { requireCoach } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createTask } from "../actions";
@@ -69,6 +70,21 @@ export default async function NewTaskPage() {
             </select>
           </label>
           <Field label="Title" name="title" maxLength={120} required />
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Pillar</legend>
+            <p className="text-xs text-muted">Members earn pillar badges for Tasks in each one.</p>
+            <div className="grid grid-cols-3 gap-2">
+              {PILLARS.map((pillar) => (
+                <label
+                  key={pillar.value}
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border p-3 text-sm font-semibold has-[:checked]:border-accent has-[:checked]:bg-surface-raised"
+                >
+                  <input type="radio" name="pillar" value={pillar.value} required className="accent-accent" />
+                  {pillar.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className="block space-y-1.5">
             <span className="text-sm font-medium">Instructions</span>
             <textarea name="instructions" rows={4} maxLength={2000} className="field-input" />

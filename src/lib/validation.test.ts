@@ -98,7 +98,13 @@ describe("taskSchema", () => {
     instructions: "",
     due_on: "",
     member_ids: ["3f1b6c1e-8f4a-4d7e-9a57-1c1d2e3f4a5b"],
+    pillar: "body",
   };
+
+  it("needs a pillar", () => {
+    const result = taskSchema.safeParse({ ...valid, pillar: null });
+    expect(result.error?.issues[0].message).toBe("Choose Mind, Body or Spirit.");
+  });
 
   it("stores an empty due date as null", () => {
     expect(taskSchema.parse(valid).due_on).toBeNull();
