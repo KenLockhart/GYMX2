@@ -34,10 +34,11 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Tracking:</strong> the habits you check off, body measurements
-          (such as weight, body fat and waist) and nutrition notes you choose to
-          log. Only you can see them unless you turn on sharing with your
-          coaches. GYMX2 admins can&rsquo;t see them, and we use them only to
-          show you your progress.
+          (such as weight, body fat and waist), progress photos and nutrition
+          notes you choose to log, and your progress on coaches&rsquo; programs.
+          Only you can see them unless you turn on sharing with your coaches.
+          GYMX2 admins can&rsquo;t see them, and we use them only to show you
+          your progress.
         </li>
         <li>
           <strong>What you upload:</strong> videos, files and images, such as
@@ -104,7 +105,14 @@ export default function PrivacyPage() {
       <ul>
         <li>
           <strong>Coaches you join</strong> see your name, your progress on
-          their tasks, your session responses and your messages with them.
+          their tasks and programs, your session responses and your messages
+          with them.
+        </li>
+        <li>
+          <strong>Coach groups:</strong> each coach has a group chat with all of
+          their members. Everyone in the group sees your name and what you post
+          there. The coach can remove posts, and GYMX2 admins can read groups
+          for the same safety reasons as messages.
         </li>
         <li>
           <strong>Sellers</strong> see what you bought from them and, for gear,
