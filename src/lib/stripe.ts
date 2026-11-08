@@ -14,7 +14,7 @@ export function getStripe() {
   return client;
 }
 
-// True for test keys, so pages can say no real money moves.
+// True for test keys (secret or restricted), so pages can say no real money moves.
 export function isStripeTestMode() {
-  return (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
+  return /^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY ?? "");
 }
