@@ -314,3 +314,49 @@ export function accountDeletedEmail(input: { siteUrl: string; name: string }): E
     }),
   };
 }
+
+export function affiliateDecisionEmail(input: {
+  siteUrl: string;
+  name: string;
+  approved: boolean;
+  link: string;
+  terms: string[];
+}): Email {
+  return {
+    subject: input.approved ? "You're a GYMX2 affiliate" : "Your GYMX2 affiliate application",
+    ...render({
+      heading: input.approved ? "Welcome to the affiliate program" : "About your affiliate application",
+      blocks: input.approved
+        ? [
+            { kind: "p", text: `Hi ${input.name}, you're approved. Share your link and earn when people you refer join and buy.` },
+            { kind: "lines", lines: [`Your link: ${input.link}`, ...input.terms] },
+            { kind: "p", text: "Set up payouts on your Affiliate page so we can pay you." },
+          ]
+        : [
+            { kind: "p", text: `Hi ${input.name}, thanks for applying. We can't approve your application right now.` },
+            { kind: "p", text: "Questions? Email support@gymx2.com." },
+          ],
+      button: { label: input.approved ? "Open your Affiliate page" : "Visit GYMX2", url: `${input.siteUrl}/affiliate` },
+      footer: "You're getting this because you applied to the GYMX2 affiliate program.",
+    }),
+  };
+}
+
+export function affiliatePayoutEmail(input: { siteUrl: string; name: string; amountCents: number; count: number }): Email {
+  const amount = money(input.amountCents);
+  return {
+    subject: `You've been paid ${amount}`,
+    ...render({
+      heading: "Your affiliate payout is on its way",
+      blocks: [
+        {
+          kind: "p",
+          text: `Hi ${input.name}, we sent ${amount} for ${input.count} ${input.count === 1 ? "commission" : "commissions"} to your Stripe account.`,
+        },
+        { kind: "p", text: "Stripe moves it to your bank on your normal payout schedule, usually within a few business days." },
+      ],
+      button: { label: "See your earnings", url: `${input.siteUrl}/affiliate` },
+      footer: "You're getting this because you're a GYMX2 affiliate.",
+    }),
+  };
+}

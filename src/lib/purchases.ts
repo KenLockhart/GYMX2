@@ -2,6 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordAffiliateCommissions } from "@/lib/affiliate-server";
 import { notifyNewSale } from "@/lib/notify";
 import { getStripe } from "@/lib/stripe";
 
@@ -43,7 +44,12 @@ export async function recordPurchase(session: Stripe.Checkout.Session) {
   }
   // Only a newly saved order emails the seller, so the webhook and the buyer's return can't both send one.
   const purchaseId = inserted?.[0]?.id as string | undefined;
-  if (purchaseId) after(() => notifyNewSale(purchaseId));
+  if (purchaseId) {
+    after(async () => {
+      await notifyNewSale(purchaseId);
+      await recordAffiliateCommissions(purchaseId);
+    });
+  }
   return true;
 }
 

@@ -23,6 +23,15 @@ export async function deletionBlocker(person: { id: string; role: UserRole }) {
       return "You've sold items in the Armory, so we close coach accounts by hand to settle your buyers and payouts. Email support@gymx2.com and we'll take care of it.";
     }
   }
+  // Affiliates with commissions still owed are paid out first, by a person.
+  const { count: owed } = await createAdminClient()
+    .from("commissions")
+    .select("id", { count: "exact", head: true })
+    .eq("affiliate_id", person.id)
+    .eq("status", "pending");
+  if ((owed ?? 0) > 0) {
+    return "You have affiliate commissions that haven't been paid yet. Email support@gymx2.com and we'll settle them and close your account.";
+  }
   return null;
 }
 
