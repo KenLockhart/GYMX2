@@ -1,6 +1,8 @@
 import "server-only";
+import { after } from "next/server";
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyNewSale } from "@/lib/notify";
 import { getStripe } from "@/lib/stripe";
 
 // Saves a completed Checkout payment. Safe to call more than once for the same session:
@@ -14,7 +16,7 @@ export async function recordPurchase(session: Stripe.Checkout.Session) {
   const isGear = kind === "product";
   const shipping = session.collected_information?.shipping_details ?? null;
 
-  const { error } = await createAdminClient()
+  const { data: inserted, error } = await createAdminClient()
     .from("purchases")
     .upsert(
       {
@@ -33,11 +35,15 @@ export async function recordPurchase(session: Stripe.Checkout.Session) {
         fulfillment_status: isGear ? "to_ship" : "not_needed",
       },
       { onConflict: "stripe_session_id", ignoreDuplicates: true },
-    );
+    )
+    .select("id");
   if (error) {
     console.error(error);
     return false;
   }
+  // Only a newly saved order emails the seller, so the webhook and the buyer's return can't both send one.
+  const purchaseId = inserted?.[0]?.id as string | undefined;
+  if (purchaseId) after(() => notifyNewSale(purchaseId));
   return true;
 }
 

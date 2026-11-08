@@ -22,6 +22,7 @@ const profile = {
   youtube_url: "",
   x_url: "",
   website_url: "",
+  email_updates: true,
 };
 
 describe("safeRedirectPath", () => {

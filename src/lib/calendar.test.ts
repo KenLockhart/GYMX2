@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatEmailSessionTime,
   formatSessionTime,
+  planSessionEmails,
   localDayKey,
   monthGrid,
   monthParam,
@@ -84,6 +86,63 @@ describe("formatSessionTime", () => {
   it("shows the end date when a session runs past midnight", () => {
     expect(formatSessionTime("2026-11-11T03:00:00Z", "2026-11-11T06:00:00Z", "America/New_York")).toBe(
       "Tue, Nov 10, 10:00 PM – Nov 11, 1:00 AM",
+    );
+  });
+});
+
+describe("planSessionEmails", () => {
+  const now = new Date("2026-11-08T12:00:00Z");
+  const details = {
+    starts_at: "2026-11-10T18:00:00Z",
+    ends_at: "2026-11-10T19:00:00Z",
+    location: "Main gym",
+    meeting_url: null,
+  };
+
+  it("invites everyone on a new session", () => {
+    expect(planSessionEmails(null, { details, memberIds: ["a", "b"] }, now)).toEqual({
+      invited: ["a", "b"],
+      updated: [],
+    });
+  });
+
+  it("invites only new members when nothing else changed", () => {
+    expect(
+      planSessionEmails({ details, memberIds: ["a"] }, { details: { ...details, location: " Main gym " }, memberIds: ["a", "b"] }, now),
+    ).toEqual({ invited: ["b"], updated: [] });
+  });
+
+  it("tells existing members when the time moves", () => {
+    expect(
+      planSessionEmails(
+        { details, memberIds: ["a", "b"] },
+        { details: { ...details, starts_at: "2026-11-10T17:30:00Z" }, memberIds: ["a", "b", "c"] },
+        now,
+      ),
+    ).toEqual({ invited: ["c"], updated: ["a", "b"] });
+  });
+
+  it("treats the same moment written differently as unchanged", () => {
+    expect(
+      planSessionEmails(
+        { details: { ...details, starts_at: "2026-11-10T18:00:00+00:00" }, memberIds: ["a"] },
+        { details, memberIds: ["a"] },
+        now,
+      ).updated,
+    ).toEqual([]);
+  });
+
+  it("sends nothing for a past session", () => {
+    expect(
+      planSessionEmails(null, { details: { ...details, ends_at: "2026-11-01T19:00:00Z" }, memberIds: ["a"] }, now),
+    ).toEqual({ invited: [], updated: [] });
+  });
+});
+
+describe("formatEmailSessionTime", () => {
+  it("shows Eastern time with its label", () => {
+    expect(formatEmailSessionTime("2026-11-10T23:00:00Z", "2026-11-11T00:00:00Z")).toBe(
+      "Tue, Nov 10, 6:00 PM – 7:00 PM EST",
     );
   });
 });

@@ -19,6 +19,7 @@ export async function updateProfile(_: ActionState, formData: FormData): Promise
     youtube_url: formData.get("youtube_url") ?? "",
     x_url: formData.get("x_url") ?? "",
     website_url: formData.get("website_url") ?? "",
+    email_updates: formData.get("email_updates") === "on",
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 

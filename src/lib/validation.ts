@@ -54,6 +54,7 @@ export const profileSchema = z.object({
   youtube_url: socialLink("YouTube"),
   x_url: socialLink("X"),
   website_url: socialLink("website"),
+  email_updates: z.boolean(),
 });
 
 export const setRoleSchema = z.object({

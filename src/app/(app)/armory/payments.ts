@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { MIN_PAID_PRICE_CENTS, platformFeeCents } from "@/lib/armory";
 import { requireAccount, requireCoach } from "@/lib/auth";
+import { notifyOrderShipped } from "@/lib/notify";
 import { refreshPayoutAccount } from "@/lib/purchases";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -218,6 +220,8 @@ export async function markOrderShipped(_: ActionState, formData: FormData): Prom
   });
   if (error) return { error: "We couldn't update that order. Please try again." };
 
+  const purchaseId = parsed.data.purchase_id;
+  after(() => notifyOrderShipped(purchaseId));
   revalidatePath("/armory/sales");
-  return { message: "Marked as shipped." };
+  return { message: "Marked as shipped. We emailed the buyer." };
 }

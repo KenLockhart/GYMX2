@@ -94,3 +94,41 @@ export const responseLabel: Record<SessionResponse, string> = {
   going: "Going",
   not_going: "Can't go",
 };
+
+// Who to email after a coach saves a session. New invitees get an invite; members who were already
+// invited hear about it only when the time or place changed. Past sessions send nothing.
+export type SessionDetails = {
+  starts_at: string;
+  ends_at: string;
+  location: string;
+  meeting_url: string | null;
+};
+
+export function planSessionEmails(
+  before: { details: SessionDetails; memberIds: string[] } | null,
+  after: { details: SessionDetails; memberIds: string[] },
+  now = new Date(),
+) {
+  if (new Date(after.details.ends_at) <= now) return { invited: [], updated: [] };
+  const previous = new Set(before?.memberIds ?? []);
+  const invited = after.memberIds.filter((id) => !previous.has(id));
+  const changed =
+    before !== null &&
+    (new Date(before.details.starts_at).getTime() !== new Date(after.details.starts_at).getTime() ||
+      new Date(before.details.ends_at).getTime() !== new Date(after.details.ends_at).getTime() ||
+      before.details.location.trim() !== after.details.location.trim() ||
+      (before.details.meeting_url ?? "") !== (after.details.meeting_url ?? ""));
+  const updated = changed ? after.memberIds.filter((id) => previous.has(id)) : [];
+  return { invited, updated };
+}
+
+// Emails can't know the reader's time zone, so they show Eastern time and say so.
+export const EMAIL_TIME_ZONE = "America/New_York";
+
+export function formatEmailSessionTime(startsAt: string, endsAt: string) {
+  const zone =
+    new Intl.DateTimeFormat("en-US", { timeZone: EMAIL_TIME_ZONE, timeZoneName: "short" })
+      .formatToParts(new Date(startsAt))
+      .find((part) => part.type === "timeZoneName")?.value ?? "ET";
+  return `${formatSessionTime(startsAt, endsAt, EMAIL_TIME_ZONE)} ${zone}`;
+}
