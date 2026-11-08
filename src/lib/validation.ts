@@ -188,7 +188,37 @@ export const armoryItemSchema = z.discriminatedUnion("kind", [
     image_path: z.union([blankToNull, storagePath]),
     visible_to_all: z.boolean(),
   }),
+  z.object({
+    kind: z.literal("product"),
+    id: z.union([blankToNull, z.uuid()]),
+    category: armoryCategory,
+    title: armoryTitle,
+    description: armoryDescription,
+    price_cents: z
+      .number({ error: "Enter a price of at least $1.00." })
+      .int()
+      .min(100, "Enter a price of at least $1.00.")
+      .max(10_000_000, "That price is too high."),
+    shipping_cents: z
+      .number({ error: "Enter the shipping fee like 5.99, or 0 for free shipping." })
+      .int()
+      .min(0)
+      .max(100_000, "That shipping fee is too high."),
+    sizes: z.array(z.string().min(1).max(20)).max(20, "Use 20 sizes or fewer."),
+    image_path: z.union([blankToNull, storagePath]),
+    visible_to_all: z.boolean(),
+  }),
 ]);
+
+export const purchaseRequestSchema = z.object({
+  item_id: z.uuid(),
+  size: z.string().trim().max(40),
+});
+
+export const shipOrderSchema = z.object({
+  purchase_id: z.uuid(),
+  tracking: z.string().trim().max(100, "Use 100 characters or fewer for the tracking number."),
+});
 
 export const uploadRequestSchema = z.object({
   bucket: z.enum(["armory-files", "armory-images"]),

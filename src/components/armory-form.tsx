@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { prepareArmoryUpload, saveArmoryItem } from "@/app/(app)/armory/actions";
 import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
-import { ARMORY_CATEGORIES, PLATFORM_FEE_PERCENT, describeSize, type ArmoryKind } from "@/lib/armory";
+import { ARMORY_CATEGORIES, DEFAULT_SIZES, PLATFORM_FEE_PERCENT, describeSize, type ArmoryKind } from "@/lib/armory";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 export type ArmoryFormValues = {
@@ -14,6 +14,8 @@ export type ArmoryFormValues = {
   title: string;
   description: string;
   price: string;
+  shipping: string;
+  sizes: string;
   buy_url: string;
   file_path: string;
   file_name: string;
@@ -119,23 +121,30 @@ export function ArmoryForm({
     <ActionForm action={saveArmoryItem} className="max-w-xl space-y-5">
       <input type="hidden" name="id" value={initial.id} />
       <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="file_path" value={kind === "link" ? "" : filePath} />
-      <input type="hidden" name="file_name" value={kind === "link" ? "" : fileName} />
+      <input type="hidden" name="file_path" value={kind === "download" || kind === "paid" ? filePath : ""} />
+      <input type="hidden" name="file_name" value={kind === "download" || kind === "paid" ? fileName : ""} />
       <input type="hidden" name="image_path" value={imagePath} />
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">How do people get it?</legend>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2">
           {(
             [
               ["link", "Buy it elsewhere", "Link to your shop, Amazon, Gumroad and so on."],
               ["download", "Free download", "Upload a file members download here."],
               [
                 "paid",
-                "Sell it here",
+                "Sell a digital file",
                 payouts === "platform"
-                  ? "Members pay by card. Sales go to GYMX2."
-                  : `Members pay by card. You get the sale minus GYMX2's ${PLATFORM_FEE_PERCENT}% fee.`,
+                  ? "An ebook or program members pay for and download. Sales go to GYMX2."
+                  : `An ebook or program members pay for and download. You get the sale minus GYMX2's ${PLATFORM_FEE_PERCENT}% fee.`,
+              ],
+              [
+                "product",
+                "Sell gear",
+                payouts === "platform"
+                  ? "Shirts and other physical items. Buyers pick a size and give an address; you ship it."
+                  : `Shirts and other physical items. Buyers pick a size and give an address; you ship it and keep the shipping fee.`,
               ],
             ] as const
           ).map(([value, title, detail]) => (
@@ -180,7 +189,44 @@ export function ArmoryForm({
         />
       </label>
 
-      {kind === "link" ? (
+      {kind === "product" ? (
+        <>
+          {payouts === "missing" && (
+            <p role="status" className="rounded-lg border border-accent bg-surface p-3 text-sm">
+              Before members can buy this, connect where your money goes.{" "}
+              <Link href="/armory/payouts" className="text-link">
+                Set up payouts
+              </Link>
+              . You can save the item now.
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Price in USD"
+              name="price"
+              inputMode="decimal"
+              placeholder="49.95"
+              required
+              defaultValue={initial.price}
+            />
+            <Field
+              label="Shipping fee in USD"
+              name="shipping"
+              inputMode="decimal"
+              placeholder="5.99"
+              defaultValue={initial.shipping}
+              hint="Added at checkout. Leave blank or 0 for free shipping. US addresses only for now."
+            />
+          </div>
+          <Field
+            label="Sizes (optional)"
+            name="sizes"
+            placeholder={DEFAULT_SIZES}
+            defaultValue={initial.sizes}
+            hint="Separate with commas. Buyers must pick one. Leave blank if there's only one version."
+          />
+        </>
+      ) : kind === "link" ? (
         <>
           <Field
             label="Shop link"

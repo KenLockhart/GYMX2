@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArmoryForm } from "@/components/armory-form";
+import { DEFAULT_SIZES } from "@/lib/armory";
 import { requireCoachOrAdmin } from "@/lib/auth";
 import { loadPayoutStatus } from "../payout-status";
 
@@ -29,6 +30,8 @@ export default async function NewArmoryItemPage() {
           title: "",
           description: "",
           price: "",
+          shipping: "",
+          sizes: DEFAULT_SIZES,
           buy_url: "",
           file_path: "",
           file_name: "",

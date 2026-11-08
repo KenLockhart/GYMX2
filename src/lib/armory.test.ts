@@ -3,10 +3,12 @@ import {
   categoryLabel,
   describeSize,
   fileExtension,
+  addressLines,
   formatMoney,
   formatPrice,
   isCategory,
   parsePrice,
+  parseSizes,
   platformFeeCents,
   publicImageUrl,
   safeFileName,
@@ -104,5 +106,31 @@ describe("formatMoney", () => {
   it("shows zero as dollars", () => {
     expect(formatMoney(0)).toBe("$0.00");
     expect(formatMoney(1799)).toBe("$17.99");
+  });
+});
+
+describe("parseSizes", () => {
+  it("reads a comma list", () => {
+    expect(parseSizes("S, M, L, XL")).toEqual(["S", "M", "L", "XL"]);
+  });
+
+  it("drops blanks and repeats, and accepts one per line", () => {
+    expect(parseSizes("S\n m \n\nM, ,L")).toEqual(["S", "m", "L"]);
+  });
+
+  it("allows no sizes", () => {
+    expect(parseSizes("  ")).toEqual([]);
+  });
+});
+
+describe("addressLines", () => {
+  it("formats a US address", () => {
+    expect(
+      addressLines({ line1: "1 Main St", line2: null, city: "Atlanta", state: "GA", postal_code: "30301", country: "US" }),
+    ).toEqual(["1 Main St", "Atlanta, GA 30301"]);
+  });
+
+  it("handles a missing address", () => {
+    expect(addressLines(null)).toEqual([]);
   });
 });
