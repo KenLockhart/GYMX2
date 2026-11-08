@@ -25,9 +25,14 @@ export default async function AdminPage() {
           {requests === 1 ? "request" : "requests"} waiting
         </p>
       </div>
-        <Link href="/admin/messages" className="btn-secondary">
-          Review conversations
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/messages" className="btn-secondary">
+            Review conversations
+          </Link>
+          <Link href="/armory/sales" className="btn-secondary">
+            Armory sales
+          </Link>
+        </div>
       </div>
 
       {error ? (

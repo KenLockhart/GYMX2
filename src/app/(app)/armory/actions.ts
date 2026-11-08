@@ -63,8 +63,10 @@ async function removeFiles(paths: { bucket: string; path: string | null }[]) {
 export async function saveArmoryItem(_: ActionState, formData: FormData): Promise<ActionState> {
   const { profile } = await requireCoachOrAdmin();
   const kind = formData.get("kind");
-  const price_cents = kind === "link" ? parsePrice(String(formData.get("price") ?? "")) : null;
-  if (Number.isNaN(price_cents)) return { error: "Enter the price like 24.99, or leave it blank." };
+  const price_cents = kind === "download" ? null : parsePrice(String(formData.get("price") ?? ""));
+  if (Number.isNaN(price_cents)) {
+    return { error: kind === "paid" ? "Enter the price like 24.99." : "Enter the price like 24.99, or leave it blank." };
+  }
 
   const parsed = armoryItemSchema.safeParse({
     kind,
@@ -84,7 +86,7 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
 
   // Uploads must sit in the owner's own folder. The database checks this too.
   const ownPath = (path: string | null) => !path || path.startsWith(`${profile.id}/`);
-  if (!ownPath(item.image_path) || (item.kind === "download" && !ownPath(item.file_path))) {
+  if (!ownPath(item.image_path) || (item.kind !== "link" && !ownPath(item.file_path))) {
     return { error: "That upload didn't work. Please try again." };
   }
 
@@ -93,10 +95,10 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     category: item.category,
     title: item.title,
     description: item.description,
-    price_cents: item.kind === "link" ? item.price_cents : null,
+    price_cents: item.kind === "download" ? null : item.price_cents,
     buy_url: item.kind === "link" ? item.buy_url : null,
-    file_path: item.kind === "download" ? item.file_path : null,
-    file_name: item.kind === "download" ? item.file_name : null,
+    file_path: item.kind === "link" ? null : item.file_path,
+    file_name: item.kind === "link" ? null : item.file_name,
     image_path: item.image_path,
     visible_to_all: item.visible_to_all,
   };

@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { prepareArmoryUpload, saveArmoryItem } from "@/app/(app)/armory/actions";
 import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
-import { ARMORY_CATEGORIES, describeSize, type ArmoryKind } from "@/lib/armory";
+import { ARMORY_CATEGORIES, PLATFORM_FEE_PERCENT, describeSize, type ArmoryKind } from "@/lib/armory";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 export type ArmoryFormValues = {
@@ -98,7 +99,16 @@ function UploadField({
   );
 }
 
-export function ArmoryForm({ initial, submitLabel }: { initial: ArmoryFormValues; submitLabel: string }) {
+export function ArmoryForm({
+  initial,
+  submitLabel,
+  payouts,
+}: {
+  initial: ArmoryFormValues;
+  submitLabel: string;
+  // "ready": the coach can be paid. "missing": they need to set up payouts first. "platform": GYMX2's own item.
+  payouts: "ready" | "missing" | "platform";
+}) {
   const [kind, setKind] = useState<ArmoryKind>(initial.kind);
   const [filePath, setFilePath] = useState(initial.file_path);
   const [fileName, setFileName] = useState(initial.file_name);
@@ -109,17 +119,24 @@ export function ArmoryForm({ initial, submitLabel }: { initial: ArmoryFormValues
     <ActionForm action={saveArmoryItem} className="max-w-xl space-y-5">
       <input type="hidden" name="id" value={initial.id} />
       <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="file_path" value={kind === "download" ? filePath : ""} />
-      <input type="hidden" name="file_name" value={kind === "download" ? fileName : ""} />
+      <input type="hidden" name="file_path" value={kind === "link" ? "" : filePath} />
+      <input type="hidden" name="file_name" value={kind === "link" ? "" : fileName} />
       <input type="hidden" name="image_path" value={imagePath} />
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">How do people get it?</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           {(
             [
               ["link", "Buy it elsewhere", "Link to your shop, Amazon, Gumroad and so on."],
               ["download", "Free download", "Upload a file members download here."],
+              [
+                "paid",
+                "Sell it here",
+                payouts === "platform"
+                  ? "Members pay by card. Sales go to GYMX2."
+                  : `Members pay by card. You get the sale minus GYMX2's ${PLATFORM_FEE_PERCENT}% fee.`,
+              ],
             ] as const
           ).map(([value, title, detail]) => (
             <label
@@ -184,8 +201,35 @@ export function ArmoryForm({ initial, submitLabel }: { initial: ArmoryFormValues
           />
         </>
       ) : (
+        <>
+        {kind === "paid" && (
+          <>
+            {payouts === "missing" && (
+              <p role="status" className="rounded-lg border border-accent bg-surface p-3 text-sm">
+                Before members can buy this, connect where your money goes.{" "}
+                <Link href="/armory/payouts" className="text-link">
+                  Set up payouts
+                </Link>
+                . You can save the item now.
+              </p>
+            )}
+            <Field
+              label="Price in USD"
+              name="price"
+              inputMode="decimal"
+              placeholder="19.99"
+              required
+              defaultValue={initial.price}
+              hint={
+                payouts === "platform"
+                  ? "At least $1.00."
+                  : `At least $1.00. Stripe's card fees also come out of your share.`
+              }
+            />
+          </>
+        )}
         <UploadField
-          label="File to download"
+          label={kind === "paid" ? "File buyers download" : "File to download"}
           hint="PDF, EPUB, ZIP, MP3, MP4, PNG or JPG, up to 50 MB."
           accept=".pdf,.epub,.zip,.mp3,.mp4,.png,.jpg,.jpeg"
           bucket="armory-files"
@@ -195,6 +239,7 @@ export function ArmoryForm({ initial, submitLabel }: { initial: ArmoryFormValues
             setFileName(name);
           }}
         />
+        </>
       )}
 
       <UploadField

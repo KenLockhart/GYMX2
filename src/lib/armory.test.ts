@@ -3,9 +3,11 @@ import {
   categoryLabel,
   describeSize,
   fileExtension,
+  formatMoney,
   formatPrice,
   isCategory,
   parsePrice,
+  platformFeeCents,
   publicImageUrl,
   safeFileName,
 } from "./armory";
@@ -84,5 +86,23 @@ describe("describeSize", () => {
   it("shows KB and MB", () => {
     expect(describeSize(2048)).toBe("2 KB");
     expect(describeSize(5 * 1024 * 1024)).toBe("5.0 MB");
+  });
+});
+
+describe("platformFeeCents", () => {
+  it.each([
+    [1999, 200],
+    [1000, 100],
+    [105, 11],
+    [0, 0],
+  ])("takes 10%% of %i cents", (amount, fee) => {
+    expect(platformFeeCents(amount)).toBe(fee);
+  });
+});
+
+describe("formatMoney", () => {
+  it("shows zero as dollars", () => {
+    expect(formatMoney(0)).toBe("$0.00");
+    expect(formatMoney(1799)).toBe("$17.99");
   });
 });

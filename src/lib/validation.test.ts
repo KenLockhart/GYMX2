@@ -247,4 +247,15 @@ describe("armoryItemSchema", () => {
   it("rejects an unknown category", () => {
     expect(armoryItemSchema.safeParse({ ...link, category: "weapons" }).success).toBe(false);
   });
+
+  const paid = { ...download, kind: "paid", price_cents: 1999 };
+
+  it("accepts a paid download", () => {
+    expect(armoryItemSchema.safeParse(paid).success).toBe(true);
+  });
+
+  it.each([null, 50])("needs a paid price of at least $1 (got %s)", (price_cents) => {
+    const result = armoryItemSchema.safeParse({ ...paid, price_cents });
+    expect(result.error?.issues[0].message).toBe("Enter a price of at least $1.00.");
+  });
 });

@@ -42,14 +42,24 @@ export default async function ArmoryPage({
           <h1 className="text-5xl">The Armory</h1>
           <p className="mt-2 max-w-xl text-muted">
             {profile.role === "coach"
-              ? "Ebooks, gear and programs for your members. Link to where you already sell, or share free downloads."
+              ? "Ebooks, gear and programs for your members. Sell them here, link to where you already sell, or share free downloads."
               : "Ebooks, gear and programs chosen by your coaches."}
           </p>
         </div>
         {canAdd && (
-          <Link href="/armory/new" className="btn-primary">
-            Add an item
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/armory/sales" className="btn-secondary">
+              Sales
+            </Link>
+            {profile.role === "coach" && (
+              <Link href="/armory/payouts" className="btn-secondary">
+                Payouts
+              </Link>
+            )}
+            <Link href="/armory/new" className="btn-primary">
+              Add an item
+            </Link>
+          </div>
         )}
       </div>
 

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArmoryForm } from "@/components/armory-form";
 import { publicImageUrl } from "@/lib/armory";
 import { requireCoachOrAdmin } from "@/lib/auth";
+import { loadPayoutStatus } from "../../payout-status";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmoryItem } from "@/lib/types";
@@ -24,6 +25,7 @@ export default async function EditArmoryItemPage({ params }: { params: Promise<{
     .eq("coach_id", profile.id)
     .maybeSingle<ArmoryItem>();
   if (!data) notFound();
+  const payouts = await loadPayoutStatus(profile);
 
   return (
     <div className="space-y-6">
@@ -33,6 +35,7 @@ export default async function EditArmoryItemPage({ params }: { params: Promise<{
       <h1 className="text-5xl">Edit item</h1>
       <ArmoryForm
         submitLabel="Save changes"
+        payouts={payouts}
         initial={{
           id: data.id,
           kind: data.kind,

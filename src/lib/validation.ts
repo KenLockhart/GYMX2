@@ -172,6 +172,22 @@ export const armoryItemSchema = z.discriminatedUnion("kind", [
     image_path: z.union([blankToNull, storagePath]),
     visible_to_all: z.boolean(),
   }),
+  z.object({
+    kind: z.literal("paid"),
+    id: z.union([blankToNull, z.uuid()]),
+    category: armoryCategory,
+    title: armoryTitle,
+    description: armoryDescription,
+    price_cents: z
+      .number({ error: "Enter a price of at least $1.00." })
+      .int()
+      .min(100, "Enter a price of at least $1.00.")
+      .max(10_000_000, "That price is too high."),
+    file_path: z.string().min(1, "Upload the file buyers will download.").pipe(storagePath),
+    file_name: z.string().trim().min(1, "Upload the file buyers will download.").max(200),
+    image_path: z.union([blankToNull, storagePath]),
+    visible_to_all: z.boolean(),
+  }),
 ]);
 
 export const uploadRequestSchema = z.object({
