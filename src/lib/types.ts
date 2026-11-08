@@ -13,6 +13,9 @@ export type Profile = {
   website_url: string | null;
   email_updates: boolean;
   join_mode: "free" | "paid" | "both";
+  share_tracking: boolean;
+  protein_target_g: number | null;
+  calorie_target: number | null;
   created_at: string;
   updated_at: string;
 };

@@ -31,6 +31,7 @@ export type MemberActivity = {
   messages: string[]; // when they sent a message
   purchases: number;
   coaches: number; // coaches they've joined
+  habits: { day: string; pillar: Pillar }[]; // habit check-ins, "YYYY-MM-DD"
 };
 
 export type CoachActivity = {
@@ -204,6 +205,8 @@ export function allChallengesDone(challenges: Challenge[]) {
 // ---- Badges ---------------------------------------------------------------------------------
 
 type MemberStats = {
+  habits: number;
+  balancedDays: number;
   tasks: number;
   pillarTasks: Record<Pillar, number>;
   sessions: number;
@@ -345,6 +348,27 @@ export const MEMBER_BADGES: BadgeRule<MemberStats>[] = [
     icon: "⚔️",
     earned: (s) => s.weekComplete,
   },
+  {
+    key: "first_habit",
+    name: "Habit Starter",
+    description: "Check off your first daily habit",
+    icon: "🌱",
+    earned: (s) => s.habits >= 1,
+  },
+  {
+    key: "habits_100",
+    name: "Habit Machine",
+    description: "Check off 100 daily habits",
+    icon: "💯",
+    earned: (s) => s.habits >= 100,
+  },
+  {
+    key: "balanced_day",
+    name: "Balanced Day",
+    description: "Check off a Mind, Body and Spirit habit on the same day",
+    icon: "☯️",
+    earned: (s) => s.balancedDays >= 1,
+  },
 ];
 
 export const COACH_BADGES: BadgeRule<CoachStats>[] = [
@@ -475,11 +499,16 @@ export function memberProgress(
       ...activity.memoDays,
       ...activity.going.map(dayKey),
       ...activity.messages.map(dayKey),
+      ...activity.habits.map((row) => row.day),
     ],
     now,
   );
+  const pillarsByDay = new Map<string, Set<Pillar>>();
+  for (const row of activity.habits) pillarsByDay.set(row.day, (pillarsByDay.get(row.day) ?? new Set()).add(row.pillar));
   const challenges = memberChallenges(activity, now);
   const stats: MemberStats = {
+    habits: activity.habits.length,
+    balancedDays: [...pillarsByDay.values()].filter((pillars) => pillars.size === 3).length,
     tasks: activity.completions.length,
     pillarTasks,
     sessions: activity.going.length,
@@ -494,7 +523,8 @@ export function memberProgress(
     stats.tasks * MEMBER_POINTS.tasks +
     stats.sessions * MEMBER_POINTS.sessions +
     stats.messages * MEMBER_POINTS.messages +
-    stats.memos * MEMBER_POINTS.memos;
+    stats.memos * MEMBER_POINTS.memos +
+    stats.habits * MEMBER_POINTS.habits;
 
   const badges = MEMBER_BADGES.map(({ earned, ...badge }) => ({
     ...badge,

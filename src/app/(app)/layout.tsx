@@ -74,9 +74,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               Memos
             </Link>
             {profile.role !== "admin" && (
-              <Link href="/progress" className="hover:text-accent">
-                Progress
-              </Link>
+              <>
+                <Link href="/track" className="hover:text-accent">
+                  Track
+                </Link>
+                <Link href="/progress" className="hover:text-accent">
+                  Progress
+                </Link>
+              </>
             )}
             <Link href="/profile" className="hover:text-accent">
               Profile

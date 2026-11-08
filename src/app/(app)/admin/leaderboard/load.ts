@@ -27,7 +27,7 @@ export async function loadActivity(since: string | null): Promise<ActivityRows> 
   const after = <Q,>(query: Q, column: string): Q =>
     since ? (query as unknown as { gte: (column: string, value: string) => Q }).gte(column, since) : query;
 
-  const [people, completions, assignedRows, going, sessions, messages, memos, videos, joins, sales] =
+  const [people, completions, assignedRows, going, sessions, messages, memos, videos, joins, sales, habits] =
     await Promise.all([
       readAll<ActivityRows["people"][number]>(() => db.from("profiles").select("id, display_name, role").order("id")),
       readAll<ActivityRows["completions"][number]>(() =>
@@ -58,6 +58,9 @@ export async function loadActivity(since: string | null): Promise<ActivityRows> 
           "created_at",
         ).order("id"),
       ),
+      readAll<ActivityRows["habits"][number]>(() =>
+        after(db.from("habit_logs").select("user_id"), "created_at").order("habit_id"),
+      ),
     ]);
 
   return {
@@ -71,5 +74,6 @@ export async function loadActivity(since: string | null): Promise<ActivityRows> 
     videos,
     joins,
     sales,
+    habits,
   };
 }
