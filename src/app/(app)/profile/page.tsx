@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { deletionBlocker } from "@/lib/account-deletion";
 import { requireAccount } from "@/lib/auth";
+import { GoalsForm, SpecialtiesForm } from "@/components/goals-form";
 import { PushToggle } from "@/components/push-toggle";
+import { updateGoals, updateSpecialties } from "../welcome/actions";
 import { DeleteAccountForm } from "./delete-account-form";
 import { ProfileForm } from "./profile-form";
 
@@ -18,6 +20,54 @@ export default async function ProfilePage() {
         <h1 className="text-5xl">Your profile</h1>
         <ProfileForm profile={profile} email={email} />
       </div>
+
+      {profile.role === "member" && (
+        <section
+          id="goals"
+          aria-labelledby="goals-heading"
+          className="scroll-mt-6 space-y-4 border-t border-border pt-8"
+        >
+          <h2 id="goals-heading" className="text-2xl">
+            Your goals
+          </h2>
+          <p className="max-w-xl text-sm text-muted">
+            Used to suggest coaches. Coaches you join see these so they can
+            tailor your training.{" "}
+            <Link href="/welcome/matches" className="text-link">
+              See your matches
+            </Link>
+          </p>
+          <GoalsForm
+            action={updateGoals}
+            initial={{
+              goals: profile.goals,
+              experience: profile.experience,
+              focus: profile.focus,
+            }}
+            submitLabel="Save goals"
+          />
+        </section>
+      )}
+
+      {profile.role === "coach" && (
+        <section
+          id="specialties"
+          aria-labelledby="specialties-heading"
+          className="scroll-mt-6 space-y-3 border-t border-border pt-8"
+        >
+          <h2 id="specialties-heading" className="text-2xl">
+            Your specialties
+          </h2>
+          <p className="max-w-xl text-sm text-muted">
+            New members pick their goals when they sign up. Pick what you coach
+            best and you&apos;ll be suggested to members who want it.
+          </p>
+          <SpecialtiesForm
+            action={updateSpecialties}
+            initial={profile.specialties}
+          />
+        </section>
+      )}
 
       <section
         id="notifications"

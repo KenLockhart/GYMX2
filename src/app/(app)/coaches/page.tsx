@@ -6,6 +6,7 @@ import { formatMoney } from "@/lib/armory";
 import { requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
+import { matchCoaches } from "@/lib/onboarding";
 import { joinCoach, leaveCoach } from "./actions";
 import { BadgeRow } from "@/components/game-parts";
 import { loadBadges } from "@/lib/achievements-data";
@@ -20,7 +21,7 @@ export default async function CoachesPage() {
   const [coachResult, joinedResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, bio, join_mode")
+      .select("id, display_name, bio, join_mode, specialties")
       .eq("role", "coach")
       .order("display_name"),
     supabase
@@ -30,8 +31,23 @@ export default async function CoachesPage() {
   ]);
   const coaches = (coachResult.data ?? []) as Pick<
     Profile,
-    "id" | "display_name" | "bio" | "join_mode"
+    "id" | "display_name" | "bio" | "join_mode" | "specialties"
   >[];
+  const matched = new Map(
+    matchCoaches(
+      { goals: profile.goals, focus: profile.focus },
+      coaches.map((coach) => ({
+        id: coach.id,
+        specialties: coach.specialties ?? [],
+        programs: 0,
+      })),
+      coaches.length,
+    ).map((match) => [match.id, match]),
+  );
+  // Best matches first, then everyone else alphabetically.
+  coaches.sort(
+    (a, b) => (matched.get(b.id)?.score ?? 0) - (matched.get(a.id)?.score ?? 0),
+  );
   // The cheapest open plan per coach, for "Plans from $X/month".
   const { data: planData } = await supabase
     .from("coach_plans")
@@ -87,6 +103,11 @@ export default async function CoachesPage() {
                       {coach.display_name}
                     </Link>
                     <BadgeRow badges={badges.get(coach.id) ?? []} max={5} />
+                    {(matched.get(coach.id)?.shared.length ?? 0) > 0 && (
+                      <span className="rounded bg-accent px-1.5 py-0.5 text-xs font-bold uppercase text-accent-foreground">
+                        Good match
+                      </span>
+                    )}
                   </div>
                   {coach.bio && (
                     <p className="mt-1 text-sm text-muted">{coach.bio}</p>
