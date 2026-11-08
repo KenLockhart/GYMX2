@@ -137,3 +137,45 @@ export const messageSchema = z.object({
   other_user_id: z.uuid("Choose who to message."),
   body: z.string().trim().min(1, "Write a message first.").max(4000, "Use 4,000 characters or fewer."),
 });
+
+const armoryTitle = z.string().trim().min(1, "Enter a title.").max(120, "Use 120 characters or fewer for the title.");
+const armoryDescription = z.string().trim().max(4000, "Use 4,000 characters or fewer for the description.");
+const armoryCategory = z.enum(["ebook", "gear", "program", "other"], { error: "Choose a category." });
+const blankToNull = z.literal("").transform(() => null);
+// Stored paths look like "<owner id>/<random>-<name>". The owner part is checked again by the database.
+const storagePath = z.string().regex(/^[0-9a-f-]{36}\/[\w.-]{1,200}$/, "That upload didn't work. Please try again.");
+
+export const armoryItemSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("link"),
+    id: z.union([blankToNull, z.uuid()]),
+    category: armoryCategory,
+    title: armoryTitle,
+    description: armoryDescription,
+    price_cents: z.number().int().min(0).max(10_000_000).nullable(),
+    buy_url: z
+      .string()
+      .trim()
+      .max(1000, "The link is too long.")
+      .refine((value) => isHttpsUrl(value), { error: "Add the full shop link, starting with https://" }),
+    image_path: z.union([blankToNull, storagePath]),
+    visible_to_all: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal("download"),
+    id: z.union([blankToNull, z.uuid()]),
+    category: armoryCategory,
+    title: armoryTitle,
+    description: armoryDescription,
+    file_path: z.string().min(1, "Upload the file people will download.").pipe(storagePath),
+    file_name: z.string().trim().min(1, "Upload the file people will download.").max(200),
+    image_path: z.union([blankToNull, storagePath]),
+    visible_to_all: z.boolean(),
+  }),
+]);
+
+export const uploadRequestSchema = z.object({
+  bucket: z.enum(["armory-files", "armory-images"]),
+  file_name: z.string().trim().min(1).max(200),
+  size: z.number().int().positive(),
+});

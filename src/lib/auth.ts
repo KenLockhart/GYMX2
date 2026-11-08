@@ -37,3 +37,10 @@ export async function requireAdmin() {
   if (account.profile.role !== "admin") redirect("/dashboard");
   return account;
 }
+
+// Coaches sell to their members; admins can add GYMX2's own items.
+export async function requireCoachOrAdmin() {
+  const account = await requireAccount();
+  if (account.profile.role !== "coach" && account.profile.role !== "admin") redirect("/dashboard");
+  return account;
+}
