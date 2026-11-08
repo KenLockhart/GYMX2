@@ -9,7 +9,7 @@ import { getSiteUrl } from "@/lib/supabase/env";
 
 type PurchaseForRefund = {
   id: string;
-  member_id: string;
+  member_id: string | null;
   seller_id: string | null;
   item_title: string;
   amount_cents: number;
@@ -71,7 +71,7 @@ export async function recordRefund(purchase: PurchaseForRefund, refundedBy: stri
 
   after(async () => {
     try {
-      const buyer = await loadRecipient(purchase.member_id);
+      const buyer = purchase.member_id ? await loadRecipient(purchase.member_id) : null;
       const common = {
         siteUrl: getSiteUrl(),
         itemTitle: purchase.item_title,

@@ -295,3 +295,22 @@ export function refundEmail(input: {
     }),
   };
 }
+
+export function accountDeletedEmail(input: { siteUrl: string; name: string }): Email {
+  return {
+    subject: "Your GYMX2 account was deleted",
+    ...render({
+      heading: "Your account is deleted",
+      blocks: [
+        { kind: "p", text: `Hi ${input.name}, your GYMX2 account and everything in it has been deleted, as you asked.` },
+        {
+          kind: "p",
+          text: "We keep records of past purchases for tax and accounting, without your name attached. Backups clear within 30 days.",
+        },
+        { kind: "p", text: "If you didn't do this, email support@gymx2.com right away." },
+      ],
+      button: { label: "Visit GYMX2", url: input.siteUrl },
+      footer: "This is the last email you'll get from GYMX2.",
+    }),
+  };
+}

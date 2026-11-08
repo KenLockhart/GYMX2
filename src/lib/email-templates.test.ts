@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountDeletedEmail,
   escapeHtml,
   flaggedMessageEmail,
   refundEmail,
@@ -179,5 +180,14 @@ describe("refundEmail", () => {
     const email = refundEmail({ ...base, audience: "seller" });
     expect(email.subject).toBe("Order refunded: Tee");
     expect(email.text).toContain("Please don't send it.");
+  });
+});
+
+describe("accountDeletedEmail", () => {
+  it("confirms the deletion and says what's kept", () => {
+    const email = accountDeletedEmail({ siteUrl, name: "Sam" });
+    expect(email.subject).toBe("Your GYMX2 account was deleted");
+    expect(email.text).toContain("Hi Sam, your GYMX2 account");
+    expect(email.text).toContain("without your name attached");
   });
 });
