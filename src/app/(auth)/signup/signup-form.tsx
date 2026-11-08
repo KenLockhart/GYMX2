@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
 import { signUp } from "../actions";
 
@@ -24,6 +25,17 @@ export function SignupForm() {
           <span className="block text-muted">An admin reviews every coach request.</span>
         </span>
       </label>
+      <p className="text-sm text-muted">
+        By creating an account, you agree to the{" "}
+        <Link href="/terms" className="text-link">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="text-link">
+          Privacy Policy
+        </Link>
+        , and confirm you are 18 or older.
+      </p>
       <FormStatus />
       <SubmitButton pendingText="Creating account...">Create account</SubmitButton>
     </ActionForm>
