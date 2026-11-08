@@ -2,7 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { formatMoney } from "@/lib/armory";
 import { requireAdmin } from "@/lib/auth";
-import { COACH_POINTS, LEADERBOARD_RANGES, MEMBER_POINTS, buildLeaderboards, rangeStart } from "@/lib/leaderboard";
+import {
+  COACH_POINTS,
+  LEADERBOARD_RANGES,
+  MEMBER_POINTS,
+  buildLeaderboards,
+  rangeStart,
+} from "@/lib/leaderboard";
 import { loadActivity } from "./load";
 
 export const metadata: Metadata = { title: "Leaderboard" };
@@ -27,7 +33,9 @@ function Board({
         {note && <p className="text-xs text-muted">{note}</p>}
       </div>
       {rows.length === 0 ? (
-        <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">{empty}</p>
+        <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
+          {empty}
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full min-w-[28rem] text-left text-sm">
@@ -47,8 +55,15 @@ function Board({
             </thead>
             <tbody className="divide-y divide-border">
               {rows.map((row, rank) => (
-                <tr key={row.key} className={rank === 0 ? "bg-surface-raised" : undefined}>
-                  <td className={`p-3 font-semibold ${rank < 3 ? "text-accent" : "text-muted"}`}>{rank + 1}</td>
+                <tr
+                  key={row.key}
+                  className={rank === 0 ? "bg-surface-raised" : undefined}
+                >
+                  <td
+                    className={`p-3 font-semibold ${rank < 3 ? "text-accent" : "text-muted"}`}
+                  >
+                    {rank + 1}
+                  </td>
                   <td className="p-3 font-medium">{row.name}</td>
                   {row.cells.map((cell, index) => (
                     <td
@@ -75,9 +90,14 @@ export default async function LeaderboardPage({
 }) {
   await requireAdmin();
   const requested = (await searchParams).range;
-  const { range, since } = rangeStart(typeof requested === "string" ? requested : undefined);
+  const { range, since } = rangeStart(
+    typeof requested === "string" ? requested : undefined,
+  );
   const boards = buildLeaderboards(await loadActivity(since));
-  const empty = range.days === null ? "Nothing yet." : `Nothing in the ${range.label.toLowerCase()}.`;
+  const empty =
+    range.days === null
+      ? "Nothing yet."
+      : `Nothing in the ${range.label.toLowerCase()}.`;
 
   return (
     <div className="space-y-8">
@@ -88,7 +108,8 @@ export default async function LeaderboardPage({
         <div>
           <h1 className="text-5xl">Leaderboard</h1>
           <p className="mt-2 max-w-2xl text-muted">
-            Who&apos;s most active and who&apos;s selling. Scores count what people do, never what they write.
+            Who&apos;s most active and who&apos;s selling. Scores count what
+            people do, never what they write.
           </p>
         </div>
         <nav aria-label="Time range" className="flex gap-2">
@@ -117,18 +138,38 @@ export default async function LeaderboardPage({
           rows={boards.members.map((row) => ({
             key: row.id,
             name: row.name,
-            cells: [row.tasks, row.sessions, row.messages, row.memos, row.score],
+            cells: [
+              row.tasks,
+              row.sessions,
+              row.messages,
+              row.memos,
+              row.score,
+            ],
           }))}
           empty={empty}
         />
         <Board
           title="Most active coaches"
           note={`Points: video ${COACH_POINTS.videos} · new member ${COACH_POINTS.newMembers} · session ${COACH_POINTS.sessions} · task given ${COACH_POINTS.tasks} · message ${COACH_POINTS.messages}`}
-          columns={["Videos", "New members", "Sessions", "Tasks given", "Messages", "Score"]}
+          columns={[
+            "Videos",
+            "New members",
+            "Sessions",
+            "Tasks given",
+            "Messages",
+            "Score",
+          ]}
           rows={boards.coaches.map((row) => ({
             key: row.id,
             name: row.name,
-            cells: [row.videos, row.newMembers, row.sessions, row.tasks, row.messages, row.score],
+            cells: [
+              row.videos,
+              row.newMembers,
+              row.sessions,
+              row.tasks,
+              row.messages,
+              row.score,
+            ],
           }))}
           empty={empty}
         />
@@ -150,12 +191,16 @@ export default async function LeaderboardPage({
           rows={boards.sellers.map((row) => ({
             key: row.id,
             name: row.name,
-            cells: [row.sales, row.id === "gymx2" ? "—" : formatMoney(row.earned), formatMoney(row.cents)],
+            cells: [
+              row.sales,
+              row.id === "gymx2" ? "—" : formatMoney(row.earned),
+              formatMoney(row.cents),
+            ],
           }))}
           empty={empty}
         />
         <Board
-          title="Best-selling items"
+          title="Best-selling items and memberships"
           columns={["Revenue", "Sold"]}
           rows={boards.items.map((row) => ({
             key: row.id ?? row.title,
@@ -165,7 +210,10 @@ export default async function LeaderboardPage({
               </Link>
             ) : (
               <span>
-                {row.title} <span className="text-xs text-muted">(removed)</span>
+                {row.title}{" "}
+                <span className="text-xs text-muted">
+                  {row.membership ? "(monthly payments)" : "(removed)"}
+                </span>
               </span>
             ),
             cells: [formatMoney(row.cents), row.sold],

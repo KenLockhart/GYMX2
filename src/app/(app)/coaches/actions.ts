@@ -6,7 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
 
-export async function joinCoach(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function joinCoach(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const { profile } = await requireAccount();
   const coachId = idSchema.safeParse(formData.get("coach_id"));
   if (!coachId.success) return { error: "Choose a coach." };
@@ -25,18 +28,39 @@ export async function joinCoach(_: ActionState, formData: FormData): Promise<Act
   return {};
 }
 
-export async function leaveCoach(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function leaveCoach(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const { profile } = await requireAccount();
   const coachId = idSchema.safeParse(formData.get("coach_id"));
   if (!coachId.success) return { error: "Choose a coach." };
 
   const supabase = await createClient();
+  const { data: memberships } = await supabase
+    .from("subscriptions")
+    .select("status, cancel_at_period_end")
+    .eq("coach_id", coachId.data)
+    .eq("member_id", profile.id);
+  if (
+    (memberships ?? []).some(
+      (row) =>
+        ["trialing", "active", "past_due"].includes(row.status as string) &&
+        !row.cancel_at_period_end,
+    )
+  ) {
+    return {
+      error:
+        "You have a paid membership with this coach. Cancel it in My purchases first.",
+    };
+  }
   const { error } = await supabase
     .from("coach_members")
     .delete()
     .eq("coach_id", coachId.data)
     .eq("member_id", profile.id);
-  if (error) return { error: "We couldn't leave that coach. Please try again." };
+  if (error)
+    return { error: "We couldn't leave that coach. Please try again." };
 
   revalidatePath("/", "layout");
   return {};

@@ -54,7 +54,7 @@ export async function loadActivity(since: string | null): Promise<ActivityRows> 
       ),
       readAll<ActivityRows["sales"][number]>(() =>
         after(
-          db.from("purchases").select("member_id, seller_id, item_id, item_title, amount_cents, fee_cents, refunded_at"),
+          db.from("purchases").select("member_id, seller_id, item_id, item_title, amount_cents, fee_cents, refunded_at, kind"),
           "created_at",
         ).order("id"),
       ),

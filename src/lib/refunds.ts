@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import { voidCommissionsForPurchase } from "@/lib/affiliate-server";
 import { loadRecipient, sendEmail } from "@/lib/email";
 import { refundEmail } from "@/lib/email-templates";
+import { invoiceForPaymentIntent, invoicePaymentIntent } from "@/lib/membership-server";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
@@ -31,10 +32,17 @@ export async function refundPurchase(purchaseId: string, refundedBy: string) {
   if (purchase.refunded_at) return { error: "This order was already refunded." };
   const stripe = getStripe();
   try {
-    const session = await stripe.checkout.sessions.retrieve(purchase.stripe_session_id, {
-      expand: ["payment_intent"],
-    });
-    const intent = session.payment_intent as Stripe.PaymentIntent | null;
+    // Armory orders are Checkout sessions; membership payments are invoices.
+    let intent: Stripe.PaymentIntent | null;
+    if (purchase.stripe_session_id.startsWith("in_")) {
+      const intentId = await invoicePaymentIntent(purchase.stripe_session_id);
+      intent = intentId ? await stripe.paymentIntents.retrieve(intentId) : null;
+    } else {
+      const session = await stripe.checkout.sessions.retrieve(purchase.stripe_session_id, {
+        expand: ["payment_intent"],
+      });
+      intent = session.payment_intent as Stripe.PaymentIntent | null;
+    }
     if (!intent) return { error: "Stripe has no payment for this order." };
     const toCoach = Boolean(intent.transfer_data?.destination);
     await stripe.refunds.create(
@@ -96,7 +104,7 @@ export async function recordRefund(purchase: PurchaseForRefund, refundedBy: stri
 export async function recordRefundFromCharge(charge: Stripe.Charge) {
   if (!charge.refunded || typeof charge.payment_intent !== "string") return;
   const sessions = await getStripe().checkout.sessions.list({ payment_intent: charge.payment_intent, limit: 1 });
-  const sessionId = sessions.data[0]?.id;
+  const sessionId = sessions.data[0]?.id ?? (await invoiceForPaymentIntent(charge.payment_intent));
   if (!sessionId) return;
   const { data: purchase } = await createAdminClient()
     .from("purchases")

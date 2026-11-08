@@ -469,3 +469,35 @@ export function weeklyDigestEmail(input: {
     }),
   };
 }
+
+export function membershipChangeEmail(input: {
+  siteUrl: string;
+  change: "started" | "ended";
+  memberName: string;
+  planName: string;
+  priceCents: number;
+  trial: boolean;
+}): Email {
+  const started = input.change === "started";
+  return {
+    subject: started
+      ? `New ${input.trial ? "trial" : "member"}: ${oneLine(input.memberName, 40)} joined ${oneLine(input.planName, 40)}`
+      : `Membership ended: ${oneLine(input.memberName, 40)}`,
+    ...render({
+      heading: started ? "You have a new subscriber" : "A membership ended",
+      blocks: started
+        ? [
+            {
+              kind: "p",
+              text: `${input.memberName} subscribed to ${input.planName} (${money(input.priceCents)}/month)${
+                input.trial ? ", starting with a 7-day free trial" : ""
+              }.`,
+            },
+            { kind: "p", text: "Say hello and give them their first Task." },
+          ]
+        : [{ kind: "p", text: `${input.memberName}'s ${input.planName} membership has ended.` }],
+      button: { label: "See your members", url: `${input.siteUrl}/plans` },
+      footer: "You're getting this because you offer memberships on GYMX2.",
+    }),
+  };
+}
