@@ -1,3 +1,4 @@
+import { detectFlags, type MessageFlag } from "./message-flags";
 import type { Message } from "./types";
 
 export type Contact = { id: string; display_name: string; connected: boolean };
@@ -56,34 +57,55 @@ export type ReviewConversation = {
   member_name: string;
   count: number;
   last: Pick<Message, "body" | "created_at" | "sender_id">;
+  // Messages that tripped a flag, the kinds seen, and when the latest one was sent.
+  flagged: number;
+  flags: MessageFlag[];
+  last_flagged_at: string | null;
 };
 
 // For admin review: one row per coach and member pair, most recently active first.
+// With flaggedOnly, just the pairs with a flagged message, the most recently flagged first.
 export function groupForReview(
   messages: (Pick<Message, "coach_id" | "member_id" | "sender_id" | "body" | "created_at"> & {
     coach?: { display_name: string } | null;
     member?: { display_name: string } | null;
   })[],
+  { flaggedOnly = false }: { flaggedOnly?: boolean } = {},
 ): ReviewConversation[] {
   const byPair = new Map<string, ReviewConversation>();
   for (const message of messages) {
     const key = `${message.coach_id}:${message.member_id}`;
-    const row = byPair.get(key);
+    let row = byPair.get(key);
     if (!row) {
-      byPair.set(key, {
+      row = {
         coach_id: message.coach_id,
         member_id: message.member_id,
         coach_name: message.coach?.display_name ?? "Unknown coach",
         member_name: message.member?.display_name ?? "Unknown member",
-        count: 1,
+        count: 0,
         last: { body: message.body, created_at: message.created_at, sender_id: message.sender_id },
-      });
-      continue;
+        flagged: 0,
+        flags: [],
+        last_flagged_at: null,
+      };
+      byPair.set(key, row);
     }
     row.count += 1;
     if (message.created_at > row.last.created_at) {
       row.last = { body: message.body, created_at: message.created_at, sender_id: message.sender_id };
     }
+    const flags = detectFlags(message.body);
+    if (flags.length) {
+      row.flagged += 1;
+      for (const flag of flags) if (!row.flags.includes(flag)) row.flags.push(flag);
+      if (!row.last_flagged_at || message.created_at > row.last_flagged_at) row.last_flagged_at = message.created_at;
+    }
   }
-  return [...byPair.values()].sort((a, b) => b.last.created_at.localeCompare(a.last.created_at));
+  const rows = [...byPair.values()];
+  if (flaggedOnly) {
+    return rows
+      .filter((row) => row.flagged > 0)
+      .sort((a, b) => (b.last_flagged_at ?? "").localeCompare(a.last_flagged_at ?? ""));
+  }
+  return rows.sort((a, b) => b.last.created_at.localeCompare(a.last.created_at));
 }

@@ -228,3 +228,29 @@ export function sessionEmail(input: {
     }),
   };
 }
+
+export function flaggedMessageEmail(input: {
+  siteUrl: string;
+  coachName: string;
+  memberName: string;
+  fromCoach: boolean;
+  reasons: string;
+  body: string;
+  reviewPath: string;
+}): Email {
+  const sender = input.fromCoach ? `${input.coachName} (coach)` : `${input.memberName} (member)`;
+  const preview = input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
+  return {
+    subject: `Flagged message: ${oneLine(input.coachName, 40)} and ${oneLine(input.memberName, 40)}`,
+    ...render({
+      heading: "A message was flagged",
+      blocks: [
+        { kind: "p", text: `${sender} sent a message that mentions: ${input.reasons}.` },
+        { kind: "quote", text: preview },
+        { kind: "p", text: "This is a reason to look, not proof. Open the conversation to see it in context." },
+      ],
+      button: { label: "Review the conversation", url: `${input.siteUrl}${input.reviewPath}` },
+      footer: "You get this because you're a GYMX2 admin. We send at most one per conversation each day.",
+    }),
+  };
+}

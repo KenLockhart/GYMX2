@@ -2,7 +2,9 @@ import "server-only";
 import { addressLines, type ShippingAddress } from "@/lib/armory";
 import { formatEmailSessionTime } from "@/lib/calendar";
 import { loadRecipient, sendEmail } from "@/lib/email";
+import { describeFlags, detectFlags } from "@/lib/message-flags";
 import {
+  flaggedMessageEmail,
   newMessageEmail,
   newSaleEmail,
   orderShippedEmail,
@@ -104,18 +106,24 @@ export function notifyOrderShipped(purchaseId: string) {
   });
 }
 
+type MessageRow = { id: string; coach_id: string; member_id: string; sender_id: string; body: string };
+
+export async function notifyNewMessage(messageId: string) {
+  const { data: message } = await createAdminClient()
+    .from("messages")
+    .select("id, coach_id, member_id, sender_id, body")
+    .eq("id", messageId)
+    .maybeSingle<MessageRow>();
+  if (!message) return;
+  await notifyRecipient(message);
+  await alertAdminsIfFlagged(message);
+}
+
 // Emails only the first unread message in a conversation, so a quick back-and-forth
 // doesn't fill someone's inbox. Once they read the conversation, the next message emails again.
-export function notifyNewMessage(messageId: string) {
+function notifyRecipient(message: MessageRow) {
   return safely("new message", async () => {
     const admin = createAdminClient();
-    const { data: message } = await admin
-      .from("messages")
-      .select("id, coach_id, member_id, sender_id, body")
-      .eq("id", messageId)
-      .maybeSingle<{ id: string; coach_id: string; member_id: string; sender_id: string; body: string }>();
-    if (!message) return;
-
     const { count } = await admin
       .from("messages")
       .select("id", { count: "exact", head: true })
@@ -139,6 +147,46 @@ export function notifyNewMessage(messageId: string) {
         conversationPath: `/messages/${message.sender_id}`,
       }),
     );
+  });
+}
+
+// Tells admins when a message mentions a phone number, email, payment app or talking elsewhere.
+// At most one email per conversation each day, however many flagged messages follow.
+function alertAdminsIfFlagged(message: MessageRow) {
+  return safely("flagged message", async () => {
+    const flags = detectFlags(message.body);
+    if (flags.length === 0) return;
+
+    const admin = createAdminClient();
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: recent } = await admin
+      .from("messages")
+      .select("body")
+      .eq("coach_id", message.coach_id)
+      .eq("member_id", message.member_id)
+      .neq("id", message.id)
+      .gte("created_at", since)
+      .limit(500);
+    if ((recent ?? []).some((row) => detectFlags(row.body as string).length > 0)) return;
+
+    const [{ data: admins }, coach, member] = await Promise.all([
+      admin.from("profiles").select("id").eq("role", "admin"),
+      loadRecipient(message.coach_id),
+      loadRecipient(message.member_id),
+    ]);
+    const email = flaggedMessageEmail({
+      siteUrl: getSiteUrl(),
+      coachName: coach?.name ?? "A coach",
+      memberName: member?.name ?? "a member",
+      fromCoach: message.sender_id === message.coach_id,
+      reasons: describeFlags(flags).toLowerCase(),
+      body: message.body,
+      reviewPath: `/admin/messages/${message.coach_id}/${message.member_id}`,
+    });
+    for (const row of admins ?? []) {
+      const person = await loadRecipient(row.id as string);
+      if (person) await sendEmail(person.email, email);
+    }
   });
 }
 

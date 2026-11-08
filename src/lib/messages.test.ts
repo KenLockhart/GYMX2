@@ -96,3 +96,23 @@ describe("groupForReview", () => {
     expect(rows[1]).toMatchObject({ count: 2, last: { body: "Later" } });
   });
 });
+
+describe("groupForReview flags", () => {
+  const messages = [
+    { ...message({ member_id: "ana", body: "Venmo me", created_at: "2026-11-08T08:00:00Z" }), member: { display_name: "Ana" } },
+    { ...message({ member_id: "ana", body: "Nice work", created_at: "2026-11-08T13:00:00Z" }), member: { display_name: "Ana" } },
+    { ...message({ member_id: "ben", body: "Text me at 404-555-0123", created_at: "2026-11-08T10:00:00Z" }), member: { display_name: "Ben" } },
+    { ...message({ member_id: "cy", body: "Leg day", created_at: "2026-11-08T14:00:00Z" }), member: { display_name: "Cy" } },
+  ];
+
+  it("counts flagged messages and the kinds found", () => {
+    const ana = groupForReview(messages).find((row) => row.member_name === "Ana");
+    expect(ana).toMatchObject({ count: 2, flagged: 1, flags: ["payment"], last_flagged_at: "2026-11-08T08:00:00Z" });
+  });
+
+  it("keeps only flagged pairs, most recently flagged first", () => {
+    const rows = groupForReview(messages, { flaggedOnly: true });
+    expect(rows.map((row) => row.member_name)).toEqual(["Ben", "Ana"]);
+    expect(rows[0].flags).toEqual(["phone", "off_platform"]);
+  });
+});

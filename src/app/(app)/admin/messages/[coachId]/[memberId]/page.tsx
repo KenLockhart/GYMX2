@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { describeFlags, detectFlags } from "@/lib/message-flags";
 import { createClient } from "@/lib/supabase/server";
 import type { Message } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
@@ -54,6 +55,7 @@ export default async function ReviewConversationPage({
   const messages = (messageResult.data ?? []) as Message[];
   if (!messageResult.error && messages.length === 0) notFound();
   const names = new Map((peopleResult.data ?? []).map((person) => [person.id as string, person.display_name as string]));
+  const flaggedCount = messages.filter((message) => detectFlags(message.body).length > 0).length;
   const coachName = names.get(coachId) ?? "Unknown coach";
   const memberName = names.get(memberId) ?? "Unknown member";
 
@@ -68,7 +70,8 @@ export default async function ReviewConversationPage({
         </h1>
         <p className="mt-2 text-sm text-muted">
           Coach: {coachName} · Member: {memberName} ·{" "}
-          {connectionResult.data ? "Still connected" : "No longer connected"} · {messages.length} messages ·
+          {connectionResult.data ? "Still connected" : "No longer connected"} · {messages.length} messages ·{" "}
+          {flaggedCount > 0 && <span className="font-semibold text-danger">{flaggedCount} flagged · </span>}
           Read-only
         </p>
       </div>
@@ -82,6 +85,7 @@ export default async function ReviewConversationPage({
           {messages.map((message) => {
             const fromCoach = message.sender_id === coachId;
             const matches = highlight && message.body.toLowerCase().includes(highlight);
+            const flags = detectFlags(message.body);
             return (
               <li key={message.id} className={`flex flex-col ${fromCoach ? "items-start" : "items-end"}`}>
                 <span className="mb-1 text-xs text-muted">
@@ -90,10 +94,13 @@ export default async function ReviewConversationPage({
                 <p
                   className={`max-w-[85%] whitespace-pre-line break-words rounded-2xl px-4 py-2 sm:max-w-[70%] ${
                     matches ? "bg-accent text-accent-foreground" : "bg-surface-raised"
-                  }`}
+                  } ${flags.length ? "ring-2 ring-danger" : ""}`}
                 >
                   {message.body}
                 </p>
+                {flags.length > 0 && (
+                  <span className="mt-1 text-xs font-semibold text-danger">Flagged: {describeFlags(flags)}</span>
+                )}
               </li>
             );
           })}

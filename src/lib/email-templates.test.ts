@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   escapeHtml,
+  flaggedMessageEmail,
   newMessageEmail,
   newSaleEmail,
   orderShippedEmail,
@@ -141,5 +142,23 @@ describe("sessionEmail", () => {
     expect(email.subject).toBe("Session cancelled: Leg day");
     expect(email.text).not.toContain("Let your coach know");
     expect(email.text).toContain("https://gymx2.com/calendar\n");
+  });
+});
+
+describe("flaggedMessageEmail", () => {
+  it("names who sent it, why, and links to the review", () => {
+    const email = flaggedMessageEmail({
+      siteUrl,
+      coachName: "Coach Ken",
+      memberName: "Sam",
+      fromCoach: true,
+      reasons: "phone number, payment app",
+      body: "Venmo me, 404-555-0123",
+      reviewPath: "/admin/messages/c/m",
+    });
+    expect(email.subject).toBe("Flagged message: Coach Ken and Sam");
+    expect(email.text).toContain("Coach Ken (coach) sent a message that mentions: phone number, payment app.");
+    expect(email.text).toContain("> Venmo me, 404-555-0123");
+    expect(email.text).toContain("https://gymx2.com/admin/messages/c/m");
   });
 });

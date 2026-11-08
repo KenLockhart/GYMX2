@@ -63,7 +63,9 @@ export default function PrivacyPage() {
       <p>
         Messages on GYMX2 are private between a coach and a member, but they are not end-to-end encrypted.
         GYMX2 admins can read coach–member conversations to keep members safe, investigate reports, and stop
-        coaches from moving members off the platform in breach of our Terms. Admins can read but cannot send,
+        coaches from moving members off the platform in breach of our Terms. GYMX2 automatically checks
+        messages for things like phone numbers, email addresses and payment apps, and points admins to those
+        conversations. Admins can read but cannot send,
         change or delete messages in your conversations. Please don&rsquo;t share passwords, card numbers or
         other sensitive information in messages.
       </p>
