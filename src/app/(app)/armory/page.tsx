@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAccount } from "@/lib/auth";
-import { ARMORY_CATEGORIES, categoryLabel, formatPrice, isCategory, publicImageUrl } from "@/lib/armory";
+import {
+  ARMORY_CATEGORIES,
+  categoryLabel,
+  formatPrice,
+  isCategory,
+  publicImageUrl,
+} from "@/lib/armory";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmoryItem } from "@/lib/types";
@@ -10,7 +16,14 @@ export const metadata: Metadata = { title: "The Armory" };
 
 type CatalogItem = Pick<
   ArmoryItem,
-  "id" | "coach_id" | "kind" | "category" | "title" | "price_cents" | "image_path" | "visible_to_all"
+  | "id"
+  | "coach_id"
+  | "kind"
+  | "category"
+  | "title"
+  | "price_cents"
+  | "image_path"
+  | "visible_to_all"
 > & { coach: { display_name: string } | null };
 
 export default async function ArmoryPage({
@@ -27,7 +40,9 @@ export default async function ArmoryPage({
   const supabase = await createClient();
   let query = supabase
     .from("armory_items")
-    .select("id, coach_id, kind, category, title, price_cents, image_path, visible_to_all, coach:profiles!coach_id(display_name)")
+    .select(
+      "id, coach_id, kind, category, title, price_cents, image_path, visible_to_all, coach:profiles!coach_id(display_name)",
+    )
     .order("created_at", { ascending: false })
     .limit(200);
   if (category) query = query.eq("category", category);
@@ -46,24 +61,34 @@ export default async function ArmoryPage({
               : "Ebooks, gear and programs chosen by your coaches."}
           </p>
         </div>
-        {canAdd && (
-          <div className="flex flex-wrap gap-2">
-            <Link href="/armory/sales" className="btn-secondary">
-              Sales
+        <div className="flex flex-wrap gap-2">
+          {profile.role !== "admin" && (
+            <Link href="/armory/purchases" className="btn-secondary">
+              My purchases
             </Link>
-            {profile.role === "coach" && (
-              <Link href="/armory/payouts" className="btn-secondary">
-                Payouts
+          )}
+          {canAdd && (
+            <>
+              <Link href="/armory/sales" className="btn-secondary">
+                Sales
               </Link>
-            )}
-            <Link href="/armory/new" className="btn-primary">
-              Add an item
-            </Link>
-          </div>
-        )}
+              {profile.role === "coach" && (
+                <Link href="/armory/payouts" className="btn-secondary">
+                  Payouts
+                </Link>
+              )}
+              <Link href="/armory/new" className="btn-primary">
+                Add an item
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
-      <nav className="flex flex-wrap gap-2 text-sm" aria-label="Filter by category">
+      <nav
+        className="flex flex-wrap gap-2 text-sm"
+        aria-label="Filter by category"
+      >
         <Link
           href="/armory"
           className={`rounded-full border px-3 py-1 ${!category ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-raised"}`}
@@ -99,7 +124,10 @@ export default async function ArmoryPage({
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => {
             const image = publicImageUrl(supabaseUrl, item.image_path);
-            const price = item.kind === "download" ? "Free download" : formatPrice(item.price_cents);
+            const price =
+              item.kind === "download"
+                ? "Free download"
+                : formatPrice(item.price_cents);
             return (
               <li key={item.id}>
                 <Link
@@ -110,7 +138,12 @@ export default async function ArmoryPage({
                     {image ? (
                       // Covers come from public storage at any size, so a plain image tag is simplest.
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={image} alt="" className="size-full object-cover" loading="lazy" />
+                      <img
+                        src={image}
+                        alt=""
+                        className="size-full object-cover"
+                        loading="lazy"
+                      />
                     ) : (
                       <span className="font-display text-2xl font-bold uppercase text-muted">
                         {categoryLabel(item.category)}
@@ -118,12 +151,24 @@ export default async function ArmoryPage({
                     )}
                   </div>
                   <div className="space-y-1 p-3">
-                    <p className="line-clamp-2 font-semibold group-hover:text-accent">{item.title}</p>
+                    <p className="line-clamp-2 font-semibold group-hover:text-accent">
+                      {item.title}
+                    </p>
                     <p className="text-sm text-muted">
-                      {[item.coach_id !== profile.id && item.coach?.display_name, price].filter(Boolean).join(" · ")}
+                      {[
+                        item.coach_id !== profile.id &&
+                          item.coach?.display_name,
+                        price,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                     {item.coach_id === profile.id && (
-                      <p className="text-xs text-muted">{item.visible_to_all ? "Everyone can see this" : "Your members only"}</p>
+                      <p className="text-xs text-muted">
+                        {item.visible_to_all
+                          ? "Everyone can see this"
+                          : "Your members only"}
+                      </p>
                     )}
                   </div>
                 </Link>

@@ -31,6 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .select("id")
       .eq("item_id", id)
       .eq("member_id", account.profile.id)
+      .is("refunded_at", null)
       .limit(1);
     if (!owned?.length) return NextResponse.redirect(new URL(`/armory/${id}`, request.url), { status: 303 });
   }

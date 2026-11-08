@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   escapeHtml,
   flaggedMessageEmail,
+  refundEmail,
   newMessageEmail,
   newSaleEmail,
   orderShippedEmail,
@@ -160,5 +161,23 @@ describe("flaggedMessageEmail", () => {
     expect(email.text).toContain("Coach Ken (coach) sent a message that mentions: phone number, payment app.");
     expect(email.text).toContain("> Venmo me, 404-555-0123");
     expect(email.text).toContain("https://gymx2.com/admin/messages/c/m");
+  });
+});
+
+describe("refundEmail", () => {
+  const base = { siteUrl, itemTitle: "Tee", amountCents: 3500, buyerName: "Sam", orderCancelled: true };
+
+  it("tells the buyer the amount and that nothing will ship", () => {
+    const email = refundEmail({ ...base, audience: "buyer" });
+    expect(email.subject).toBe("Refund for Tee");
+    expect(email.text).toContain("We refunded $35.00 for Tee");
+    expect(email.text).toContain("nothing will arrive");
+    expect(email.text).toContain("https://gymx2.com/armory/purchases");
+  });
+
+  it("tells the seller not to ship a cancelled order", () => {
+    const email = refundEmail({ ...base, audience: "seller" });
+    expect(email.subject).toBe("Order refunded: Tee");
+    expect(email.text).toContain("Please don't send it.");
   });
 });

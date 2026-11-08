@@ -254,3 +254,44 @@ export function flaggedMessageEmail(input: {
     }),
   };
 }
+
+export function refundEmail(input: {
+  siteUrl: string;
+  audience: "buyer" | "seller";
+  itemTitle: string;
+  amountCents: number;
+  buyerName: string;
+  orderCancelled: boolean;
+}): Email {
+  const amount = money(input.amountCents);
+  const buyer = input.audience === "buyer";
+  const blocks: Block[] = buyer
+    ? [
+        { kind: "p", text: `We refunded ${amount} for ${input.itemTitle} to the card you paid with.` },
+        { kind: "p", text: "Your bank may take 5–10 business days to show it." },
+        ...(input.orderCancelled
+          ? [{ kind: "p" as const, text: "Your order was cancelled before it shipped, so nothing will arrive." }]
+          : []),
+      ]
+    : [
+        { kind: "p", text: `${input.buyerName}'s order of ${input.itemTitle} (${amount}) was refunded.` },
+        {
+          kind: "p",
+          text: input.orderCancelled
+            ? "It hadn't shipped, so it's been removed from your orders to ship. Please don't send it."
+            : "Your share of the sale is taken back from your Stripe balance.",
+        },
+      ];
+
+  return {
+    subject: buyer ? `Refund for ${oneLine(input.itemTitle)}` : `Order refunded: ${oneLine(input.itemTitle)}`,
+    ...render({
+      heading: buyer ? "Your refund is on its way" : "An order was refunded",
+      blocks,
+      button: buyer
+        ? { label: "See your purchases", url: `${input.siteUrl}/armory/purchases` }
+        : { label: "See your sales", url: `${input.siteUrl}/armory/sales` },
+      footer: ORDER_FOOTER,
+    }),
+  };
+}

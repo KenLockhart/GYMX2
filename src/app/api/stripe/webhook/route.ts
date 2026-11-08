@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { recordPurchase } from "@/lib/purchases";
+import { recordRefundFromCharge } from "@/lib/refunds";
 import { getStripe } from "@/lib/stripe";
 
 // Stripe calls this after a payment. The signature check proves the message really came from Stripe.
@@ -21,6 +22,16 @@ export async function POST(request: NextRequest) {
     // A failed save asks Stripe to try again later.
     if (!saved && event.data.object.payment_status === "paid") {
       return new NextResponse("Could not record purchase", { status: 500 });
+    }
+  }
+
+  // A full refund made in the Stripe dashboard is recorded here too.
+  if (event.type === "charge.refunded") {
+    try {
+      await recordRefundFromCharge(event.data.object);
+    } catch (error) {
+      console.error(error);
+      return new NextResponse("Could not record refund", { status: 500 });
     }
   }
 

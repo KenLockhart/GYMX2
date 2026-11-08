@@ -7,12 +7,13 @@ import { MIN_PAID_PRICE_CENTS, platformFeeCents } from "@/lib/armory";
 import { requireAccount, requireCoach } from "@/lib/auth";
 import { notifyOrderShipped } from "@/lib/notify";
 import { refreshPayoutAccount } from "@/lib/purchases";
+import { refundPurchase } from "@/lib/refunds";
 import { getStripe, isStripeConfigured, stripePublishableKey } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState, ArmoryItem, CheckoutState } from "@/lib/types";
-import { purchaseRequestSchema, shipOrderSchema } from "@/lib/validation";
+import { idSchema, purchaseRequestSchema, shipOrderSchema } from "@/lib/validation";
 
 // Sends a coach to Stripe to set up (or finish setting up) the account their sales are paid into.
 export async function startPayoutSetup(): Promise<ActionState> {
@@ -125,6 +126,7 @@ export async function buyArmoryItem(_: CheckoutState, formData: FormData): Promi
       .select("id")
       .eq("item_id", sellable.id)
       .eq("member_id", profile.id)
+      .is("refunded_at", null)
       .limit(1);
     if (owned?.length) return { error: "You already own this. Use the Download button." };
   }
@@ -238,4 +240,28 @@ export async function markOrderShipped(_: ActionState, formData: FormData): Prom
   after(() => notifyOrderShipped(purchaseId));
   revalidatePath("/armory/sales");
   return { message: "Marked as shipped. We emailed the buyer." };
+}
+
+// The seller, or any admin, refunds an order in full.
+export async function refundOrder(_: ActionState, formData: FormData): Promise<ActionState> {
+  const { profile } = await requireAccount();
+  const purchaseId = idSchema.safeParse(formData.get("purchase_id"));
+  if (!purchaseId.success) return { error: "Choose an order." };
+
+  // Row security shows sellers their own sales and admins every sale.
+  const supabase = await createClient();
+  const { data: purchase } = await supabase
+    .from("purchases")
+    .select("id, seller_id, member_id")
+    .eq("id", purchaseId.data)
+    .maybeSingle();
+  if (!purchase || (purchase.seller_id !== profile.id && profile.role !== "admin")) {
+    return { error: "We couldn't find that order." };
+  }
+
+  const result = await refundPurchase(purchase.id as string, profile.id);
+  if ("error" in result) return { error: result.error };
+
+  revalidatePath("/armory/sales");
+  return { message: "Refunded. We emailed the buyer." };
 }
