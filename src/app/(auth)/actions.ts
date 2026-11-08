@@ -1,6 +1,9 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { attributeSignup } from "@/lib/affiliate-server";
+import { REFERRAL_COOKIE } from "@/lib/affiliates";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
@@ -51,6 +54,19 @@ export async function signUp(_: ActionState, formData: FormData): Promise<Action
     },
   });
   if (error) return { error: "We couldn't create that account. Check your details or try logging in." };
+
+  // Came through an affiliate link? Credit them. (An email that already has an account comes back
+  // with no identities, and isn't a new sign-up.)
+  const store = await cookies();
+  const referralCode = store.get(REFERRAL_COOKIE)?.value;
+  if (referralCode && data.user && (data.user.identities?.length ?? 0) > 0) {
+    try {
+      await attributeSignup(data.user.id, referralCode);
+      store.delete(REFERRAL_COOKIE);
+    } catch (referralError) {
+      console.error(referralError);
+    }
+  }
 
   if (data.session) redirect("/dashboard");
   return { message: "Check your email for a link to confirm your account." };

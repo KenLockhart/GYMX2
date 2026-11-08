@@ -5,6 +5,7 @@ import { getSupabaseEnv } from "./env";
 const PROTECTED_PREFIXES = [
   "/dashboard",
   "/profile",
+  "/affiliate",
   "/admin",
   "/tasks",
   "/library",

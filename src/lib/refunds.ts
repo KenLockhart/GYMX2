@@ -1,6 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import type Stripe from "stripe";
+import { voidCommissionsForPurchase } from "@/lib/affiliate-server";
 import { loadRecipient, sendEmail } from "@/lib/email";
 import { refundEmail } from "@/lib/email-templates";
 import { getStripe } from "@/lib/stripe";
@@ -68,6 +69,7 @@ export async function recordRefund(purchase: PurchaseForRefund, refundedBy: stri
     .is("refunded_at", null)
     .select("id");
   if (!data?.length) return;
+  await voidCommissionsForPurchase(purchase.id);
 
   after(async () => {
     try {

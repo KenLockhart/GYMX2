@@ -231,3 +231,52 @@ export const uploadRequestSchema = z.object({
   file_name: z.string().trim().min(1).max(200),
   size: z.number().int().positive(),
 });
+
+export const affiliateApplicationSchema = z.object({
+  code: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]{2,23}$/, "Use 3 to 24 lowercase letters, numbers or dashes, starting with a letter or number."),
+  application: z
+    .string()
+    .trim()
+    .min(10, "Tell us a little about how you'll share GYMX2.")
+    .max(1000, "Use 1,000 characters or fewer."),
+});
+
+const optionalPercent = z.union([
+  z.literal("").transform(() => null),
+  z.coerce.number({ error: "Enter a percentage like 10." }).min(0).max(100, "Use a percentage up to 100."),
+]);
+
+const optionalDollars = z.union([
+  z.literal("").transform(() => null),
+  z.coerce
+    .number({ error: "Enter an amount like 5 or 5.00." })
+    .min(0)
+    .max(1000, "Use an amount up to $1,000.")
+    .transform((dollars) => Math.round(dollars * 100)),
+]);
+
+export const affiliateRatesSchema = z.object({
+  user_id: z.uuid(),
+  sale_percent: optionalPercent,
+  signup_bonus: optionalDollars,
+});
+
+export const programSettingsSchema = z.object({
+  sale_percent: z.coerce.number({ error: "Enter the sale percentage." }).min(0).max(100),
+  sale_base: z.enum(["platform_share", "sale_price"]),
+  signup_bonus: z.coerce
+    .number({ error: "Enter the sign-up bonus." })
+    .min(0)
+    .max(1000)
+    .transform((dollars) => Math.round(dollars * 100)),
+  hold_days: z.coerce.number().int("Use whole days.").min(0).max(365),
+  attribution_months: z.coerce.number().int("Use whole months.").min(1).max(120),
+  cookie_days: z.coerce.number().int("Use whole days.").min(1).max(365),
+  min_payout: z.coerce
+    .number({ error: "Enter the minimum payout." })
+    .min(1, "The minimum payout is at least $1.")
+    .max(10000)
+    .transform((dollars) => Math.round(dollars * 100)),
+});

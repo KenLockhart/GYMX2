@@ -31,7 +31,9 @@ export function ActionForm({
         // A plain form action makes React clear the fields, losing what was typed if the server rejects it.
         event.preventDefault();
         if (confirmMessage && !window.confirm(confirmMessage)) return;
-        const formData = new FormData(event.currentTarget);
+        // Include the button that was pressed, for forms with more than one (Approve / Decline).
+        const submitter = (event.nativeEvent as SubmitEvent).submitter;
+        const formData = new FormData(event.currentTarget, submitter);
         startTransition(() => formAction(formData));
       }}
     >
