@@ -1,0 +1,90 @@
+import "server-only";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { sendEmail } from "@/lib/email";
+import { accountDeletedEmail } from "@/lib/email-templates";
+import { getStripe, isStripeConfigured } from "@/lib/stripe";
+import { deleteVideo, isStreamConfigured } from "@/lib/stream";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getSiteUrl, getSupabaseEnv } from "@/lib/supabase/env";
+import type { UserRole } from "@/lib/types";
+
+// Who may delete their own account here. Admins hand over first; coaches with sales email support,
+// because buyers' downloads and the coach's payouts need settling by a person.
+export async function deletionBlocker(person: { id: string; role: UserRole }) {
+  if (person.role === "admin") {
+    return "Admins can't delete their own account. Ask another admin to change your role to member first.";
+  }
+  if (person.role === "coach") {
+    const { count } = await createAdminClient()
+      .from("purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", person.id);
+    if ((count ?? 0) > 0) {
+      return "You've sold items in the Armory, so we close coach accounts by hand to settle your buyers and payouts. Email support@gymx2.com and we'll take care of it.";
+    }
+  }
+  return null;
+}
+
+// Checks the password without touching the browser's sign-in, as a guard against someone
+// deleting an account from a computer left signed in.
+export async function passwordMatches(email: string, password: string) {
+  const { url, publishableKey } = getSupabaseEnv();
+  const client = createSupabaseClient(url, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  if (!error) await client.auth.signOut({ scope: "local" });
+  return !error;
+}
+
+async function removeStoredFiles(userId: string) {
+  const storage = createAdminClient().storage;
+  for (const bucket of ["armory-files", "armory-images"]) {
+    const { data } = await storage.from(bucket).list(userId, { limit: 1000 });
+    const paths = (data ?? []).map((file) => `${userId}/${file.name}`);
+    if (paths.length) await storage.from(bucket).remove(paths);
+  }
+}
+
+async function removeVideos(userId: string) {
+  if (!isStreamConfigured()) return;
+  const { data } = await createAdminClient().from("videos").select("cloudflare_uid").eq("coach_id", userId);
+  for (const video of data ?? []) await deleteVideo(video.cloudflare_uid as string);
+}
+
+async function removePayoutAccount(userId: string) {
+  if (!isStripeConfigured()) return;
+  const { data } = await createAdminClient()
+    .from("payout_accounts")
+    .select("stripe_account_id")
+    .eq("coach_id", userId)
+    .maybeSingle();
+  if (data?.stripe_account_id) await getStripe().accounts.del(data.stripe_account_id as string);
+}
+
+// Deletes the person and everything that belongs to them. Files and videos outside the database
+// go first, each on a best-effort basis, so a hiccup at Cloudflare or Stripe never leaves an
+// account half-deleted. Orders they bought stay, without their name.
+export async function deleteAccount(person: { id: string; email: string; name: string }) {
+  for (const [label, step] of [
+    ["files", () => removeStoredFiles(person.id)],
+    ["videos", () => removeVideos(person.id)],
+    ["payout account", () => removePayoutAccount(person.id)],
+  ] as const) {
+    try {
+      await step();
+    } catch (error) {
+      console.error(`Account deletion: removing ${label} failed`, error);
+    }
+  }
+
+  const { error } = await createAdminClient().auth.admin.deleteUser(person.id);
+  if (error) {
+    console.error(error);
+    return false;
+  }
+
+  await sendEmail(person.email, accountDeletedEmail({ siteUrl: getSiteUrl(), name: person.name }));
+  return true;
+}

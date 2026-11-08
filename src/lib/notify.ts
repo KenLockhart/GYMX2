@@ -27,7 +27,8 @@ async function safely(label: string, work: () => Promise<void>) {
 
 type PurchaseRow = {
   id: string;
-  member_id: string;
+  // Empty once the buyer has deleted their account; the order is kept for records.
+  member_id: string | null;
   seller_id: string | null;
   item_title: string;
   amount_cents: number;
@@ -62,7 +63,7 @@ export function notifyNewSale(purchaseId: string) {
       sellerIds = (data ?? []).map((row) => row.id as string);
     }
 
-    const buyer = await loadRecipient(purchase.member_id);
+    const buyer = purchase.member_id ? await loadRecipient(purchase.member_id) : null;
     const email = newSaleEmail({
       siteUrl: getSiteUrl(),
       itemTitle: purchase.item_title,
@@ -85,7 +86,7 @@ export function notifyNewSale(purchaseId: string) {
 export function notifyOrderShipped(purchaseId: string) {
   return safely("order shipped", async () => {
     const purchase = await loadPurchase(purchaseId);
-    if (!purchase || purchase.fulfillment_status !== "shipped") return;
+    if (!purchase?.member_id || purchase.fulfillment_status !== "shipped") return;
 
     const [buyer, seller] = await Promise.all([
       loadRecipient(purchase.member_id),
