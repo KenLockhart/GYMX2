@@ -14,7 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Reads one person's activity with the server key: only IDs and dates, never what they wrote.
 // Callers decide who may see the result (the person themselves, or an admin).
 
-async function loadMemberActivity(userId: string): Promise<MemberActivity> {
+export async function loadMemberActivity(userId: string): Promise<MemberActivity> {
   const db = createAdminClient();
   const [completions, memos, going, messages, purchases, coaches] =
     await Promise.all([
@@ -66,7 +66,7 @@ async function loadMemberActivity(userId: string): Promise<MemberActivity> {
   };
 }
 
-async function loadCoachActivity(userId: string): Promise<CoachActivity> {
+export async function loadCoachActivity(userId: string): Promise<CoachActivity> {
   const db = createAdminClient();
   const [videos, given, sessions, messages, members, sales] = await Promise.all(
     [
