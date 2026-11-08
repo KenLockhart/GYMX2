@@ -55,3 +55,13 @@ export type CalendarSession = {
   starts_at: string;
   ends_at: string;
 };
+
+export type Message = {
+  id: string;
+  coach_id: string;
+  member_id: string;
+  sender_id: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+};

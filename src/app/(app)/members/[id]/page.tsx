@@ -53,9 +53,14 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       <Link href="/members" className="text-link text-sm">
         Back to members
       </Link>
-      <div>
-        <h1 className="text-5xl">{member.display_name}</h1>
-        {member.bio && <p className="mt-2 max-w-xl text-muted">{member.bio}</p>}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-5xl">{member.display_name}</h1>
+          {member.bio && <p className="mt-2 max-w-xl text-muted">{member.bio}</p>}
+        </div>
+        <Link href={`/messages/${id}`} className="btn-primary shrink-0">
+          Message
+        </Link>
       </div>
 
       <section className="space-y-3">
