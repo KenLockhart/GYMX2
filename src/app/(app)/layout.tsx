@@ -91,6 +91,12 @@ export default async function AppLayout({
             </Link>
             {profile.role !== "admin" && (
               <>
+                <Link
+                  href={profile.role === "coach" ? "/checkins" : "/checkin"}
+                  className="hover:text-accent"
+                >
+                  {profile.role === "coach" ? "Check-ins" : "Check-in"}
+                </Link>
                 <Link href="/track" className="hover:text-accent">
                   Track
                 </Link>

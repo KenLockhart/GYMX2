@@ -114,7 +114,24 @@ export async function loadCoachInsights(coachId: string) {
     []) as unknown as (AssignmentRow & { member_id: string })[];
 
   // Every touchpoint a member has with this coach, for "last active".
+  // Weekly check-ins from this coach's members.
+  const { data: checkins } = members.length
+    ? await db
+        .from("checkins")
+        .select("member_id, created_at")
+        .in(
+          "member_id",
+          members.map((member) => member.member_id),
+        )
+        .gte("created_at", since)
+        .limit(10000)
+    : { data: [] };
+
   const activity: ActivityRow[] = [
+    ...(checkins ?? []).map((row) => ({
+      member_id: row.member_id as string,
+      at: row.created_at as string,
+    })),
     ...assignmentRows.flatMap((row) =>
       row.completed_at
         ? [{ member_id: row.member_id, at: row.completed_at }]

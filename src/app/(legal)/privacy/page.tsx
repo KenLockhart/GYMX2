@@ -41,7 +41,9 @@ export default function PrivacyPage() {
           notes you choose to log, and your progress on coaches&rsquo; programs.
           Only you can see them unless you turn on sharing with your coaches.
           GYMX2 admins can&rsquo;t see them, and we use them only to show you
-          your progress.
+          your progress. Weekly check-ins (your energy, sleep, stress and
+          motivation ratings and what you write) go only to the coaches
+          you&rsquo;ve joined.
         </li>
         <li>
           <strong>What you upload:</strong> videos, files and images, such as

@@ -3,6 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { syncProgress } from "@/lib/achievements-data";
 import { requireAccount } from "@/lib/auth";
+import { weekStart } from "@/lib/checkins";
+import { todayKey } from "@/lib/reminders";
+import { createClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -23,6 +26,26 @@ export default async function DashboardPage() {
   // Visiting the dashboard also catches up on any badges earned elsewhere (messages, sales).
   const progress = await syncProgress(profile).catch(() => null);
 
+  // From Thursday on, members with a coach see a nudge until they check in for the week.
+  let checkinDue = false;
+  const today = todayKey();
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+  if (profile.role === "member" && (weekday === 0 || weekday >= 4)) {
+    const supabase = await createClient();
+    const [{ count: coaches }, { count: done }] = await Promise.all([
+      supabase
+        .from("coach_members")
+        .select("coach_id", { count: "exact", head: true })
+        .eq("member_id", profile.id),
+      supabase
+        .from("checkins")
+        .select("id", { count: "exact", head: true })
+        .eq("member_id", profile.id)
+        .eq("week_start", weekStart(today)),
+    ]);
+    checkinDue = (coaches ?? 0) > 0 && (done ?? 0) === 0;
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -32,6 +55,23 @@ export default async function DashboardPage() {
         <h1 className="mt-1 text-5xl">Welcome, {profile.display_name}</h1>
         <p className="mt-3 max-w-xl text-muted">{roleIntro[profile.role]}</p>
       </div>
+
+      {checkinDue && (
+        <Link
+          href="/checkin"
+          className="flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-lg border border-accent bg-surface p-5 transition hover:bg-surface-raised"
+        >
+          <span>
+            <span className="block text-lg font-semibold">
+              How did your week go?
+            </span>
+            <span className="text-sm text-muted">
+              Your weekly check-in takes a minute. Your coach reads every one.
+            </span>
+          </span>
+          <span className="btn-primary">Check in</span>
+        </Link>
+      )}
 
       {progress && (
         <Link
