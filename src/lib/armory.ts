@@ -8,7 +8,7 @@ export const ARMORY_CATEGORIES = [
 ] as const;
 
 export type ArmoryCategory = (typeof ARMORY_CATEGORIES)[number]["value"];
-export type ArmoryKind = "link" | "download" | "paid";
+export type ArmoryKind = "link" | "download" | "paid" | "product";
 
 export function categoryLabel(category: string) {
   return ARMORY_CATEGORIES.find((item) => item.value === category)?.label ?? "Other";
@@ -94,3 +94,44 @@ export const MIN_PAID_PRICE_CENTS = 100;
 export function formatMoney(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
+
+export const DEFAULT_SIZES = "S, M, L, XL, 2XL";
+
+// "S, M, L" or one per line, into a clean list. Repeats and blanks are dropped.
+export function parseSizes(text: string) {
+  const seen = new Set<string>();
+  const sizes: string[] = [];
+  for (const raw of text.split(/[,\n]/)) {
+    const size = raw.trim().slice(0, 20);
+    const key = size.toLowerCase();
+    if (!size || seen.has(key)) continue;
+    seen.add(key);
+    sizes.push(size);
+  }
+  return sizes;
+}
+
+export type ShippingAddress = {
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+};
+
+export function addressLines(address: ShippingAddress | null) {
+  if (!address) return [];
+  const cityLine = [address.city, [address.state, address.postal_code].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
+  return [address.line1, address.line2, cityLine, address.country === "US" ? null : address.country].filter(
+    (line): line is string => Boolean(line),
+  );
+}
+
+export const fulfillmentLabel: Record<string, string> = {
+  not_needed: "Digital",
+  to_ship: "To ship",
+  shipped: "Shipped",
+};

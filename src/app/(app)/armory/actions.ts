@@ -10,6 +10,7 @@ import {
   MAX_IMAGE_BYTES,
   fileExtension,
   parsePrice,
+  parseSizes,
   safeFileName,
 } from "@/lib/armory";
 import { requireCoachOrAdmin } from "@/lib/auth";
@@ -65,8 +66,14 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
   const kind = formData.get("kind");
   const price_cents = kind === "download" ? null : parsePrice(String(formData.get("price") ?? ""));
   if (Number.isNaN(price_cents)) {
-    return { error: kind === "paid" ? "Enter the price like 24.99." : "Enter the price like 24.99, or leave it blank." };
+    return {
+      error: kind === "link" ? "Enter the price like 24.99, or leave it blank." : "Enter the price like 24.99.",
+    };
   }
+  // Gear only: a flat shipping fee (blank means free) and the sizes a buyer chooses from.
+  const shipping_cents = kind === "product" ? (parsePrice(String(formData.get("shipping") ?? "")) ?? 0) : 0;
+  if (Number.isNaN(shipping_cents)) return { error: "Enter the shipping fee like 5.99, or 0 for free shipping." };
+  const sizes = kind === "product" ? parseSizes(String(formData.get("sizes") ?? "")) : [];
 
   const parsed = armoryItemSchema.safeParse({
     kind,
@@ -80,13 +87,16 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     file_name: formData.get("file_name") ?? "",
     image_path: formData.get("image_path") ?? "",
     visible_to_all: formData.get("visible_to_all") === "on",
+    shipping_cents,
+    sizes,
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const item = parsed.data;
 
   // Uploads must sit in the owner's own folder. The database checks this too.
   const ownPath = (path: string | null) => !path || path.startsWith(`${profile.id}/`);
-  if (!ownPath(item.image_path) || (item.kind !== "link" && !ownPath(item.file_path))) {
+  const filePath = item.kind === "download" || item.kind === "paid" ? item.file_path : null;
+  if (!ownPath(item.image_path) || !ownPath(filePath)) {
     return { error: "That upload didn't work. Please try again." };
   }
 
@@ -97,10 +107,12 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     description: item.description,
     price_cents: item.kind === "download" ? null : item.price_cents,
     buy_url: item.kind === "link" ? item.buy_url : null,
-    file_path: item.kind === "link" ? null : item.file_path,
-    file_name: item.kind === "link" ? null : item.file_name,
+    file_path: filePath,
+    file_name: item.kind === "download" || item.kind === "paid" ? item.file_name : null,
     image_path: item.image_path,
     visible_to_all: item.visible_to_all,
+    sizes: item.kind === "product" ? item.sizes : [],
+    shipping_cents: item.kind === "product" ? item.shipping_cents : 0,
   };
 
   const supabase = await createClient();

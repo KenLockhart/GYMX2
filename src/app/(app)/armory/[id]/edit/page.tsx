@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArmoryForm } from "@/components/armory-form";
-import { publicImageUrl } from "@/lib/armory";
+import { DEFAULT_SIZES, publicImageUrl } from "@/lib/armory";
 import { requireCoachOrAdmin } from "@/lib/auth";
 import { loadPayoutStatus } from "../../payout-status";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -43,6 +43,8 @@ export default async function EditArmoryItemPage({ params }: { params: Promise<{
           title: data.title,
           description: data.description,
           price: data.price_cents === null ? "" : (data.price_cents / 100).toFixed(2),
+          shipping: data.kind === "product" ? (data.shipping_cents / 100).toFixed(2) : "",
+          sizes: data.kind === "product" ? data.sizes.join(", ") : DEFAULT_SIZES,
           buy_url: data.buy_url ?? "",
           file_path: data.file_path ?? "",
           file_name: data.file_name ?? "",

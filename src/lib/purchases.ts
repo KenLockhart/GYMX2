@@ -7,8 +7,12 @@ import { getStripe } from "@/lib/stripe";
 // the webhook and the buyer's return to the site may both report it.
 export async function recordPurchase(session: Stripe.Checkout.Session) {
   if (session.payment_status !== "paid") return false;
-  const { item_id, member_id, seller_id, item_title, fee_cents } = session.metadata ?? {};
+  const { item_id, member_id, seller_id, item_title, fee_cents, kind, size } = session.metadata ?? {};
   if (!item_id || !member_id || !item_title) return false;
+
+  // Gear needs shipping. Stripe collected the address at checkout.
+  const isGear = kind === "product";
+  const shipping = session.collected_information?.shipping_details ?? null;
 
   const { error } = await createAdminClient()
     .from("purchases")
@@ -22,6 +26,11 @@ export async function recordPurchase(session: Stripe.Checkout.Session) {
         fee_cents: Number(fee_cents ?? 0),
         currency: session.currency ?? "usd",
         stripe_session_id: session.id,
+        size: size || null,
+        shipping_cents: isGear ? (session.shipping_cost?.amount_total ?? 0) : 0,
+        shipping_name: isGear ? (shipping?.name ?? null) : null,
+        shipping_address: isGear ? (shipping?.address ?? null) : null,
+        fulfillment_status: isGear ? "to_ship" : "not_needed",
       },
       { onConflict: "stripe_session_id", ignoreDuplicates: true },
     );

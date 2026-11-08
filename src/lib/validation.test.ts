@@ -254,6 +254,31 @@ describe("armoryItemSchema", () => {
     expect(armoryItemSchema.safeParse(paid).success).toBe(true);
   });
 
+  const product = {
+    kind: "product",
+    id: "",
+    category: "gear",
+    title: "Shirt",
+    description: "",
+    price_cents: 4995,
+    shipping_cents: 599,
+    sizes: ["S", "M"],
+    image_path: "",
+    visible_to_all: true,
+  };
+
+  it("accepts gear with sizes and shipping", () => {
+    expect(armoryItemSchema.safeParse(product).success).toBe(true);
+  });
+
+  it("needs a price for gear", () => {
+    expect(armoryItemSchema.safeParse({ ...product, price_cents: null }).success).toBe(false);
+  });
+
+  it("allows free shipping", () => {
+    expect(armoryItemSchema.safeParse({ ...product, shipping_cents: 0 }).success).toBe(true);
+  });
+
   it.each([null, 50])("needs a paid price of at least $1 (got %s)", (price_cents) => {
     const result = armoryItemSchema.safeParse({ ...paid, price_cents });
     expect(result.error?.issues[0].message).toBe("Enter a price of at least $1.00.");

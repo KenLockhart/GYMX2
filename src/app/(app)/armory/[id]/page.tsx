@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
 import { requireAccount } from "@/lib/auth";
-import { PLATFORM_FEE_PERCENT, categoryLabel, formatPrice, publicImageUrl } from "@/lib/armory";
+import { PLATFORM_FEE_PERCENT, categoryLabel, formatMoney, formatPrice, publicImageUrl } from "@/lib/armory";
 import { confirmCheckoutSession } from "@/lib/purchases";
 import { isStripeTestMode } from "@/lib/stripe";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -41,15 +41,28 @@ export default async function ArmoryItemPage({
   if (!item) notFound();
 
   const isOwner = item.coach_id === profile.id;
+  const isSold = item.kind === "paid" || item.kind === "product";
   const [{ data: owned }, { count: salesCount }] = await Promise.all([
-    item.kind === "paid" && !isOwner
-      ? supabase.from("purchases").select("id").eq("item_id", item.id).eq("member_id", profile.id).limit(1)
+    isSold && !isOwner
+      ? supabase
+          .from("purchases")
+          .select("id, size, fulfillment_status, tracking_number, created_at")
+          .eq("item_id", item.id)
+          .eq("member_id", profile.id)
+          .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] }),
-    item.kind === "paid" && isOwner
+    isSold && isOwner
       ? supabase.from("purchases").select("id", { count: "exact", head: true }).eq("item_id", item.id)
       : Promise.resolve({ count: null }),
   ]);
-  const hasBought = Boolean(owned?.length);
+  const myOrders = (owned ?? []) as {
+    id: string;
+    size: string | null;
+    fulfillment_status: string;
+    tracking_number: string | null;
+    created_at: string;
+  }[];
+  const hasBought = myOrders.length > 0;
   const canRemove = isOwner || profile.role === "admin";
   const image = publicImageUrl(getSupabaseEnv().url, item.image_path);
   const price = formatPrice(item.price_cents);
@@ -95,6 +108,91 @@ export default async function ArmoryItemPage({
                 Buy now
               </a>
               <p className="text-xs text-muted">Opens the seller&apos;s shop in a new tab. Payment happens there, not on GYMX2.</p>
+            </div>
+          ) : item.kind === "product" ? (
+            <div className="space-y-3">
+              {returnedSession && hasBought && (
+                <p role="status" className="rounded-lg border border-accent bg-surface p-3 text-sm">
+                  Thanks for your order! The seller will ship it to the address you gave at checkout.
+                </p>
+              )}
+              {returnedSession && !hasBought && (
+                <p role="status" className="rounded-lg border border-border bg-surface p-3 text-sm">
+                  We&apos;re confirming your payment. Refresh this page in a moment.
+                </p>
+              )}
+              <p className="text-2xl font-semibold">
+                {price}
+                <span className="ml-2 text-base font-normal text-muted">
+                  {item.shipping_cents > 0 ? `+ ${formatMoney(item.shipping_cents)} shipping` : "Free shipping"}
+                </span>
+              </p>
+              {isOwner || profile.role === "admin" ? (
+                <p className="text-sm text-muted">
+                  {item.sizes.length > 0 ? `Sizes: ${item.sizes.join(", ")} · ` : ""}
+                  {isOwner && (
+                    <>
+                      {salesCount ?? 0} {salesCount === 1 ? "order" : "orders"} ·{" "}
+                    </>
+                  )}
+                  <Link href="/armory/sales" className="text-link">
+                    {isOwner ? "See orders to ship" : "See all orders"}
+                  </Link>
+                </p>
+              ) : (
+                <>
+                  <ActionForm action={buyArmoryItem} className="max-w-xs space-y-3">
+                    <input type="hidden" name="item_id" value={item.id} />
+                    {item.sizes.length > 0 && (
+                      <label className="block space-y-1.5">
+                        <span className="text-sm font-medium">Size</span>
+                        <select name="size" required defaultValue="" className="field-input">
+                          <option value="" disabled>
+                            Choose a size
+                          </option>
+                          {item.sizes.map((size) => (
+                            <option key={size} value={size}>
+                              {size}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <SubmitButton pendingText="Opening checkout..." className="btn-primary">
+                      {hasBought ? "Order another" : "Buy now"}
+                    </SubmitButton>
+                    <FormStatus />
+                  </ActionForm>
+                  <p className="text-xs text-muted">
+                    Secure card payment by Stripe. You&apos;ll enter your US shipping address at checkout.
+                    {isStripeTestMode() && " Test mode: use card 4242 4242 4242 4242, any future date and any CVC."}
+                  </p>
+                </>
+              )}
+              {hasBought && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Your orders</p>
+                  <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
+                    {myOrders.map((order) => (
+                      <li key={order.id} className="flex flex-wrap justify-between gap-2 p-3">
+                        <span>
+                          {new Date(order.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            timeZone: "UTC",
+                          })}
+                          {order.size && ` · Size ${order.size}`}
+                        </span>
+                        <span className={order.fulfillment_status === "shipped" ? "text-success" : "text-muted"}>
+                          {order.fulfillment_status === "shipped"
+                            ? `Shipped${order.tracking_number ? ` · Tracking ${order.tracking_number}` : ""}`
+                            : "Preparing to ship"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           ) : item.kind === "paid" ? (
             <div className="space-y-2">
@@ -177,7 +275,7 @@ export default async function ArmoryItemPage({
                 </SubmitButton>
                 <FormStatus />
               </ActionForm>
-              {isOwner && item.kind === "paid" && item.coach?.role === "coach" && (
+              {isOwner && isSold && item.coach?.role === "coach" && (
                 <p className="w-full text-xs text-muted">
                   You get each sale minus GYMX2&apos;s {PLATFORM_FEE_PERCENT}% fee and Stripe&apos;s card fees.
                 </p>
