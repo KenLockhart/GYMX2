@@ -566,6 +566,26 @@ export function taskDueEmail(input: {
   };
 }
 
+export function checkinReminderEmail(input: {
+  siteUrl: string;
+  name: string;
+}): Email {
+  return {
+    subject: "How did your week go?",
+    ...render({
+      heading: "Time for your weekly check-in",
+      blocks: [
+        {
+          kind: "p",
+          text: `Hi ${input.name}, take a minute to rate your energy, sleep, stress and motivation and share a win. Your coach reads every one.`,
+        },
+      ],
+      button: { label: "Check in", url: `${input.siteUrl}/checkin` },
+      footer: UPDATES_FOOTER,
+    }),
+  };
+}
+
 export function streakReminderEmail(input: {
   siteUrl: string;
   name: string;

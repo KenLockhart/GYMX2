@@ -9,6 +9,8 @@ const PROTECTED_PREFIXES = [
   "/plans",
   "/insights",
   "/welcome",
+  "/checkin",
+  "/checkins",
   "/track",
   "/programs",
   "/groups",

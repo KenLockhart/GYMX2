@@ -10,6 +10,7 @@ import { loadCoachActivity, loadMemberActivity } from "@/lib/achievements-data";
 import { formatEmailSessionTime } from "@/lib/calendar";
 import { loadRecipient, sendEmail } from "@/lib/email";
 import {
+  checkinReminderEmail,
   sessionReminderEmail,
   streakReminderEmail,
   taskDueEmail,
@@ -24,12 +25,13 @@ import {
   todayKey,
   tomorrowKey,
 } from "@/lib/reminders";
+import { weekStart } from "@/lib/checkins";
 import { unlockedThrough } from "@/lib/programs";
 import { sendPush } from "@/lib/push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 
-type Kind = "session" | "task" | "streak" | "weekly";
+type Kind = "session" | "task" | "streak" | "weekly" | "checkin";
 
 // Sends one reminder at most once: the log row is claimed first, and only the run that claims it
 // sends. People who turned off message and session emails get no reminders.
@@ -383,6 +385,55 @@ export async function runMorningReminders(now = new Date()) {
   return result;
 }
 
+// Sunday evening: members with a coach who haven't checked in this week get a nudge.
+async function remindCheckins(now: Date) {
+  const today = todayKey(now);
+  if (new Date(`${today}T12:00:00Z`).getUTCDay() !== 0) return 0;
+  const week = weekStart(today);
+  const db = createAdminClient();
+  const [{ data: links }, { data: done }] = await Promise.all([
+    db.from("coach_members").select("member_id").limit(50000),
+    db.from("checkins").select("member_id").eq("week_start", week).limit(50000),
+  ]);
+  const checkedIn = new Set((done ?? []).map((row) => row.member_id as string));
+  const due = [
+    ...new Set((links ?? []).map((row) => row.member_id as string)),
+  ].filter((id) => !checkedIn.has(id));
+  let sent = 0;
+  for (const memberId of due) {
+    try {
+      const emailed = await sendOnce(memberId, "checkin", week, (name) =>
+        checkinReminderEmail({ siteUrl: getSiteUrl(), name }),
+      );
+      // Push goes to anyone with notifications on, once per week (the log row is claimed by the email step
+      // when they get emails; otherwise claim it here).
+      if (!emailed) {
+        const { data: claimed } = await db
+          .from("reminder_log")
+          .upsert(
+            { user_id: memberId, kind: "checkin", ref: week },
+            { onConflict: "user_id,kind,ref", ignoreDuplicates: true },
+          )
+          .select("user_id");
+        if (!claimed?.length) continue;
+      }
+      await sendPush([memberId], {
+        title: "How did your week go?",
+        body: "Your weekly check-in takes a minute. Your coach reads every one.",
+        url: "/checkin",
+        tag: "checkin-reminder",
+      });
+      sent += 1;
+    } catch (error) {
+      console.error("Check-in reminder failed", memberId, error);
+    }
+  }
+  return sent;
+}
+
 export async function runEveningReminders(now = new Date()) {
-  return { streaks: await remindStreaks(now) };
+  return {
+    streaks: await remindStreaks(now),
+    checkins: await remindCheckins(now),
+  };
 }
