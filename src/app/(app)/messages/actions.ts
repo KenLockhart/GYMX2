@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireAccount } from "@/lib/auth";
+import { notifyNewMessage } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
 import type { Message } from "@/lib/types";
 import { idSchema, messageSchema } from "@/lib/validation";
@@ -25,10 +27,13 @@ export async function sendMessage(
     };
   }
 
+  const messageId = id as string;
+  after(() => notifyNewMessage(messageId));
+
   const { data } = await supabase
     .from("messages")
     .select("id, coach_id, member_id, sender_id, body, read_at, created_at")
-    .eq("id", id as string)
+    .eq("id", messageId)
     .single<Message>();
 
   revalidatePath("/messages");

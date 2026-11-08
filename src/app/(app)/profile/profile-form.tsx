@@ -44,6 +44,24 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
         ))}
       </section>
 
+      <section className="space-y-4">
+        <h2 className="text-2xl">Emails</h2>
+        <label className="flex items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            name="email_updates"
+            defaultChecked={profile.email_updates}
+            className="mt-0.5 size-4 accent-accent"
+          />
+          <span>
+            Email me about new messages and sessions
+            <span className="block text-muted">
+              We always email about your orders, such as when something you bought ships.
+            </span>
+          </span>
+        </label>
+      </section>
+
       {profile.role === "member" && (
         <label className="flex items-start gap-3 text-sm">
           <input

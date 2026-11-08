@@ -11,6 +11,7 @@ export type Profile = {
   youtube_url: string | null;
   x_url: string | null;
   website_url: string | null;
+  email_updates: boolean;
   created_at: string;
   updated_at: string;
 };
