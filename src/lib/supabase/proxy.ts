@@ -8,6 +8,7 @@ const PROTECTED_PREFIXES = [
   "/affiliate",
   "/plans",
   "/insights",
+  "/welcome",
   "/track",
   "/programs",
   "/groups",

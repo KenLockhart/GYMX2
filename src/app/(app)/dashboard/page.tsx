@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { syncProgress } from "@/lib/achievements-data";
 import { requireAccount } from "@/lib/auth";
 import type { UserRole } from "@/lib/types";
@@ -11,18 +12,23 @@ const roleIntro: Record<UserRole, string> = {
     "You're in. Join a coach to start getting Tasks and sessions, and keep daily notes in your Memos.",
   coach:
     "You're set up as a coach. Upload videos to your library, give Tasks to your members and schedule sessions.",
-  admin: "You manage GYMX2. Review coach requests and member roles from the admin area.",
+  admin:
+    "You manage GYMX2. Review coach requests and member roles from the admin area.",
 };
 
 export default async function DashboardPage() {
   const { profile } = await requireAccount();
+  // New members answer a few questions first (they can skip).
+  if (profile.role === "member" && !profile.onboarded_at) redirect("/welcome");
   // Visiting the dashboard also catches up on any badges earned elsewhere (messages, sales).
   const progress = await syncProgress(profile).catch(() => null);
 
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-widest text-accent">{profile.role}</p>
+        <p className="text-sm font-semibold uppercase tracking-widest text-accent">
+          {profile.role}
+        </p>
         <h1 className="mt-1 text-5xl">Welcome, {profile.display_name}</h1>
         <p className="mt-3 max-w-xl text-muted">{roleIntro[profile.role]}</p>
       </div>
@@ -34,11 +40,15 @@ export default async function DashboardPage() {
         >
           <div>
             <p className="text-sm text-muted">Level {progress.level.number}</p>
-            <p className="text-2xl font-bold uppercase">{progress.level.name}</p>
+            <p className="text-2xl font-bold uppercase">
+              {progress.level.name}
+            </p>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-raised">
               <div
                 className="h-full rounded-full bg-accent"
-                style={{ width: `${Math.round(progress.level.progress * 100)}%` }}
+                style={{
+                  width: `${Math.round(progress.level.progress * 100)}%`,
+                }}
               />
             </div>
           </div>
@@ -52,12 +62,17 @@ export default async function DashboardPage() {
           <div>
             <p className="text-sm text-muted">This week</p>
             <p className="text-2xl font-bold">
-              {progress.challenges.filter((challenge) => challenge.done >= challenge.goal).length} /{" "}
-              {progress.challenges.length} challenges
+              {
+                progress.challenges.filter(
+                  (challenge) => challenge.done >= challenge.goal,
+                ).length
+              }{" "}
+              / {progress.challenges.length} challenges
             </p>
             {progress.newKeys.length > 0 && (
               <p className="text-sm font-semibold text-accent">
-                New badge{progress.newKeys.length > 1 ? "s" : ""}! See your progress
+                New badge{progress.newKeys.length > 1 ? "s" : ""}! See your
+                progress
               </p>
             )}
           </div>

@@ -16,6 +16,11 @@ export type Profile = {
   share_tracking: boolean;
   protein_target_g: number | null;
   calorie_target: number | null;
+  goals: string[];
+  experience: "new" | "some" | "experienced" | null;
+  focus: "mind" | "body" | "spirit" | null;
+  onboarded_at: string | null;
+  specialties: string[];
   created_at: string;
   updated_at: string;
 };
