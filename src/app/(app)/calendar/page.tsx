@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarMonth, ResponseButtons, SessionTime, type CalendarItem } from "@/components/calendar-parts";
+import {
+  CalendarMonth,
+  ResponseButtons,
+  SessionTime,
+  type CalendarItem,
+} from "@/components/calendar-parts";
 import { requireAccount } from "@/lib/auth";
 import {
   monthParam,
@@ -16,7 +21,10 @@ import type { CalendarSession } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Calendar" };
 
-type SessionRow = Pick<CalendarSession, "id" | "title" | "starts_at" | "ends_at" | "location"> & {
+type SessionRow = Pick<
+  CalendarSession,
+  "id" | "title" | "starts_at" | "ends_at" | "location"
+> & {
   coach: { display_name: string } | null;
   session_invites: { member_id: string; response: SessionResponse }[];
 };
@@ -25,7 +33,8 @@ const SESSION_FIELDS =
   "id, title, starts_at, ends_at, location, coach:profiles!coach_id(display_name), session_invites(member_id, response)";
 
 function goingCount(session: SessionRow) {
-  return session.session_invites.filter((invite) => invite.response === "going").length;
+  return session.session_invites.filter((invite) => invite.response === "going")
+    .length;
 }
 
 export default async function CalendarPage({
@@ -64,7 +73,8 @@ export default async function CalendarPage({
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const loadFailed = monthResult.error || upcomingResult.error || taskResult.error;
+  const loadFailed =
+    monthResult.error || upcomingResult.error || taskResult.error;
   const monthSessions = (monthResult.data ?? []) as unknown as SessionRow[];
   const upcoming = (upcomingResult.data ?? []) as unknown as SessionRow[];
   const tasks = (taskResult.data ?? []) as unknown as {
@@ -75,7 +85,8 @@ export default async function CalendarPage({
   }[];
 
   const myResponse = (session: SessionRow) =>
-    session.session_invites.find((invite) => invite.member_id === profile.id)?.response ?? "pending";
+    session.session_invites.find((invite) => invite.member_id === profile.id)
+      ?.response ?? "pending";
 
   const items: CalendarItem[] = [
     ...monthSessions.map((session) => ({
@@ -141,22 +152,34 @@ export default async function CalendarPage({
                     className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
-                      <Link href={`/calendar/${session.id}`} className="text-link font-semibold">
+                      <Link
+                        href={`/calendar/${session.id}`}
+                        className="text-link font-semibold"
+                      >
                         {session.title}
                       </Link>
                       <p className="mt-1 text-sm text-muted">
-                        <SessionTime startsAt={session.starts_at} endsAt={session.ends_at} />
+                        <SessionTime
+                          startsAt={session.starts_at}
+                          endsAt={session.ends_at}
+                        />
                         {[
                           !isCoach && session.coach?.display_name,
                           session.location,
-                          !isMember && `${goingCount(session)} of ${session.session_invites.length} going`,
+                          !isMember &&
+                            `${goingCount(session)} of ${session.session_invites.length} going`,
                         ]
                           .filter(Boolean)
                           .map((part) => ` · ${part}`)
                           .join("")}
                       </p>
                     </div>
-                    {isMember && <ResponseButtons sessionId={session.id} response={myResponse(session)} />}
+                    {isMember && (
+                      <ResponseButtons
+                        sessionId={session.id}
+                        response={myResponse(session)}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -173,7 +196,10 @@ export default async function CalendarPage({
                 >
                   Previous
                 </Link>
-                <Link href="/calendar" className="btn-secondary px-3 py-2 text-sm">
+                <Link
+                  href="/calendar"
+                  className="btn-secondary px-3 py-2 text-sm"
+                >
                   Today
                 </Link>
                 <Link

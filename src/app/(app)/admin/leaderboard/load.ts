@@ -50,6 +50,7 @@ export async function loadActivity(
     sales,
     habits,
     programDays,
+    attended,
   ] = await Promise.all([
     readAll<ActivityRows["people"][number]>(() =>
       db.from("profiles").select("id, display_name, role").order("id"),
@@ -123,6 +124,12 @@ export async function loadActivity(
         .order("enrollment_id")
         .order("day_id"),
     ),
+    // Showing up live counts as a session too.
+    readAll<ActivityRows["going"][number]>(() =>
+      after(db.from("session_attendance").select("member_id"), "joined_at")
+        .order("session_id")
+        .order("member_id"),
+    ),
   ]);
 
   return {
@@ -131,7 +138,7 @@ export async function loadActivity(
     assigned: assignedRows.flatMap((row) =>
       row.task ? [{ coach_id: row.task.coach_id }] : [],
     ),
-    going,
+    going: [...going, ...attended],
     sessions,
     messages,
     memos,

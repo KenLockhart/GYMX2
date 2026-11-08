@@ -18,7 +18,10 @@ function oneLine(value: string, max = 80) {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
-type Block = { kind: "p"; text: string } | { kind: "lines"; lines: string[] } | { kind: "quote"; text: string };
+type Block =
+  | { kind: "p"; text: string }
+  | { kind: "lines"; lines: string[] }
+  | { kind: "quote"; text: string };
 
 function render({
   heading,
@@ -33,7 +36,8 @@ function render({
 }): Omit<Email, "subject"> {
   const htmlBlocks = blocks
     .map((block) => {
-      if (block.kind === "p") return `<p style="margin:0 0 16px">${escapeHtml(block.text)}</p>`;
+      if (block.kind === "p")
+        return `<p style="margin:0 0 16px">${escapeHtml(block.text)}</p>`;
       if (block.kind === "lines")
         return `<p style="margin:0 0 16px">${block.lines.map(escapeHtml).join("<br>")}</p>`;
       return `<blockquote style="margin:0 0 16px;padding:12px 16px;border-left:3px solid #c8f135;background:#f4f4f5;white-space:pre-wrap">${escapeHtml(block.text)}</blockquote>`;
@@ -59,25 +63,37 @@ ${htmlBlocks}
       .map((line) => `> ${line}`)
       .join("\n");
   });
-  const text = [heading, ...textBlocks, `${button.label}: ${button.url}`, "", footer].join("\n\n");
+  const text = [
+    heading,
+    ...textBlocks,
+    `${button.label}: ${button.url}`,
+    "",
+    footer,
+  ].join("\n\n");
 
   return { html, text };
 }
 
 const ORDER_FOOTER = "You're getting this because of an order on GYMX2.";
-const UPDATES_FOOTER = "You can turn these emails off on your Profile page on GYMX2.";
+const UPDATES_FOOTER =
+  "You can turn these emails off on your Profile page on GYMX2.";
 
 function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100);
 }
 
 // A link to the carrier's tracking page when the number's format makes the carrier clear.
 export function trackingUrl(tracking: string) {
   const number = tracking.replace(/\s+/g, "").toUpperCase();
-  if (/^1Z[0-9A-Z]{16}$/.test(number)) return `https://www.ups.com/track?tracknum=${number}`;
+  if (/^1Z[0-9A-Z]{16}$/.test(number))
+    return `https://www.ups.com/track?tracknum=${number}`;
   if (/^(9[2-5]\d{18,20}|[A-Z]{2}\d{9}US)$/.test(number))
     return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${number}`;
-  if (/^(\d{12}|\d{15})$/.test(number)) return `https://www.fedex.com/fedextrack/?trknbr=${number}`;
+  if (/^(\d{12}|\d{15})$/.test(number))
+    return `https://www.fedex.com/fedextrack/?trknbr=${number}`;
   return null;
 }
 
@@ -106,7 +122,10 @@ export function newSaleEmail(input: {
   }
   if (input.needsShipping) {
     blocks.push({ kind: "p", text: "Ship it to:" });
-    blocks.push({ kind: "lines", lines: [input.shippingName ?? input.buyerName, ...input.addressLines] });
+    blocks.push({
+      kind: "lines",
+      lines: [input.shippingName ?? input.buyerName, ...input.addressLines],
+    });
     blocks.push({
       kind: "p",
       text: "When it's on its way, mark it shipped on your Sales page and add the tracking number. We'll email the buyer.",
@@ -118,9 +137,14 @@ export function newSaleEmail(input: {
       ? `New order to ship: ${oneLine(input.itemTitle)}`
       : `You made a sale: ${oneLine(input.itemTitle)}`,
     ...render({
-      heading: input.needsShipping ? "You have an order to ship" : "You made a sale",
+      heading: input.needsShipping
+        ? "You have an order to ship"
+        : "You made a sale",
       blocks,
-      button: { label: input.needsShipping ? "Open orders to ship" : "See your sales", url: `${input.siteUrl}/armory/sales` },
+      button: {
+        label: input.needsShipping ? "Open orders to ship" : "See your sales",
+        url: `${input.siteUrl}/armory/sales`,
+      },
       footer: ORDER_FOOTER,
     }),
   };
@@ -141,7 +165,10 @@ export function orderShippedEmail(input: {
     },
     input.tracking
       ? { kind: "p", text: `Tracking number: ${input.tracking}` }
-      : { kind: "p", text: "No tracking number was added. Message your coach if you have questions." },
+      : {
+          kind: "p",
+          text: "No tracking number was added. Message your coach if you have questions.",
+        },
   ];
 
   return {
@@ -163,13 +190,17 @@ export function newMessageEmail(input: {
   body: string;
   conversationPath: string;
 }): Email {
-  const preview = input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
+  const preview =
+    input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
   return {
     subject: `New message from ${oneLine(input.senderName, 60)}`,
     ...render({
       heading: `${input.senderName} sent you a message`,
       blocks: [{ kind: "quote", text: preview }],
-      button: { label: "Reply on GYMX2", url: `${input.siteUrl}${input.conversationPath}` },
+      button: {
+        label: "Reply on GYMX2",
+        url: `${input.siteUrl}${input.conversationPath}`,
+      },
       footer: `We only email about the first unread message in a conversation. ${UPDATES_FOOTER}`,
     }),
   };
@@ -218,12 +249,20 @@ export function sessionEmail(input: {
         { kind: "lines", lines: details },
         ...(input.change === "cancelled"
           ? []
-          : [{ kind: "p" as const, text: "Let your coach know if you can make it." }]),
+          : [
+              {
+                kind: "p" as const,
+                text: "Let your coach know if you can make it.",
+              },
+            ]),
       ],
       button:
         input.change === "cancelled"
           ? { label: "Open your calendar", url: `${input.siteUrl}/calendar` }
-          : { label: "Going or can't go?", url: `${input.siteUrl}/calendar/${input.sessionId}` },
+          : {
+              label: "Going or can't go?",
+              url: `${input.siteUrl}/calendar/${input.sessionId}`,
+            },
       footer: UPDATES_FOOTER,
     }),
   };
@@ -238,19 +277,32 @@ export function flaggedMessageEmail(input: {
   body: string;
   reviewPath: string;
 }): Email {
-  const sender = input.fromCoach ? `${input.coachName} (coach)` : `${input.memberName} (member)`;
-  const preview = input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
+  const sender = input.fromCoach
+    ? `${input.coachName} (coach)`
+    : `${input.memberName} (member)`;
+  const preview =
+    input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
   return {
     subject: `Flagged message: ${oneLine(input.coachName, 40)} and ${oneLine(input.memberName, 40)}`,
     ...render({
       heading: "A message was flagged",
       blocks: [
-        { kind: "p", text: `${sender} sent a message that mentions: ${input.reasons}.` },
+        {
+          kind: "p",
+          text: `${sender} sent a message that mentions: ${input.reasons}.`,
+        },
         { kind: "quote", text: preview },
-        { kind: "p", text: "This is a reason to look, not proof. Open the conversation to see it in context." },
+        {
+          kind: "p",
+          text: "This is a reason to look, not proof. Open the conversation to see it in context.",
+        },
       ],
-      button: { label: "Review the conversation", url: `${input.siteUrl}${input.reviewPath}` },
-      footer: "You get this because you're a GYMX2 admin. We send at most one per conversation each day.",
+      button: {
+        label: "Review the conversation",
+        url: `${input.siteUrl}${input.reviewPath}`,
+      },
+      footer:
+        "You get this because you're a GYMX2 admin. We send at most one per conversation each day.",
     }),
   };
 }
@@ -267,14 +319,28 @@ export function refundEmail(input: {
   const buyer = input.audience === "buyer";
   const blocks: Block[] = buyer
     ? [
-        { kind: "p", text: `We refunded ${amount} for ${input.itemTitle} to the card you paid with.` },
-        { kind: "p", text: "Your bank may take 5–10 business days to show it." },
+        {
+          kind: "p",
+          text: `We refunded ${amount} for ${input.itemTitle} to the card you paid with.`,
+        },
+        {
+          kind: "p",
+          text: "Your bank may take 5–10 business days to show it.",
+        },
         ...(input.orderCancelled
-          ? [{ kind: "p" as const, text: "Your order was cancelled before it shipped, so nothing will arrive." }]
+          ? [
+              {
+                kind: "p" as const,
+                text: "Your order was cancelled before it shipped, so nothing will arrive.",
+              },
+            ]
           : []),
       ]
     : [
-        { kind: "p", text: `${input.buyerName}'s order of ${input.itemTitle} (${amount}) was refunded.` },
+        {
+          kind: "p",
+          text: `${input.buyerName}'s order of ${input.itemTitle} (${amount}) was refunded.`,
+        },
         {
           kind: "p",
           text: input.orderCancelled
@@ -284,30 +350,44 @@ export function refundEmail(input: {
       ];
 
   return {
-    subject: buyer ? `Refund for ${oneLine(input.itemTitle)}` : `Order refunded: ${oneLine(input.itemTitle)}`,
+    subject: buyer
+      ? `Refund for ${oneLine(input.itemTitle)}`
+      : `Order refunded: ${oneLine(input.itemTitle)}`,
     ...render({
       heading: buyer ? "Your refund is on its way" : "An order was refunded",
       blocks,
       button: buyer
-        ? { label: "See your purchases", url: `${input.siteUrl}/armory/purchases` }
+        ? {
+            label: "See your purchases",
+            url: `${input.siteUrl}/armory/purchases`,
+          }
         : { label: "See your sales", url: `${input.siteUrl}/armory/sales` },
       footer: ORDER_FOOTER,
     }),
   };
 }
 
-export function accountDeletedEmail(input: { siteUrl: string; name: string }): Email {
+export function accountDeletedEmail(input: {
+  siteUrl: string;
+  name: string;
+}): Email {
   return {
     subject: "Your GYMX2 account was deleted",
     ...render({
       heading: "Your account is deleted",
       blocks: [
-        { kind: "p", text: `Hi ${input.name}, your GYMX2 account and everything in it has been deleted, as you asked.` },
+        {
+          kind: "p",
+          text: `Hi ${input.name}, your GYMX2 account and everything in it has been deleted, as you asked.`,
+        },
         {
           kind: "p",
           text: "We keep records of past purchases for tax and accounting, without your name attached. Backups clear within 30 days.",
         },
-        { kind: "p", text: "If you didn't do this, email support@gymx2.com right away." },
+        {
+          kind: "p",
+          text: "If you didn't do this, email support@gymx2.com right away.",
+        },
       ],
       button: { label: "Visit GYMX2", url: input.siteUrl },
       footer: "This is the last email you'll get from GYMX2.",
@@ -323,26 +403,51 @@ export function affiliateDecisionEmail(input: {
   terms: string[];
 }): Email {
   return {
-    subject: input.approved ? "You're a GYMX2 affiliate" : "Your GYMX2 affiliate application",
+    subject: input.approved
+      ? "You're a GYMX2 affiliate"
+      : "Your GYMX2 affiliate application",
     ...render({
-      heading: input.approved ? "Welcome to the affiliate program" : "About your affiliate application",
+      heading: input.approved
+        ? "Welcome to the affiliate program"
+        : "About your affiliate application",
       blocks: input.approved
         ? [
-            { kind: "p", text: `Hi ${input.name}, you're approved. Share your link and earn when people you refer join and buy.` },
-            { kind: "lines", lines: [`Your link: ${input.link}`, ...input.terms] },
-            { kind: "p", text: "Set up payouts on your Affiliate page so we can pay you." },
+            {
+              kind: "p",
+              text: `Hi ${input.name}, you're approved. Share your link and earn when people you refer join and buy.`,
+            },
+            {
+              kind: "lines",
+              lines: [`Your link: ${input.link}`, ...input.terms],
+            },
+            {
+              kind: "p",
+              text: "Set up payouts on your Affiliate page so we can pay you.",
+            },
           ]
         : [
-            { kind: "p", text: `Hi ${input.name}, thanks for applying. We can't approve your application right now.` },
+            {
+              kind: "p",
+              text: `Hi ${input.name}, thanks for applying. We can't approve your application right now.`,
+            },
             { kind: "p", text: "Questions? Email support@gymx2.com." },
           ],
-      button: { label: input.approved ? "Open your Affiliate page" : "Visit GYMX2", url: `${input.siteUrl}/affiliate` },
-      footer: "You're getting this because you applied to the GYMX2 affiliate program.",
+      button: {
+        label: input.approved ? "Open your Affiliate page" : "Visit GYMX2",
+        url: `${input.siteUrl}/affiliate`,
+      },
+      footer:
+        "You're getting this because you applied to the GYMX2 affiliate program.",
     }),
   };
 }
 
-export function affiliatePayoutEmail(input: { siteUrl: string; name: string; amountCents: number; count: number }): Email {
+export function affiliatePayoutEmail(input: {
+  siteUrl: string;
+  name: string;
+  amountCents: number;
+  count: number;
+}): Email {
   const amount = money(input.amountCents);
   return {
     subject: `You've been paid ${amount}`,
@@ -353,7 +458,10 @@ export function affiliatePayoutEmail(input: { siteUrl: string; name: string; amo
           kind: "p",
           text: `Hi ${input.name}, we sent ${amount} for ${input.count} ${input.count === 1 ? "commission" : "commissions"} to your Stripe account.`,
         },
-        { kind: "p", text: "Stripe moves it to your bank on your normal payout schedule, usually within a few business days." },
+        {
+          kind: "p",
+          text: "Stripe moves it to your bank on your normal payout schedule, usually within a few business days.",
+        },
       ],
       button: { label: "See your earnings", url: `${input.siteUrl}/affiliate` },
       footer: "You're getting this because you're a GYMX2 affiliate.",
@@ -364,38 +472,93 @@ export function affiliatePayoutEmail(input: { siteUrl: string; name: string; amo
 export function sessionReminderEmail(input: {
   siteUrl: string;
   name: string;
-  sessions: { id: string; title: string; when: string; where: string; coachName: string }[];
+  sessions: {
+    id: string;
+    title: string;
+    when: string;
+    where: string;
+    coachName: string;
+  }[];
 }): Email {
   const one = input.sessions.length === 1 ? input.sessions[0] : null;
   return {
-    subject: one ? `Tomorrow: ${oneLine(one.title)}` : `You have ${input.sessions.length} sessions tomorrow`,
+    subject: one
+      ? `Tomorrow: ${oneLine(one.title)}`
+      : `You have ${input.sessions.length} sessions tomorrow`,
     ...render({
       heading: one ? "Your session is tomorrow" : "Your sessions tomorrow",
       blocks: [
         { kind: "p", text: `Hi ${input.name}, here's what's coming up.` },
         ...input.sessions.map((session) => ({
           kind: "lines" as const,
-          lines: [`${session.title} with ${session.coachName}`, session.when, ...(session.where ? [session.where] : [])],
+          lines: [
+            `${session.title} with ${session.coachName}`,
+            session.when,
+            ...(session.where ? [session.where] : []),
+          ],
         })),
         { kind: "p", text: "Can't make it? Let your coach know on GYMX2." },
       ],
       button: one
-        ? { label: "Open the session", url: `${input.siteUrl}/calendar/${one.id}` }
+        ? {
+            label: "Open the session",
+            url: `${input.siteUrl}/calendar/${one.id}`,
+          }
         : { label: "Open your calendar", url: `${input.siteUrl}/calendar` },
       footer: UPDATES_FOOTER,
     }),
   };
 }
 
-export function taskDueEmail(input: { siteUrl: string; name: string; tasks: { title: string; coachName: string }[] }): Email {
+export function liveNowEmail(input: {
+  siteUrl: string;
+  name: string;
+  coachName: string;
+  title: string;
+  sessionId: string;
+}): Email {
+  return {
+    subject: `${oneLine(input.coachName)} is live: ${oneLine(input.title)}`,
+    ...render({
+      heading: "Your session is live",
+      blocks: [
+        {
+          kind: "p",
+          text: `Hi ${input.name}, ${input.coachName} just went live for "${input.title}". Jump in and train together.`,
+        },
+      ],
+      button: {
+        label: "Watch live",
+        url: `${input.siteUrl}/calendar/${input.sessionId}/live`,
+      },
+      footer: UPDATES_FOOTER,
+    }),
+  };
+}
+
+export function taskDueEmail(input: {
+  siteUrl: string;
+  name: string;
+  tasks: { title: string; coachName: string }[];
+}): Email {
   const one = input.tasks.length === 1 ? input.tasks[0] : null;
   return {
-    subject: one ? `Due tomorrow: ${oneLine(one.title)}` : `${input.tasks.length} Tasks are due tomorrow`,
+    subject: one
+      ? `Due tomorrow: ${oneLine(one.title)}`
+      : `${input.tasks.length} Tasks are due tomorrow`,
     ...render({
       heading: one ? "A Task is due tomorrow" : "Tasks due tomorrow",
       blocks: [
-        { kind: "p", text: `Hi ${input.name}, finish ${one ? "this" : "these"} to stay on track (+3 points each).` },
-        { kind: "lines", lines: input.tasks.map((task) => `${task.title} (from ${task.coachName})`) },
+        {
+          kind: "p",
+          text: `Hi ${input.name}, finish ${one ? "this" : "these"} to stay on track (+3 points each).`,
+        },
+        {
+          kind: "lines",
+          lines: input.tasks.map(
+            (task) => `${task.title} (from ${task.coachName})`,
+          ),
+        },
       ],
       button: { label: "Open your Tasks", url: `${input.siteUrl}/tasks` },
       footer: UPDATES_FOOTER,
@@ -403,13 +566,21 @@ export function taskDueEmail(input: { siteUrl: string; name: string; tasks: { ti
   };
 }
 
-export function streakReminderEmail(input: { siteUrl: string; name: string; days: number; coach: boolean }): Email {
+export function streakReminderEmail(input: {
+  siteUrl: string;
+  name: string;
+  days: number;
+  coach: boolean;
+}): Email {
   return {
     subject: `🔥 Keep your ${input.days}-day streak alive`,
     ...render({
       heading: `Your ${input.days}-day streak ends tonight`,
       blocks: [
-        { kind: "p", text: `Hi ${input.name}, you haven't been active today yet. One thing before midnight keeps it going.` },
+        {
+          kind: "p",
+          text: `Hi ${input.name}, you haven't been active today yet. One thing before midnight keeps it going.`,
+        },
         {
           kind: "p",
           text: input.coach
@@ -443,7 +614,9 @@ export function weeklyDigestEmail(input: {
     {
       kind: "p",
       text: `Hi ${input.name}, last week you finished ${input.lastWeekDone} of ${input.challengeCount} challenges.${
-        input.newBadges.length ? ` New badges: ${input.newBadges.join(", ")}.` : ""
+        input.newBadges.length
+          ? ` New badges: ${input.newBadges.join(", ")}.`
+          : ""
       }`,
     },
     {
@@ -457,7 +630,10 @@ export function weeklyDigestEmail(input: {
     { kind: "lines", lines: input.challenges },
   ];
   if (input.upcoming.length) {
-    blocks.push({ kind: "p", text: "Coming up:" }, { kind: "lines", lines: input.upcoming });
+    blocks.push(
+      { kind: "p", text: "Coming up:" },
+      { kind: "lines", lines: input.upcoming },
+    );
   }
   return {
     subject: "Your GYMX2 week",
@@ -495,7 +671,12 @@ export function membershipChangeEmail(input: {
             },
             { kind: "p", text: "Say hello and give them their first Task." },
           ]
-        : [{ kind: "p", text: `${input.memberName}'s ${input.planName} membership has ended.` }],
+        : [
+            {
+              kind: "p",
+              text: `${input.memberName}'s ${input.planName} membership has ended.`,
+            },
+          ],
       button: { label: "See your members", url: `${input.siteUrl}/plans` },
       footer: "You're getting this because you offer memberships on GYMX2.",
     }),

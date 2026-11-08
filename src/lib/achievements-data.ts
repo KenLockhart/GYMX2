@@ -27,6 +27,7 @@ export async function loadMemberActivity(
     coaches,
     habits,
     programDays,
+    attended,
   ] = await Promise.all([
     db
       .from("task_assignments")
@@ -66,6 +67,11 @@ export async function loadMemberActivity(
       .select("completed_at, day:program_days(pillar)")
       .eq("member_id", userId)
       .limit(5000),
+    db
+      .from("session_attendance")
+      .select("joined_at")
+      .eq("member_id", userId)
+      .limit(5000),
   ]);
 
   return {
@@ -102,7 +108,11 @@ export async function loadMemberActivity(
         })),
       ),
     memoDays: (memos.data ?? []).map((row) => row.memo_date as string),
-    going: (going.data ?? []).map((row) => row.responded_at as string),
+    // Showing up live counts as a session too, on top of saying "Going".
+    going: [
+      ...(going.data ?? []).map((row) => row.responded_at as string),
+      ...(attended.data ?? []).map((row) => row.joined_at as string),
+    ],
     messages: (messages.data ?? []).map((row) => row.created_at as string),
     purchases: purchases.count ?? 0,
     coaches: coaches.count ?? 0,
