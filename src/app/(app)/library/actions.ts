@@ -6,7 +6,16 @@ import { deleteVideo as deleteStreamVideo, isStreamConfigured } from "@/lib/stre
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
+import { videoInUseError } from "@/lib/format";
 import { idSchema } from "@/lib/validation";
+
+async function videoInUseMessage(videoId: string) {
+  const { count } = await createAdminClient()
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("video_id", videoId);
+  return videoInUseError(count ?? 0);
+}
 
 export async function deleteVideo(_: ActionState, formData: FormData): Promise<ActionState> {
   await requireAccount();
@@ -29,14 +38,9 @@ export async function deleteVideo(_: ActionState, formData: FormData): Promise<A
     .eq("id", videoId.data)
     .select("id");
 
-  if (error) {
-    return {
-      error:
-        error.code === "23503"
-          ? "This video is used by a Task. Delete the Task first."
-          : "We couldn't delete that video. Please try again.",
-    };
-  }
+  // Tasks keep their video, so the database refuses to delete one that a Task still uses.
+  if (error?.code === "23503") return { error: await videoInUseMessage(videoId.data) };
+  if (error) return { error: "We couldn't delete that video. Please try again." };
   if (!deleted?.length) return { error: "We couldn't find that video." };
 
   if (stored && isStreamConfigured()) {
