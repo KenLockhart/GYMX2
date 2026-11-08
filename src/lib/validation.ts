@@ -98,3 +98,37 @@ export function safeRedirectPath(path: unknown, fallback = "/dashboard") {
   if (path.startsWith("//") || path.includes("\\")) return fallback;
   return path;
 }
+
+const optionalHttpsUrl = z
+  .string()
+  .trim()
+  .max(500, "The meeting link is too long.")
+  .refine((value) => value === "" || isHttpsUrl(value), {
+    error: "The meeting link must be a full address starting with https://",
+  });
+
+const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
+
+// Times arrive as full ISO moments. The browser turns the coach's local date and time into one before sending.
+export const sessionSchema = z
+  .object({
+    id: z.union([z.literal("").transform(() => null), z.uuid()]),
+    title: taskOrVideoTitle,
+    notes: z.string().trim().max(2000, "Use 2,000 characters or fewer for the notes."),
+    location: z.string().trim().max(200, "Use 200 characters or fewer for the location."),
+    meeting_url: optionalHttpsUrl,
+    starts_at: z.iso.datetime({ offset: true, error: "Choose a date and start time." }),
+    ends_at: z.iso.datetime({ offset: true, error: "Choose an end time." }),
+    member_ids: z.array(z.uuid()).min(1, "Invite at least one member.").max(200),
+  })
+  .refine((value) => Date.parse(value.ends_at) > Date.parse(value.starts_at), {
+    error: "The session must end after it starts.",
+  })
+  .refine((value) => Date.parse(value.ends_at) - Date.parse(value.starts_at) <= MAX_SESSION_MS, {
+    error: "A session can last up to 24 hours.",
+  });
+
+export const sessionResponseSchema = z.object({
+  session_id: z.uuid(),
+  response: z.enum(["going", "not_going"]),
+});

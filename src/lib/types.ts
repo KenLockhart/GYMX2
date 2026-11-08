@@ -44,3 +44,14 @@ export type ActionState = {
   error?: string;
   message?: string;
 };
+
+export type CalendarSession = {
+  id: string;
+  coach_id: string;
+  title: string;
+  notes: string;
+  location: string;
+  meeting_url: string | null;
+  starts_at: string;
+  ends_at: string;
+};

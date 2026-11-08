@@ -4,6 +4,8 @@ import {
   memoSchema,
   profileSchema,
   safeRedirectPath,
+  sessionResponseSchema,
+  sessionSchema,
   setRoleSchema,
   signUpSchema,
   taskSchema,
@@ -134,5 +136,63 @@ describe("setRoleSchema", () => {
       role: "owner",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("sessionSchema", () => {
+  const valid = {
+    id: "",
+    title: "Morning run",
+    notes: "",
+    location: "Main park",
+    meeting_url: "",
+    starts_at: "2026-11-10T14:00:00.000Z",
+    ends_at: "2026-11-10T15:00:00.000Z",
+    member_ids: ["3f1b6c1e-8f4a-4d7e-9a57-1c1d2e3f4a5b"],
+  };
+
+  it("accepts a new session", () => {
+    expect(sessionSchema.parse(valid).id).toBeNull();
+  });
+
+  it("must end after it starts", () => {
+    const result = sessionSchema.safeParse({ ...valid, ends_at: valid.starts_at });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toBe("The session must end after it starts.");
+  });
+
+  it("lasts at most a day", () => {
+    expect(sessionSchema.safeParse({ ...valid, ends_at: "2026-11-12T14:00:00.000Z" }).success).toBe(false);
+  });
+
+  it.each(["http://meet.example.com", "meet.example.com"])("rejects the meeting link %s", (meeting_url) => {
+    expect(sessionSchema.safeParse({ ...valid, meeting_url }).success).toBe(false);
+  });
+
+  it("accepts an https meeting link", () => {
+    expect(sessionSchema.safeParse({ ...valid, meeting_url: "https://meet.example.com/x" }).success).toBe(true);
+  });
+
+  it("needs a start time", () => {
+    expect(sessionSchema.safeParse({ ...valid, starts_at: "" }).success).toBe(false);
+  });
+
+  it("requires a member", () => {
+    expect(sessionSchema.safeParse({ ...valid, member_ids: [] }).success).toBe(false);
+  });
+});
+
+describe("sessionResponseSchema", () => {
+  it.each(["going", "not_going"])("accepts %s", (response) => {
+    expect(
+      sessionResponseSchema.safeParse({ session_id: "3f1b6c1e-8f4a-4d7e-9a57-1c1d2e3f4a5b", response }).success,
+    ).toBe(true);
+  });
+
+  it("rejects pending", () => {
+    expect(
+      sessionResponseSchema.safeParse({ session_id: "3f1b6c1e-8f4a-4d7e-9a57-1c1d2e3f4a5b", response: "pending" })
+        .success,
+    ).toBe(false);
   });
 });

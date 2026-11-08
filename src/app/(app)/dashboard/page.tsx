@@ -6,8 +6,10 @@ import type { UserRole } from "@/lib/types";
 export const metadata: Metadata = { title: "Dashboard" };
 
 const roleIntro: Record<UserRole, string> = {
-  member: "You're in. Join a coach to start getting Tasks, and keep daily notes in your Memos.",
-  coach: "You're set up as a coach. Upload videos to your library, then give Tasks to your members.",
+  member:
+    "You're in. Join a coach to start getting Tasks and sessions, and keep daily notes in your Memos.",
+  coach:
+    "You're set up as a coach. Upload videos to your library, give Tasks to your members and schedule sessions.",
   admin: "You manage GYMX2. Review coach requests and member roles from the admin area.",
 };
 
@@ -34,6 +36,9 @@ export default async function DashboardPage() {
             <Link href="/tasks" className="btn-primary">
               See your Tasks
             </Link>
+            <Link href="/calendar" className="btn-secondary">
+              Open your calendar
+            </Link>
             <Link href="/coaches" className="btn-secondary">
               Find a coach
             </Link>
@@ -46,6 +51,9 @@ export default async function DashboardPage() {
             </Link>
             <Link href="/library/upload" className="btn-secondary">
               Upload a video
+            </Link>
+            <Link href="/calendar/new" className="btn-secondary">
+              Schedule a session
             </Link>
           </>
         )}
