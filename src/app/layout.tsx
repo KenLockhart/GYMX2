@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, Inter } from "next/font/google";
+import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
 const inter = Inter({
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
     default: "GYMX2",
     template: "%s | GYMX2",
   },
-  description: "Train with the coaches and creators you want to follow.",
+  description: "Coaches and members, together: get fit, learn nutrition and get your mind right.",
 };
 
 export const viewport: Viewport = {
@@ -28,7 +29,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} ${barlow.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   );
 }
