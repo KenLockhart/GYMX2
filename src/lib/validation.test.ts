@@ -255,6 +255,15 @@ describe("armoryItemSchema", () => {
     expect(armoryItemSchema.safeParse(paid).success).toBe(true);
   });
 
+  it.each([
+    ["paid", paid],
+    ["free", download],
+  ])("never lets gear be a %s download", (_, item) => {
+    const result = armoryItemSchema.safeParse({ ...item, category: "gear" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toContain("Gear ships to the buyer");
+  });
+
   const product = {
     kind: "product",
     id: "",

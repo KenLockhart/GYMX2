@@ -209,7 +209,11 @@ export const armoryItemSchema = z.discriminatedUnion("kind", [
     image_path: z.union([blankToNull, storagePath]),
     visible_to_all: z.boolean(),
   }),
-]);
+]).refine((item) => !(item.category === "gear" && (item.kind === "download" || item.kind === "paid")), {
+  // Gear is shipped, so buyers must never get a file instead. The database enforces this too.
+  error: 'Gear ships to the buyer, so it can\'t be a download. Choose "Sell gear" or "Buy it elsewhere".',
+  path: ["category"],
+});
 
 export const purchaseRequestSchema = z.object({
   item_id: z.uuid(),

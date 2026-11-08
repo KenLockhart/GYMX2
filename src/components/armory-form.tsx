@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { prepareArmoryUpload, saveArmoryItem } from "@/app/(app)/armory/actions";
 import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
-import { ARMORY_CATEGORIES, DEFAULT_SIZES, PLATFORM_FEE_PERCENT, describeSize, type ArmoryKind } from "@/lib/armory";
+import { DEFAULT_SIZES, categoriesFor, PLATFORM_FEE_PERCENT, describeSize, type ArmoryKind } from "@/lib/armory";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 export type ArmoryFormValues = {
@@ -112,6 +112,14 @@ export function ArmoryForm({
   payouts: "ready" | "missing" | "platform";
 }) {
   const [kind, setKind] = useState<ArmoryKind>(initial.kind);
+  const [category, setCategory] = useState(initial.category);
+  const categories = categoriesFor(kind);
+  // Choosing gear picks the Gear category; a digital file can't stay in Gear.
+  function chooseKind(next: ArmoryKind) {
+    setKind(next);
+    if (next === "product") setCategory("gear");
+    else if ((next === "download" || next === "paid") && category === "gear") setCategory("other");
+  }
   const [filePath, setFilePath] = useState(initial.file_path);
   const [fileName, setFileName] = useState(initial.file_name);
   const [imagePath, setImagePath] = useState(initial.image_path);
@@ -157,7 +165,7 @@ export function ArmoryForm({
                 name="kind_choice"
                 value={value}
                 checked={kind === value}
-                onChange={() => setKind(value)}
+                onChange={() => chooseKind(value)}
                 className="sr-only"
               />
               <span className="block font-semibold">{title}</span>
@@ -169,10 +177,15 @@ export function ArmoryForm({
 
       <label className="block space-y-1.5">
         <span className="text-sm font-medium">Category</span>
-        <select name="category" defaultValue={initial.category} className="field-input">
-          {ARMORY_CATEGORIES.map((category) => (
-            <option key={category.value} value={category.value}>
-              {category.label}
+        <select
+          name="category"
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
+          className="field-input"
+        >
+          {categories.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>

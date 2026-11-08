@@ -14,6 +14,13 @@ export function categoryLabel(category: string) {
   return ARMORY_CATEGORIES.find((item) => item.value === category)?.label ?? "Other";
 }
 
+// Gear is shipped, never downloaded, so digital items can't use the Gear category.
+export function categoriesFor(kind: ArmoryKind) {
+  return kind === "download" || kind === "paid"
+    ? ARMORY_CATEGORIES.filter((category) => category.value !== "gear")
+    : ARMORY_CATEGORIES;
+}
+
 export function isCategory(value: unknown): value is ArmoryCategory {
   return ARMORY_CATEGORIES.some((item) => item.value === value);
 }

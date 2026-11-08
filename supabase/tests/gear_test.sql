@@ -1,5 +1,5 @@
 begin;
-select plan(11);
+select plan(12);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('80000000-0000-0000-0000-000000000001', 'gear-admin@example.test', '{"display_name":"Admin"}'),
@@ -41,6 +41,14 @@ select throws_ok(
   '23514',
   null,
   'sizes cannot be blank'
+);
+select throws_ok(
+  $$insert into public.armory_items (coach_id, kind, category, title, price_cents, file_path, file_name)
+    values ('80000000-0000-0000-0000-000000000002', 'paid', 'gear', 'Shirt file', 1000,
+            '80000000-0000-0000-0000-000000000002/shirt.png', 'shirt.png')$$,
+  '23514',
+  null,
+  'gear can never be sold as a download'
 );
 reset role;
 

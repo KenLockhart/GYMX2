@@ -19,7 +19,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .select("coach_id, kind, file_path, file_name")
     .eq("id", id)
     .maybeSingle();
-  if (!item || item.kind === "link" || !item.file_path) {
+  // Only digital items have a file to hand out. Gear and shop links never do.
+  if (!item || (item.kind !== "download" && item.kind !== "paid") || !item.file_path) {
     return new NextResponse("Not found", { status: 404 });
   }
 
