@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { AdminUser } from "@/lib/types";
@@ -16,12 +17,17 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h1 className="text-5xl">Admin</h1>
         <p className="mt-2 text-muted">
           {users.length} {users.length === 1 ? "person" : "people"}, {requests} coach{" "}
           {requests === 1 ? "request" : "requests"} waiting
         </p>
+      </div>
+        <Link href="/admin/messages" className="btn-secondary">
+          Review conversations
+        </Link>
       </div>
 
       {error ? (

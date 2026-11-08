@@ -132,3 +132,8 @@ export const sessionResponseSchema = z.object({
   session_id: z.uuid(),
   response: z.enum(["going", "not_going"]),
 });
+
+export const messageSchema = z.object({
+  other_user_id: z.uuid("Choose who to message."),
+  body: z.string().trim().min(1, "Write a message first.").max(4000, "Use 4,000 characters or fewer."),
+});

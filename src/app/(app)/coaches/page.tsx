@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
 import { requireAccount } from "@/lib/auth";
@@ -29,7 +30,7 @@ export default async function CoachesPage() {
       <div>
         <h1 className="text-5xl">Coaches</h1>
         <p className="mt-2 max-w-xl text-muted">
-          Join a coach to watch their videos and get Tasks from them. They&apos;ll see your name and
+          Join a coach to watch their videos, get Tasks and sessions from them, and message them. They&apos;ll see your name and
           bio, but never your email.
         </p>
       </div>
@@ -52,17 +53,25 @@ export default async function CoachesPage() {
                 className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold">{coach.display_name}</p>
+                  <Link href={`/coaches/${coach.id}`} className="text-link font-semibold">
+                    {coach.display_name}
+                  </Link>
                   {coach.bio && <p className="mt-1 text-sm text-muted">{coach.bio}</p>}
                 </div>
+                <div className="flex shrink-0 flex-wrap items-start gap-2">
+                {isJoined && (
+                  <Link href={`/messages/${coach.id}`} className="btn-secondary">
+                    Message
+                  </Link>
+                )}
                 <ActionForm
                   action={isJoined ? leaveCoach : joinCoach}
                   confirmMessage={
                     isJoined
-                      ? `Leave ${coach.display_name}? Your unfinished Tasks from them will be removed.`
+                      ? `Leave ${coach.display_name}? Your unfinished Tasks and upcoming sessions with them will be removed.`
                       : undefined
                   }
-                  className="shrink-0 space-y-2"
+                  className="space-y-2"
                 >
                   <input type="hidden" name="coach_id" value={coach.id} />
                   <SubmitButton
@@ -73,6 +82,7 @@ export default async function CoachesPage() {
                   </SubmitButton>
                   <FormStatus />
                 </ActionForm>
+                </div>
               </li>
             );
           })}

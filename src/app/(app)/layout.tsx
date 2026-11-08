@@ -2,9 +2,22 @@ import Link from "next/link";
 import { signOut } from "@/app/(auth)/actions";
 import { BrandLink } from "@/components/brand-link";
 import { requireAccount } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await requireAccount();
+
+  // Unread messages are ones the other person sent. Row security limits this to the viewer's conversations.
+  let unread = 0;
+  if (profile.role !== "admin") {
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .is("read_at", null)
+      .neq("sender_id", profile.id);
+    unread = count ?? 0;
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -32,6 +45,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {profile.role === "coach" && (
               <Link href="/members" className="hover:text-accent">
                 Members
+              </Link>
+            )}
+            {profile.role === "admin" ? (
+              <Link href="/admin/messages" className="hover:text-accent">
+                Messages
+              </Link>
+            ) : (
+              <Link href="/messages" className="inline-flex items-center gap-1.5 hover:text-accent">
+                Messages
+                {unread > 0 && (
+                  <span className="rounded-full bg-accent px-1.5 text-xs font-bold text-accent-foreground">
+                    {unread}
+                    <span className="sr-only"> unread</span>
+                  </span>
+                )}
               </Link>
             )}
             <Link href="/memos" className="hover:text-accent">

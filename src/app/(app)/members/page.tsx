@@ -37,11 +37,16 @@ export default async function MembersPage() {
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
           {members.map((member) => (
-            <li key={member.id} className="p-4">
-              <Link href={`/members/${member.id}`} className="text-link font-semibold">
-                {member.display_name}
+            <li key={member.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <Link href={`/members/${member.id}`} className="text-link font-semibold">
+                  {member.display_name}
+                </Link>
+                {member.bio && <p className="mt-1 text-sm text-muted">{member.bio}</p>}
+              </div>
+              <Link href={`/messages/${member.id}`} className="btn-secondary shrink-0 px-3 py-2 text-sm">
+                Message
               </Link>
-              {member.bio && <p className="mt-1 text-sm text-muted">{member.bio}</p>}
             </li>
           ))}
         </ul>
