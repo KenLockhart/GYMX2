@@ -65,3 +65,19 @@ export type Message = {
   read_at: string | null;
   created_at: string;
 };
+
+export type ArmoryItem = {
+  id: string;
+  coach_id: string;
+  kind: "link" | "download";
+  category: string;
+  title: string;
+  description: string;
+  price_cents: number | null;
+  buy_url: string | null;
+  file_path: string | null;
+  file_name: string | null;
+  image_path: string | null;
+  visible_to_all: boolean;
+  created_at: string;
+};

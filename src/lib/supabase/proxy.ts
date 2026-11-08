@@ -13,6 +13,7 @@ const PROTECTED_PREFIXES = [
   "/memos",
   "/calendar",
   "/messages",
+  "/armory",
 ];
 
 function matchesPrefix(pathname: string, prefix: string) {

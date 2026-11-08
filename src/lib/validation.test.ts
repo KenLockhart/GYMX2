@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  armoryItemSchema,
   emailLinkTypeSchema,
   memoSchema,
   profileSchema,
@@ -194,5 +195,56 @@ describe("sessionResponseSchema", () => {
       sessionResponseSchema.safeParse({ session_id: "3f1b6c1e-8f4a-4d7e-9a57-1c1d2e3f4a5b", response: "pending" })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("armoryItemSchema", () => {
+  const owner = "3f1b6c1e-8f4a-4d7e-9a57-1c1d2e3f4a5b";
+  const link = {
+    kind: "link",
+    id: "",
+    category: "gear",
+    title: "Bands",
+    description: "",
+    price_cents: 2499,
+    buy_url: "https://shop.example.com/bands",
+    image_path: "",
+    visible_to_all: false,
+  };
+  const download = {
+    kind: "download",
+    id: "",
+    category: "ebook",
+    title: "Meal plan",
+    description: "",
+    file_path: `${owner}/abc-plan.pdf`,
+    file_name: "plan.pdf",
+    image_path: `${owner}/cover.png`,
+    visible_to_all: true,
+  };
+
+  it("accepts an outside-link item", () => {
+    expect(armoryItemSchema.parse(link)).toMatchObject({ id: null, image_path: null });
+  });
+
+  it("needs an https shop link", () => {
+    expect(armoryItemSchema.safeParse({ ...link, buy_url: "shop.example.com" }).success).toBe(false);
+  });
+
+  it("accepts a free download", () => {
+    expect(armoryItemSchema.safeParse(download).success).toBe(true);
+  });
+
+  it("needs an uploaded file for a download", () => {
+    const result = armoryItemSchema.safeParse({ ...download, file_path: "" });
+    expect(result.error?.issues[0].message).toBe("Upload the file people will download.");
+  });
+
+  it.each(["../etc/passwd", `${owner}/../x.pdf`, `${owner}/a/b.pdf`])("rejects the file path %s", (file_path) => {
+    expect(armoryItemSchema.safeParse({ ...download, file_path }).success).toBe(false);
+  });
+
+  it("rejects an unknown category", () => {
+    expect(armoryItemSchema.safeParse({ ...link, category: "weapons" }).success).toBe(false);
   });
 });

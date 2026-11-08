@@ -39,6 +39,9 @@ export default async function DashboardPage() {
             <Link href="/calendar" className="btn-secondary">
               Open your calendar
             </Link>
+            <Link href="/armory" className="btn-secondary">
+              Visit the Armory
+            </Link>
             <Link href="/coaches" className="btn-secondary">
               Find a coach
             </Link>
@@ -54,6 +57,9 @@ export default async function DashboardPage() {
             </Link>
             <Link href="/calendar/new" className="btn-secondary">
               Schedule a session
+            </Link>
+            <Link href="/armory/new" className="btn-secondary">
+              Add to the Armory
             </Link>
           </>
         )}
