@@ -46,6 +46,9 @@ export type ActionState = {
   message?: string;
 };
 
+// Starting a purchase: either an error, or the secret that opens Stripe's checkout on the page.
+export type CheckoutState = ActionState & { clientSecret?: string };
+
 export type CalendarSession = {
   id: string;
   coach_id: string;

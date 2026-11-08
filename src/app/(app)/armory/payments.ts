@@ -7,11 +7,11 @@ import { MIN_PAID_PRICE_CENTS, platformFeeCents } from "@/lib/armory";
 import { requireAccount, requireCoach } from "@/lib/auth";
 import { notifyOrderShipped } from "@/lib/notify";
 import { refreshPayoutAccount } from "@/lib/purchases";
-import { getStripe, isStripeConfigured } from "@/lib/stripe";
+import { getStripe, isStripeConfigured, stripePublishableKey } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import type { ActionState, ArmoryItem } from "@/lib/types";
+import type { ActionState, ArmoryItem, CheckoutState } from "@/lib/types";
 import { purchaseRequestSchema, shipOrderSchema } from "@/lib/validation";
 
 // Sends a coach to Stripe to set up (or finish setting up) the account their sales are paid into.
@@ -80,7 +80,9 @@ export async function openPayoutDashboard(): Promise<ActionState> {
   redirect(url);
 }
 
-export async function buyArmoryItem(_: ActionState, formData: FormData): Promise<ActionState> {
+// Opens checkout for an item. With a publishable key set, the payment form is shown inside the item
+// page (the buyer never leaves gymx2.com); otherwise the buyer is sent to Stripe's checkout page.
+export async function buyArmoryItem(_: CheckoutState, formData: FormData): Promise<CheckoutState> {
   const { profile, email } = await requireAccount();
   const request = purchaseRequestSchema.safeParse({
     item_id: formData.get("item_id"),
@@ -155,10 +157,16 @@ export async function buyArmoryItem(_: ActionState, formData: FormData): Promise
   const shipping = isGear ? sellable.shipping_cents : 0;
   const fee = isPlatformItem ? 0 : platformFeeCents(sellable.price_cents);
   const site = getSiteUrl();
+  const embedded = Boolean(stripePublishableKey());
+  const returnUrl = `${site}/armory/${sellable.id}?purchase=done&session_id={CHECKOUT_SESSION_ID}`;
   let url: string | null;
+  let clientSecret: string | null;
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
+      ...(embedded
+        ? { ui_mode: "embedded" as const, return_url: returnUrl }
+        : { success_url: returnUrl, cancel_url: `${site}/armory/${sellable.id}` }),
       customer_email: email || undefined,
       client_reference_id: profile.id,
       line_items: [
@@ -198,14 +206,14 @@ export async function buyArmoryItem(_: ActionState, formData: FormData): Promise
         // What GYMX2 keeps: the 10% fee on a coach sale, or everything on GYMX2's own items.
         fee_cents: String(isPlatformItem ? sellable.price_cents + shipping : fee),
       },
-      success_url: `${site}/armory/${sellable.id}?purchase=done&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${site}/armory/${sellable.id}`,
     });
     url = session.url;
+    clientSecret = session.client_secret;
   } catch (error) {
     console.error(error);
     return { error: "We couldn't start checkout. Please try again." };
   }
+  if (embedded && clientSecret) return { clientSecret };
   if (!url) return { error: "We couldn't start checkout. Please try again." };
   redirect(url);
 }

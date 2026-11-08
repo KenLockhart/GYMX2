@@ -5,13 +5,13 @@ import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
 import { requireAccount } from "@/lib/auth";
 import { PLATFORM_FEE_PERCENT, categoryLabel, formatMoney, formatPrice, publicImageUrl } from "@/lib/armory";
 import { confirmCheckoutSession } from "@/lib/purchases";
-import { isStripeTestMode } from "@/lib/stripe";
+import { BuyPanel } from "@/components/buy-panel";
+import { isStripeTestMode, stripePublishableKey } from "@/lib/stripe";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmoryItem } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
 import { removeArmoryItem } from "../actions";
-import { buyArmoryItem } from "../payments";
 
 export const metadata: Metadata = { title: "The Armory" };
 
@@ -141,30 +141,14 @@ export default async function ArmoryItemPage({
                 </p>
               ) : (
                 <>
-                  <ActionForm action={buyArmoryItem} className="max-w-xs space-y-3">
-                    <input type="hidden" name="item_id" value={item.id} />
-                    {item.sizes.length > 0 && (
-                      <label className="block space-y-1.5">
-                        <span className="text-sm font-medium">Size</span>
-                        <select name="size" required defaultValue="" className="field-input">
-                          <option value="" disabled>
-                            Choose a size
-                          </option>
-                          {item.sizes.map((size) => (
-                            <option key={size} value={size}>
-                              {size}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    <SubmitButton pendingText="Opening checkout..." className="btn-primary">
-                      {hasBought ? "Order another" : "Buy now"}
-                    </SubmitButton>
-                    <FormStatus />
-                  </ActionForm>
+                  <BuyPanel
+                    itemId={item.id}
+                    sizes={item.sizes}
+                    buttonLabel={hasBought ? "Order another" : "Buy now"}
+                    publishableKey={stripePublishableKey()}
+                  />
                   <p className="text-xs text-muted">
-                    Secure card payment by Stripe. You&apos;ll enter your US shipping address at checkout.
+                    Secure card payment by Stripe, right here on GYMX2. You&apos;ll enter your US shipping address at checkout.
                     {isStripeTestMode() && " Test mode: use card 4242 4242 4242 4242, any future date and any CVC."}
                   </p>
                 </>
@@ -227,15 +211,14 @@ export default async function ArmoryItemPage({
               ) : (
                 <>
                   <p className="text-2xl font-semibold">{price}</p>
-                  <ActionForm action={buyArmoryItem} className="space-y-2">
-                    <input type="hidden" name="item_id" value={item.id} />
-                    <SubmitButton pendingText="Opening checkout..." className="btn-primary">
-                      Buy for {price}
-                    </SubmitButton>
-                    <FormStatus />
-                  </ActionForm>
+                  <BuyPanel
+                    itemId={item.id}
+                    sizes={[]}
+                    buttonLabel={`Buy for ${price}`}
+                    publishableKey={stripePublishableKey()}
+                  />
                   <p className="text-xs text-muted">
-                    Secure card payment by Stripe. The download unlocks as soon as you pay.
+                    Secure card payment by Stripe, right here on GYMX2. The download unlocks as soon as you pay.
                     {isStripeTestMode() && " Test mode: use card 4242 4242 4242 4242, any future date and any CVC."}
                   </p>
                 </>

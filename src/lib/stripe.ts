@@ -18,3 +18,9 @@ export function getStripe() {
 export function isStripeTestMode() {
   return /^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY ?? "");
 }
+
+// The publishable key lets the browser show Stripe's checkout inside GYMX2's pages.
+// Without it, buyers are sent to Stripe's own checkout page instead.
+export function stripePublishableKey() {
+  return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+}
