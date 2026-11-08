@@ -24,8 +24,8 @@ values ('60000000-0000-0000-0000-000000000002', 'acct_test123', true, true);
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"60000000-0000-0000-0000-000000000002","role":"authenticated"}';
 select lives_ok(
-  $$insert into public.armory_items (id, coach_id, kind, title, price_cents, file_path, file_name)
-    values ('70000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000002', 'paid', 'Program',
+  $$insert into public.armory_items (coach_id, kind, title, price_cents, file_path, file_name)
+    values ('60000000-0000-0000-0000-000000000002', 'paid', 'Program',
             1999, '60000000-0000-0000-0000-000000000002/program.pdf', 'program.pdf')$$,
   'a coach can list a paid download'
 );
@@ -59,7 +59,7 @@ select throws_ok(
 reset role;
 
 insert into public.purchases (item_id, member_id, seller_id, item_title, amount_cents, fee_cents, stripe_session_id)
-values ('70000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000004',
+values ((select id from public.armory_items where title = 'Program'), '60000000-0000-0000-0000-000000000004',
         '60000000-0000-0000-0000-000000000002', 'Program', 1999, 200, 'cs_test_1');
 
 -- The buyer
@@ -68,7 +68,7 @@ set local request.jwt.claims = '{"sub":"60000000-0000-0000-0000-000000000004","r
 select is((select count(*)::int from public.purchases), 1, 'a buyer sees their purchase');
 select throws_ok(
   $$insert into public.purchases (item_id, member_id, seller_id, item_title, amount_cents, fee_cents, stripe_session_id)
-    values ('70000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000004',
+    values ((select id from public.armory_items where title = 'Program'), '60000000-0000-0000-0000-000000000004',
             '60000000-0000-0000-0000-000000000002', 'Program', 0, 0, 'cs_fake')$$,
   '42501',
   null,
