@@ -9,7 +9,11 @@ import { planSessionEmails } from "@/lib/calendar";
 import { notifySession, type SessionSnapshot } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
-import { idSchema, sessionResponseSchema, sessionSchema } from "@/lib/validation";
+import {
+  idSchema,
+  sessionResponseSchema,
+  sessionSchema,
+} from "@/lib/validation";
 
 // Messages raised by the database for things the coach can fix are shown as they are.
 function sessionError(error: { code?: string; message: string }) {
@@ -18,19 +22,36 @@ function sessionError(error: { code?: string; message: string }) {
   return "We couldn't save that session. Please try again.";
 }
 
-const SESSION_COLUMNS = "id, coach_id, title, starts_at, ends_at, location, meeting_url";
+const SESSION_COLUMNS =
+  "id, coach_id, title, starts_at, ends_at, location, meeting_url";
 
 // The session and who is invited, as the coach sees it right now.
-async function loadSessionSnapshot(supabase: Awaited<ReturnType<typeof createClient>>, sessionId: string) {
+async function loadSessionSnapshot(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+) {
   const [{ data: session }, { data: invites }] = await Promise.all([
-    supabase.from("calendar_sessions").select(SESSION_COLUMNS).eq("id", sessionId).maybeSingle<SessionSnapshot>(),
-    supabase.from("session_invites").select("member_id").eq("session_id", sessionId),
+    supabase
+      .from("calendar_sessions")
+      .select(SESSION_COLUMNS)
+      .eq("id", sessionId)
+      .maybeSingle<SessionSnapshot>(),
+    supabase
+      .from("session_invites")
+      .select("member_id")
+      .eq("session_id", sessionId),
   ]);
   if (!session) return null;
-  return { session, memberIds: (invites ?? []).map((row) => row.member_id as string) };
+  return {
+    session,
+    memberIds: (invites ?? []).map((row) => row.member_id as string),
+  };
 }
 
-export async function saveSession(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveSession(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const { profile } = await requireCoach();
 
   const parsed = sessionSchema.safeParse({
@@ -58,9 +79,14 @@ export async function saveSession(_: ActionState, formData: FormData): Promise<A
 
   const supabase = await createClient();
   let sessionId = session.id;
-  const before = sessionId ? await loadSessionSnapshot(supabase, sessionId) : null;
+  const before = sessionId
+    ? await loadSessionSnapshot(supabase, sessionId)
+    : null;
   if (sessionId) {
-    const { error } = await supabase.rpc("update_session", { target_session_id: sessionId, ...fields });
+    const { error } = await supabase.rpc("update_session", {
+      target_session_id: sessionId,
+      ...fields,
+    });
     if (error) return { error: sessionError(error) };
   } else {
     const { data, error } = await supabase.rpc("create_session", fields);
@@ -77,10 +103,13 @@ export async function saveSession(_: ActionState, formData: FormData): Promise<A
     location: session.location,
     meeting_url: session.meeting_url || null,
   };
-  const plan = planSessionEmails(before && { details: before.session, memberIds: before.memberIds }, {
-    details: saved,
-    memberIds: session.member_ids,
-  });
+  const plan = planSessionEmails(
+    before && { details: before.session, memberIds: before.memberIds },
+    {
+      details: saved,
+      memberIds: session.member_ids,
+    },
+  );
   after(async () => {
     await notifySession("invited", saved, plan.invited);
     await notifySession("updated", saved, plan.updated);
@@ -91,7 +120,10 @@ export async function saveSession(_: ActionState, formData: FormData): Promise<A
   redirect(`/calendar/${sessionId}`);
 }
 
-export async function cancelSession(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function cancelSession(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireCoach();
   const sessionId = idSchema.safeParse(formData.get("session_id"));
   if (!sessionId.success) return { error: "Choose a session." };
@@ -104,7 +136,8 @@ export async function cancelSession(_: ActionState, formData: FormData): Promise
     .delete()
     .eq("id", sessionId.data)
     .select("id");
-  if (error) return { error: "We couldn't cancel that session. Please try again." };
+  if (error)
+    return { error: "We couldn't cancel that session. Please try again." };
   if (!data?.length) return { error: "We couldn't find that session." };
 
   if (before && new Date(before.session.ends_at) > new Date()) {
@@ -115,7 +148,10 @@ export async function cancelSession(_: ActionState, formData: FormData): Promise
   redirect("/calendar");
 }
 
-export async function respondToSession(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function respondToSession(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const { profile } = await requireAccount();
   const parsed = sessionResponseSchema.safeParse({
     session_id: formData.get("session_id"),
@@ -133,5 +169,10 @@ export async function respondToSession(_: ActionState, formData: FormData): Prom
   after(() => syncProgressQuietly(profile));
   revalidatePath("/calendar");
   revalidatePath(`/calendar/${parsed.data.session_id}`);
-  return { message: parsed.data.response === "going" ? "See you there." : "Thanks for letting your coach know." };
+  return {
+    message:
+      parsed.data.response === "going"
+        ? "See you there."
+        : "Thanks for letting your coach know.",
+  };
 }

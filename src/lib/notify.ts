@@ -5,6 +5,7 @@ import { loadRecipient, sendEmail } from "@/lib/email";
 import { describeFlags, detectFlags } from "@/lib/message-flags";
 import {
   flaggedMessageEmail,
+  liveNowEmail,
   newMessageEmail,
   newSaleEmail,
   orderShippedEmail,
@@ -59,11 +60,16 @@ export function notifyNewSale(purchaseId: string) {
 
     let sellerIds = purchase.seller_id ? [purchase.seller_id] : [];
     if (!purchase.seller_id) {
-      const { data } = await createAdminClient().from("profiles").select("id").eq("role", "admin");
+      const { data } = await createAdminClient()
+        .from("profiles")
+        .select("id")
+        .eq("role", "admin");
       sellerIds = (data ?? []).map((row) => row.id as string);
     }
 
-    const buyer = purchase.member_id ? await loadRecipient(purchase.member_id) : null;
+    const buyer = purchase.member_id
+      ? await loadRecipient(purchase.member_id)
+      : null;
     const email = newSaleEmail({
       siteUrl: getSiteUrl(),
       itemTitle: purchase.item_title,
@@ -86,11 +92,14 @@ export function notifyNewSale(purchaseId: string) {
 export function notifyOrderShipped(purchaseId: string) {
   return safely("order shipped", async () => {
     const purchase = await loadPurchase(purchaseId);
-    if (!purchase?.member_id || purchase.fulfillment_status !== "shipped") return;
+    if (!purchase?.member_id || purchase.fulfillment_status !== "shipped")
+      return;
 
     const [buyer, seller] = await Promise.all([
       loadRecipient(purchase.member_id),
-      purchase.seller_id ? loadRecipient(purchase.seller_id) : Promise.resolve(null),
+      purchase.seller_id
+        ? loadRecipient(purchase.seller_id)
+        : Promise.resolve(null),
     ]);
     if (!buyer) return;
 
@@ -107,7 +116,13 @@ export function notifyOrderShipped(purchaseId: string) {
   });
 }
 
-type MessageRow = { id: string; coach_id: string; member_id: string; sender_id: string; body: string };
+type MessageRow = {
+  id: string;
+  coach_id: string;
+  member_id: string;
+  sender_id: string;
+  body: string;
+};
 
 export async function notifyNewMessage(messageId: string) {
   const { data: message } = await createAdminClient()
@@ -135,8 +150,14 @@ function notifyRecipient(message: MessageRow) {
       .neq("id", message.id);
     if ((count ?? 0) > 0) return;
 
-    const recipientId = message.sender_id === message.coach_id ? message.member_id : message.coach_id;
-    const [recipient, sender] = await Promise.all([loadRecipient(recipientId), loadRecipient(message.sender_id)]);
+    const recipientId =
+      message.sender_id === message.coach_id
+        ? message.member_id
+        : message.coach_id;
+    const [recipient, sender] = await Promise.all([
+      loadRecipient(recipientId),
+      loadRecipient(message.sender_id),
+    ]);
     if (!recipient?.wantsUpdates) return;
 
     await sendEmail(
@@ -168,7 +189,10 @@ function alertAdminsIfFlagged(message: MessageRow) {
       .neq("id", message.id)
       .gte("created_at", since)
       .limit(500);
-    if ((recent ?? []).some((row) => detectFlags(row.body as string).length > 0)) return;
+    if (
+      (recent ?? []).some((row) => detectFlags(row.body as string).length > 0)
+    )
+      return;
 
     const [{ data: admins }, coach, member] = await Promise.all([
       admin.from("profiles").select("id").eq("role", "admin"),
@@ -201,7 +225,11 @@ export type SessionSnapshot = {
   meeting_url: string | null;
 };
 
-export function notifySession(change: SessionChange, session: SessionSnapshot, memberIds: string[]) {
+export function notifySession(
+  change: SessionChange,
+  session: SessionSnapshot,
+  memberIds: string[],
+) {
   return safely(`session ${change}`, async () => {
     if (memberIds.length === 0) return;
     const coach = await loadRecipient(session.coach_id);
@@ -219,6 +247,39 @@ export function notifySession(change: SessionChange, session: SessionSnapshot, m
     for (const memberId of memberIds) {
       const member = await loadRecipient(memberId);
       if (member?.wantsUpdates) await sendEmail(member.email, email);
+    }
+  });
+}
+
+// Invited members who haven't said "Not going" hear the moment their coach goes live.
+export function notifyLiveNow(sessionId: string) {
+  return safely("live now", async () => {
+    const db = createAdminClient();
+    const { data: session } = await db
+      .from("calendar_sessions")
+      .select("id, coach_id, title, session_invites(member_id, response)")
+      .eq("id", sessionId)
+      .maybeSingle();
+    if (!session) return;
+    const coach = await loadRecipient(session.coach_id as string);
+    const invites = (session.session_invites ?? []) as {
+      member_id: string;
+      response: string;
+    }[];
+    for (const invite of invites) {
+      if (invite.response === "not_going") continue;
+      const member = await loadRecipient(invite.member_id);
+      if (!member?.wantsUpdates) continue;
+      await sendEmail(
+        member.email,
+        liveNowEmail({
+          siteUrl: getSiteUrl(),
+          name: member.name,
+          coachName: coach?.name ?? "Your coach",
+          title: session.title as string,
+          sessionId: session.id as string,
+        }),
+      );
     }
   });
 }

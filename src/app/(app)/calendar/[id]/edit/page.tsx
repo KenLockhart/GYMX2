@@ -10,18 +10,25 @@ import { loadCoachMembers } from "../../members";
 
 export const metadata: Metadata = { title: "Edit session" };
 
-export default async function EditSessionPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditSessionPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { profile } = await requireCoach();
   const { id } = await params;
 
   const supabase = await createClient();
   const { data } = await supabase
     .from("calendar_sessions")
-    .select("id, coach_id, title, notes, location, meeting_url, starts_at, ends_at, session_invites(member_id)")
+    .select(
+      "id, coach_id, title, notes, location, meeting_url, starts_at, ends_at, session_invites(member_id)",
+    )
     .eq("id", id)
     .eq("coach_id", profile.id)
     .maybeSingle();
-  const session = data as unknown as (CalendarSession & { session_invites: { member_id: string }[] }) | null;
+  const session = data as unknown as
+    (CalendarSession & { session_invites: { member_id: string }[] }) | null;
   if (!session) notFound();
 
   const { members, error } = await loadCoachMembers(profile.id);
@@ -33,7 +40,8 @@ export default async function EditSessionPage({ params }: { params: Promise<{ id
       </Link>
       <h1 className="text-5xl">Edit session</h1>
       <p className="max-w-xl text-sm text-muted">
-        If you change the date or time, everyone invited is asked to reply again.
+        If you change the date or time, everyone invited is asked to reply
+        again.
       </p>
 
       {error ? (
@@ -53,7 +61,9 @@ export default async function EditSessionPage({ params }: { params: Promise<{ id
             meeting_url: session.meeting_url ?? "",
             starts_at: session.starts_at,
             ends_at: session.ends_at,
-            member_ids: session.session_invites.map((invite) => invite.member_id),
+            member_ids: session.session_invites.map(
+              (invite) => invite.member_id,
+            ),
           }}
         />
       )}

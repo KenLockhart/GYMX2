@@ -9,9 +9,11 @@ export async function loadCoachMembers(coachId: string) {
     .select("member:profiles!member_id(id, display_name)")
     .eq("coach_id", coachId);
 
-  const members = ((data ?? []) as unknown as {
-    member: { id: string; display_name: string } | null;
-  }[])
+  const members = (
+    (data ?? []) as unknown as {
+      member: { id: string; display_name: string } | null;
+    }[]
+  )
     .flatMap((row) => (row.member ? [row.member] : []))
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 

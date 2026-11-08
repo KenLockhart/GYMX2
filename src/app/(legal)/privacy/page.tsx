@@ -115,6 +115,12 @@ export default function PrivacyPage() {
           for the same safety reasons as messages.
         </li>
         <li>
+          <strong>Live sessions:</strong> when a coach streams a session live,
+          only the coach is on camera and nothing is recorded. Members invited
+          to the session see your name and live chat messages, and your coach
+          sees that you watched.
+        </li>
+        <li>
           <strong>Sellers</strong> see what you bought from them and, for gear,
           your name, size and shipping address so they can send it to you.
         </li>
