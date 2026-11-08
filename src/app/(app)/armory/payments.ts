@@ -93,13 +93,13 @@ export async function buyArmoryItem(_: ActionState, formData: FormData): Promise
   const supabase = await createClient();
   const { data: item } = await supabase
     .from("armory_items")
-    .select("id, coach_id, kind, title, price_cents, sizes, shipping_cents, seller:profiles!coach_id(role)")
+    .select("id, coach_id, kind, title, price_cents, sizes, shipping_cents")
     .eq("id", request.data.item_id)
     .maybeSingle();
   const sellable = item as (Pick<
     ArmoryItem,
     "id" | "coach_id" | "kind" | "title" | "price_cents" | "sizes" | "shipping_cents"
-  > & { seller: { role: string } | null }) | null;
+  >) | null;
   if (
     !sellable ||
     (sellable.kind !== "paid" && sellable.kind !== "product") ||
@@ -129,7 +129,13 @@ export async function buyArmoryItem(_: ActionState, formData: FormData): Promise
 
   // A coach's sale goes to their Stripe account with GYMX2's fee kept back.
   // GYMX2's own items (added by an admin) are paid to GYMX2 in full.
-  const isPlatformItem = sellable.seller?.role === "admin";
+  // Members can't read admin profiles, so the seller's role is looked up with the server key.
+  const { data: seller } = await createAdminClient()
+    .from("profiles")
+    .select("role")
+    .eq("id", sellable.coach_id)
+    .maybeSingle();
+  const isPlatformItem = seller?.role === "admin";
   let destination: string | null = null;
   if (!isPlatformItem) {
     const { data: account } = await createAdminClient()
