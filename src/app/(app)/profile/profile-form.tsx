@@ -54,9 +54,9 @@ export function ProfileForm({ profile, email }: { profile: Profile; email: strin
             className="mt-0.5 size-4 accent-accent"
           />
           <span>
-            Email me about new messages and sessions
+            Email me about messages, sessions and reminders
             <span className="block text-muted">
-              We always email about your orders, such as when something you bought ships.
+              Includes session and Task-due reminders, streak nudges and a Monday summary. We always email about your orders.
             </span>
           </span>
         </label>

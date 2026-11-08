@@ -360,3 +360,112 @@ export function affiliatePayoutEmail(input: { siteUrl: string; name: string; amo
     }),
   };
 }
+
+export function sessionReminderEmail(input: {
+  siteUrl: string;
+  name: string;
+  sessions: { id: string; title: string; when: string; where: string; coachName: string }[];
+}): Email {
+  const one = input.sessions.length === 1 ? input.sessions[0] : null;
+  return {
+    subject: one ? `Tomorrow: ${oneLine(one.title)}` : `You have ${input.sessions.length} sessions tomorrow`,
+    ...render({
+      heading: one ? "Your session is tomorrow" : "Your sessions tomorrow",
+      blocks: [
+        { kind: "p", text: `Hi ${input.name}, here's what's coming up.` },
+        ...input.sessions.map((session) => ({
+          kind: "lines" as const,
+          lines: [`${session.title} with ${session.coachName}`, session.when, ...(session.where ? [session.where] : [])],
+        })),
+        { kind: "p", text: "Can't make it? Let your coach know on GYMX2." },
+      ],
+      button: one
+        ? { label: "Open the session", url: `${input.siteUrl}/calendar/${one.id}` }
+        : { label: "Open your calendar", url: `${input.siteUrl}/calendar` },
+      footer: UPDATES_FOOTER,
+    }),
+  };
+}
+
+export function taskDueEmail(input: { siteUrl: string; name: string; tasks: { title: string; coachName: string }[] }): Email {
+  const one = input.tasks.length === 1 ? input.tasks[0] : null;
+  return {
+    subject: one ? `Due tomorrow: ${oneLine(one.title)}` : `${input.tasks.length} Tasks are due tomorrow`,
+    ...render({
+      heading: one ? "A Task is due tomorrow" : "Tasks due tomorrow",
+      blocks: [
+        { kind: "p", text: `Hi ${input.name}, finish ${one ? "this" : "these"} to stay on track (+3 points each).` },
+        { kind: "lines", lines: input.tasks.map((task) => `${task.title} (from ${task.coachName})`) },
+      ],
+      button: { label: "Open your Tasks", url: `${input.siteUrl}/tasks` },
+      footer: UPDATES_FOOTER,
+    }),
+  };
+}
+
+export function streakReminderEmail(input: { siteUrl: string; name: string; days: number; coach: boolean }): Email {
+  return {
+    subject: `🔥 Keep your ${input.days}-day streak alive`,
+    ...render({
+      heading: `Your ${input.days}-day streak ends tonight`,
+      blocks: [
+        { kind: "p", text: `Hi ${input.name}, you haven't been active today yet. One thing before midnight keeps it going.` },
+        {
+          kind: "p",
+          text: input.coach
+            ? "Publish a video, give a Task, schedule a session or message a member."
+            : "Finish a Task, write a Memo, RSVP to a session or message your coach.",
+        },
+      ],
+      button: input.coach
+        ? { label: "Open GYMX2", url: `${input.siteUrl}/dashboard` }
+        : { label: "Open your Tasks", url: `${input.siteUrl}/tasks` },
+      footer: UPDATES_FOOTER,
+    }),
+  };
+}
+
+export function weeklyDigestEmail(input: {
+  siteUrl: string;
+  name: string;
+  level: string;
+  points: number;
+  toNext: number;
+  nextLevel: string | null;
+  streak: number;
+  lastWeekDone: number;
+  challengeCount: number;
+  newBadges: string[];
+  challenges: string[];
+  upcoming: string[];
+}): Email {
+  const blocks: Block[] = [
+    {
+      kind: "p",
+      text: `Hi ${input.name}, last week you finished ${input.lastWeekDone} of ${input.challengeCount} challenges.${
+        input.newBadges.length ? ` New badges: ${input.newBadges.join(", ")}.` : ""
+      }`,
+    },
+    {
+      kind: "lines",
+      lines: [
+        `Level: ${input.level} (${input.points} points${input.nextLevel ? `, ${input.toNext} to ${input.nextLevel}` : ""})`,
+        `Streak: ${input.streak} ${input.streak === 1 ? "day" : "days"}`,
+      ],
+    },
+    { kind: "p", text: "This week's challenges:" },
+    { kind: "lines", lines: input.challenges },
+  ];
+  if (input.upcoming.length) {
+    blocks.push({ kind: "p", text: "Coming up:" }, { kind: "lines", lines: input.upcoming });
+  }
+  return {
+    subject: "Your GYMX2 week",
+    ...render({
+      heading: "A new week starts now",
+      blocks,
+      button: { label: "See your progress", url: `${input.siteUrl}/progress` },
+      footer: UPDATES_FOOTER,
+    }),
+  };
+}

@@ -4,6 +4,10 @@ import {
   escapeHtml,
   flaggedMessageEmail,
   refundEmail,
+  sessionReminderEmail,
+  streakReminderEmail,
+  taskDueEmail,
+  weeklyDigestEmail,
   newMessageEmail,
   newSaleEmail,
   orderShippedEmail,
@@ -189,5 +193,57 @@ describe("accountDeletedEmail", () => {
     expect(email.subject).toBe("Your GYMX2 account was deleted");
     expect(email.text).toContain("Hi Sam, your GYMX2 account");
     expect(email.text).toContain("without your name attached");
+  });
+});
+
+describe("reminder emails", () => {
+  it("reminds about one session by name", () => {
+    const email = sessionReminderEmail({
+      siteUrl,
+      name: "Sam",
+      sessions: [{ id: "s1", title: "Leg day", when: "Tue, Nov 10, 7:00 AM EST", where: "Main gym", coachName: "Ken" }],
+    });
+    expect(email.subject).toBe("Tomorrow: Leg day");
+    expect(email.text).toContain("Leg day with Ken\nTue, Nov 10, 7:00 AM EST\nMain gym");
+    expect(email.text).toContain("https://gymx2.com/calendar/s1");
+  });
+
+  it("counts several Tasks", () => {
+    const email = taskDueEmail({
+      siteUrl,
+      name: "Sam",
+      tasks: [
+        { title: "Squats", coachName: "Ken" },
+        { title: "Breathwork", coachName: "Ken" },
+      ],
+    });
+    expect(email.subject).toBe("2 Tasks are due tomorrow");
+    expect(email.text).toContain("Squats (from Ken)\nBreathwork (from Ken)");
+  });
+
+  it("nudges a streak", () => {
+    expect(streakReminderEmail({ siteUrl, name: "Sam", days: 6, coach: false }).subject).toBe(
+      "🔥 Keep your 6-day streak alive",
+    );
+  });
+
+  it("sums up the week", () => {
+    const email = weeklyDigestEmail({
+      siteUrl,
+      name: "Sam",
+      level: "Warrior",
+      points: 180,
+      toNext: 220,
+      nextLevel: "Elite",
+      streak: 4,
+      lastWeekDone: 3,
+      challengeCount: 4,
+      newBadges: ["💪 Strong Body"],
+      challenges: ["Finish 3 Tasks"],
+      upcoming: ["Leg day · Tue, Nov 10, 7:00 AM EST"],
+    });
+    expect(email.text).toContain("last week you finished 3 of 4 challenges. New badges: 💪 Strong Body.");
+    expect(email.text).toContain("Level: Warrior (180 points, 220 to Elite)");
+    expect(email.text).toContain("Coming up:");
   });
 });
