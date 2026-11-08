@@ -28,7 +28,10 @@ export default function PrivacyPage() {
           links you add. Coach profiles are visible to signed-in members.
           Members can also share their goals, experience and Mind/Body/Spirit
           focus to get coach suggestions; only coaches they join (and GYMX2
-          admins) see them.
+          admins) see them. Coaches can turn on a public page anyone can see,
+          showing their name, bio, links, specialties, published programs, plans
+          and reviews. Reviews you write about a coach appear there with your
+          first name and last initial.
         </li>
         <li>
           <strong>What you do on GYMX2:</strong> coaches you join, tasks and

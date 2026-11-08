@@ -1,14 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
+import {
+  ActionForm,
+  Field,
+  FormStatus,
+  SubmitButton,
+} from "@/components/form-parts";
 import { signUp } from "../actions";
 
-export function SignupForm() {
+export function SignupForm({ next }: { next?: string }) {
   return (
     <ActionForm action={signUp} className="space-y-4">
-      <Field label="Name" name="display_name" autoComplete="name" maxLength={80} required />
-      <Field label="Email" name="email" type="email" autoComplete="email" required />
+      {next && <input type="hidden" name="next" value={next} />}
+      <Field
+        label="Name"
+        name="display_name"
+        autoComplete="name"
+        maxLength={80}
+        required
+      />
+      <Field
+        label="Email"
+        name="email"
+        type="email"
+        autoComplete="email"
+        required
+      />
       <Field
         label="Password"
         name="password"
@@ -19,10 +37,16 @@ export function SignupForm() {
         required
       />
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="coach_requested" className="mt-0.5 size-4 accent-accent" />
+        <input
+          type="checkbox"
+          name="coach_requested"
+          className="mt-0.5 size-4 accent-accent"
+        />
         <span>
           I want to coach on GYMX2.
-          <span className="block text-muted">An admin reviews every coach request.</span>
+          <span className="block text-muted">
+            An admin reviews every coach request.
+          </span>
         </span>
       </label>
       <p className="text-sm text-muted">
@@ -37,7 +61,9 @@ export function SignupForm() {
         , and confirm you are 18 or older.
       </p>
       <FormStatus />
-      <SubmitButton pendingText="Creating account...">Create account</SubmitButton>
+      <SubmitButton pendingText="Creating account...">
+        Create account
+      </SubmitButton>
     </ActionForm>
   );
 }

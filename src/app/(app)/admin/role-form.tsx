@@ -19,7 +19,10 @@ export function RoleForm({ user }: { user: AdminUser }) {
           <option value="coach">Coach</option>
           <option value="admin">Admin</option>
         </select>
-        <SubmitButton pendingText="Saving..." className="btn-secondary px-3 py-2 text-sm">
+        <SubmitButton
+          pendingText="Saving..."
+          className="btn-secondary px-3 py-2 text-sm"
+        >
           Save
         </SubmitButton>
       </div>

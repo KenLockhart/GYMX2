@@ -9,19 +9,29 @@ import { BASE_LABELS, effectiveRates, referralLink } from "@/lib/affiliates";
 import { formatMoney } from "@/lib/armory";
 import { requireAdmin } from "@/lib/auth";
 import { loadRecipient, sendEmail } from "@/lib/email";
-import { affiliateDecisionEmail, affiliatePayoutEmail } from "@/lib/email-templates";
+import {
+  affiliateDecisionEmail,
+  affiliatePayoutEmail,
+} from "@/lib/email-templates";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 import type { ActionState } from "@/lib/types";
-import { affiliateRatesSchema, idSchema, programSettingsSchema } from "@/lib/validation";
+import {
+  affiliateRatesSchema,
+  idSchema,
+  programSettingsSchema,
+} from "@/lib/validation";
 
 function done(message: string): ActionState {
   revalidatePath("/admin/affiliates");
   return { message };
 }
 
-export async function saveProgramSettings(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveProgramSettings(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireAdmin();
   const parsed = programSettingsSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -35,12 +45,20 @@ export async function saveProgramSettings(_: ActionState, formData: FormData): P
       updated_at: new Date().toISOString(),
     })
     .eq("id", true);
-  if (error) return { error: "We couldn't save the program settings. Please try again." };
-  return done("Program settings saved. New commissions use them; earlier ones don't change.");
+  if (error)
+    return {
+      error: "We couldn't save the program settings. Please try again.",
+    };
+  return done(
+    "Program settings saved. New commissions use them; earlier ones don't change.",
+  );
 }
 
 // Approve (with optional custom rates) or reject an application, and email the applicant.
-export async function decideApplication(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function decideApplication(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireAdmin();
   const approve = formData.get("decision") === "approve";
   const parsed = affiliateRatesSchema.safeParse({
@@ -55,17 +73,28 @@ export async function decideApplication(_: ActionState, formData: FormData): Pro
     .update({
       status: approve ? "approved" : "rejected",
       decided_at: new Date().toISOString(),
-      ...(approve ? { sale_percent: parsed.data.sale_percent, signup_bonus_cents: parsed.data.signup_bonus } : {}),
+      ...(approve
+        ? {
+            sale_percent: parsed.data.sale_percent,
+            signup_bonus_cents: parsed.data.signup_bonus,
+          }
+        : {}),
     })
     .eq("user_id", parsed.data.user_id)
     .eq("status", "pending")
     .select("code, sale_percent, signup_bonus_cents")
     .maybeSingle();
-  if (error || !data) return { error: "We couldn't update that application. Refresh and try again." };
+  if (error || !data)
+    return {
+      error: "We couldn't update that application. Refresh and try again.",
+    };
 
   after(async () => {
     try {
-      const [person, settings] = await Promise.all([loadRecipient(parsed.data.user_id), loadProgramSettings()]);
+      const [person, settings] = await Promise.all([
+        loadRecipient(parsed.data.user_id),
+        loadProgramSettings(),
+      ]);
       if (!person) return;
       const rates = effectiveRates(settings, data);
       await sendEmail(
@@ -86,10 +115,17 @@ export async function decideApplication(_: ActionState, formData: FormData): Pro
       console.error(emailError);
     }
   });
-  return done(approve ? "Approved. We emailed them their link." : "Application declined. We let them know.");
+  return done(
+    approve
+      ? "Approved. We emailed them their link."
+      : "Application declined. We let them know.",
+  );
 }
 
-export async function saveAffiliateRates(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveAffiliateRates(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireAdmin();
   const parsed = affiliateRatesSchema.safeParse({
     user_id: formData.get("user_id"),
@@ -99,13 +135,20 @@ export async function saveAffiliateRates(_: ActionState, formData: FormData): Pr
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { error } = await createAdminClient()
     .from("affiliates")
-    .update({ sale_percent: parsed.data.sale_percent, signup_bonus_cents: parsed.data.signup_bonus })
+    .update({
+      sale_percent: parsed.data.sale_percent,
+      signup_bonus_cents: parsed.data.signup_bonus,
+    })
     .eq("user_id", parsed.data.user_id);
-  if (error) return { error: "We couldn't save those rates. Please try again." };
+  if (error)
+    return { error: "We couldn't save those rates. Please try again." };
   return done("Rates saved. They apply to new commissions.");
 }
 
-export async function setAffiliatePaused(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function setAffiliatePaused(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireAdmin();
   const userId = idSchema.safeParse(formData.get("user_id"));
   if (!userId.success) return { error: "Choose an affiliate." };
@@ -115,12 +158,20 @@ export async function setAffiliatePaused(_: ActionState, formData: FormData): Pr
     .update({ status: pause ? "paused" : "approved" })
     .eq("user_id", userId.data)
     .in("status", ["approved", "paused"]);
-  if (error) return { error: "We couldn't change that affiliate. Please try again." };
-  return done(pause ? "Paused. Their link stops earning until you resume it." : "Resumed.");
+  if (error)
+    return { error: "We couldn't change that affiliate. Please try again." };
+  return done(
+    pause
+      ? "Paused. Their link stops earning until you resume it."
+      : "Resumed.",
+  );
 }
 
 // Pays an affiliate everything that's ready, through a Stripe transfer to their account.
-export async function payAffiliate(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function payAffiliate(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const { profile } = await requireAdmin();
   const userId = idSchema.safeParse(formData.get("user_id"));
   if (!userId.success) return { error: "Choose an affiliate." };
@@ -128,7 +179,11 @@ export async function payAffiliate(_: ActionState, formData: FormData): Promise<
 
   const db = createAdminClient();
   const [{ data: affiliate }, settings, { data: ready }] = await Promise.all([
-    db.from("affiliates").select("stripe_account_id").eq("user_id", userId.data).maybeSingle(),
+    db
+      .from("affiliates")
+      .select("stripe_account_id")
+      .eq("user_id", userId.data)
+      .maybeSingle(),
     loadProgramSettings(),
     db
       .from("commissions")
@@ -140,15 +195,28 @@ export async function payAffiliate(_: ActionState, formData: FormData): Promise<
   ]);
   const rows = (ready ?? []) as { id: string; amount_cents: number }[];
   const total = rows.reduce((sum, row) => sum + row.amount_cents, 0);
-  if (!affiliate?.stripe_account_id) return { error: "They haven't set up payouts yet." };
+  if (!affiliate?.stripe_account_id)
+    return { error: "They haven't set up payouts yet." };
   if (total < settings.min_payout_cents) {
-    return { error: `Only ${formatMoney(total)} is ready, below the ${formatMoney(settings.min_payout_cents)} minimum.` };
+    return {
+      error: `Only ${formatMoney(total)} is ready, below the ${formatMoney(settings.min_payout_cents)} minimum.`,
+    };
   }
-  const enabled = await refreshAffiliatePayouts(userId.data, affiliate.stripe_account_id as string).catch(() => false);
-  if (!enabled) return { error: "Their Stripe account can't receive payouts yet. Ask them to finish setup." };
+  const enabled = await refreshAffiliatePayouts(
+    userId.data,
+    affiliate.stripe_account_id as string,
+  ).catch(() => false);
+  if (!enabled)
+    return {
+      error:
+        "Their Stripe account can't receive payouts yet. Ask them to finish setup.",
+    };
 
   // The same set of commissions always makes the same transfer, so a double click can't pay twice.
-  const key = createHash("sha256").update(rows.map((row) => row.id).join(",")).digest("hex").slice(0, 40);
+  const key = createHash("sha256")
+    .update(rows.map((row) => row.id).join(","))
+    .digest("hex")
+    .slice(0, 40);
   let transferId: string;
   try {
     const transfer = await getStripe().transfers.create(
@@ -175,12 +243,19 @@ export async function payAffiliate(_: ActionState, formData: FormData): Promise<
 
   const { data: payout, error: payoutError } = await db
     .from("affiliate_payouts")
-    .insert({ affiliate_id: userId.data, amount_cents: total, stripe_transfer_id: transferId, paid_by: profile.id })
+    .insert({
+      affiliate_id: userId.data,
+      amount_cents: total,
+      stripe_transfer_id: transferId,
+      paid_by: profile.id,
+    })
     .select("id")
     .single();
   if (payoutError || !payout) {
     console.error("Payout sent but not recorded", transferId, payoutError);
-    return { error: `Stripe sent the money (${transferId}), but we couldn't record it. Tell support before paying again.` };
+    return {
+      error: `Stripe sent the money (${transferId}), but we couldn't record it. Tell support before paying again.`,
+    };
   }
   await db
     .from("commissions")
@@ -195,7 +270,12 @@ export async function payAffiliate(_: ActionState, formData: FormData): Promise<
     if (person) {
       await sendEmail(
         person.email,
-        affiliatePayoutEmail({ siteUrl: getSiteUrl(), name: person.name, amountCents: total, count: rows.length }),
+        affiliatePayoutEmail({
+          siteUrl: getSiteUrl(),
+          name: person.name,
+          amountCents: total,
+          count: rows.length,
+        }),
       );
     }
   });

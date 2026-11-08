@@ -6,7 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 import { setRoleSchema } from "@/lib/validation";
 
-export async function setUserRole(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function setUserRole(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireAdmin();
 
   const parsed = setRoleSchema.safeParse({
@@ -22,7 +25,10 @@ export async function setUserRole(_: ActionState, formData: FormData): Promise<A
   });
   if (error) {
     return {
-      error: error.code === "P0001" ? error.message : "We couldn't change that role. Please try again.",
+      error:
+        error.code === "P0001"
+          ? error.message
+          : "We couldn't change that role. Please try again.",
     };
   }
 

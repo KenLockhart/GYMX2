@@ -29,11 +29,18 @@ export default async function ReviewConversationsPage({
     )
     .order("created_at", { ascending: false })
     .limit(2000);
-  if (search) request = request.ilike("body", `%${search.replace(/[%_\\]/g, (char) => `\\${char}`)}%`);
+  if (search)
+    request = request.ilike(
+      "body",
+      `%${search.replace(/[%_\\]/g, (char) => `\\${char}`)}%`,
+    );
   const { data, error } = await request;
 
   const conversations = groupForReview(
-    (data ?? []) as unknown as (Pick<Message, "coach_id" | "member_id" | "sender_id" | "body" | "created_at"> & {
+    (data ?? []) as unknown as (Pick<
+      Message,
+      "coach_id" | "member_id" | "sender_id" | "body" | "created_at"
+    > & {
       coach: { display_name: string } | null;
       member: { display_name: string } | null;
     })[],
@@ -57,22 +64,32 @@ export default async function ReviewConversationsPage({
       <div>
         <h1 className="text-5xl">Review conversations</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Read-only. Coaches and members are told admins may review their messages. Opening a
-          conversation here doesn&apos;t mark anything as read.
+          Read-only. Coaches and members are told admins may review their
+          messages. Opening a conversation here doesn&apos;t mark anything as
+          read.
         </p>
       </div>
 
       <nav aria-label="Filter conversations" className="flex gap-2">
-        <Link href={filterLink(false)} className={tabClass(!flaggedOnly)} aria-current={!flaggedOnly ? "page" : undefined}>
+        <Link
+          href={filterLink(false)}
+          className={tabClass(!flaggedOnly)}
+          aria-current={!flaggedOnly ? "page" : undefined}
+        >
           All
         </Link>
-        <Link href={filterLink(true)} className={tabClass(flaggedOnly)} aria-current={flaggedOnly ? "page" : undefined}>
+        <Link
+          href={filterLink(true)}
+          className={tabClass(flaggedOnly)}
+          aria-current={flaggedOnly ? "page" : undefined}
+        >
           Flagged
         </Link>
       </nav>
       <p className="max-w-2xl text-sm text-muted">
-        Flagged means a message mentions a phone number, an email address, a payment app such as Venmo or Cash App,
-        or talking somewhere else. It&apos;s a reason to look, not proof.
+        Flagged means a message mentions a phone number, an email address, a
+        payment app such as Venmo or Cash App, or talking somewhere else.
+        It&apos;s a reason to look, not proof.
       </p>
 
       <form className="flex max-w-xl gap-2" role="search">
@@ -116,17 +133,22 @@ export default async function ReviewConversationsPage({
               >
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
                   <span>
-                    {conversation.coach_name} <span className="text-muted">(coach)</span> ·{" "}
-                    {conversation.member_name} <span className="text-muted">(member)</span>
+                    {conversation.coach_name}{" "}
+                    <span className="text-muted">(coach)</span> ·{" "}
+                    {conversation.member_name}{" "}
+                    <span className="text-muted">(member)</span>
                   </span>
                   {conversation.flagged > 0 && (
                     <span className="rounded-full border border-danger px-2 py-0.5 text-xs font-semibold text-danger">
-                      {conversation.flagged} flagged · {describeFlags(conversation.flags)}
+                      {conversation.flagged} flagged ·{" "}
+                      {describeFlags(conversation.flags)}
                     </span>
                   )}
                 </p>
                 <p className="mt-1 truncate text-sm text-muted">
-                  {search ? `${conversation.count} matching · ` : `${conversation.count} messages · `}
+                  {search
+                    ? `${conversation.count} matching · `
+                    : `${conversation.count} messages · `}
                   {preview(conversation.last.body)}
                 </p>
               </Link>

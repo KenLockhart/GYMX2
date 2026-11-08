@@ -3,7 +3,9 @@ import Link from "next/link";
 import { deletionBlocker } from "@/lib/account-deletion";
 import { requireAccount } from "@/lib/auth";
 import { GoalsForm, SpecialtiesForm } from "@/components/goals-form";
+import { PublicPageForm } from "@/components/public-page-form";
 import { PushToggle } from "@/components/push-toggle";
+import { suggestSlug } from "@/lib/public-pages";
 import { updateGoals, updateSpecialties } from "../welcome/actions";
 import { DeleteAccountForm } from "./delete-account-form";
 import { ProfileForm } from "./profile-form";
@@ -65,6 +67,34 @@ export default async function ProfilePage() {
           <SpecialtiesForm
             action={updateSpecialties}
             initial={profile.specialties}
+          />
+        </section>
+      )}
+
+      {profile.role === "coach" && (
+        <section
+          id="public-page"
+          aria-labelledby="public-page-heading"
+          className="scroll-mt-6 space-y-3 border-t border-border pt-8"
+        >
+          <h2 id="public-page-heading" className="text-2xl">
+            Public page
+          </h2>
+          <p className="max-w-xl text-sm text-muted">
+            A page you can share on social media and in your bio so new people
+            can find you and join on GYMX2.
+            {profile.public_page && profile.public_slug && (
+              <>
+                {" "}
+                <Link href={`/c/${profile.public_slug}`} className="text-link">
+                  View your page
+                </Link>
+              </>
+            )}
+          </p>
+          <PublicPageForm
+            slug={profile.public_slug ?? suggestSlug(profile.display_name)}
+            on={profile.public_page}
           />
         </section>
       )}

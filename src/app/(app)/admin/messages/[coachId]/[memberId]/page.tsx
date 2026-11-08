@@ -30,7 +30,11 @@ export default async function ReviewConversationPage({
 }) {
   await requireAdmin();
   const { coachId, memberId } = await params;
-  if (!idSchema.safeParse(coachId).success || !idSchema.safeParse(memberId).success) notFound();
+  if (
+    !idSchema.safeParse(coachId).success ||
+    !idSchema.safeParse(memberId).success
+  )
+    notFound();
   const query = (await searchParams).q;
   const highlight = typeof query === "string" ? query.trim().toLowerCase() : "";
 
@@ -43,7 +47,10 @@ export default async function ReviewConversationPage({
       .eq("member_id", memberId)
       .order("created_at")
       .limit(2000),
-    supabase.from("profiles").select("id, display_name").in("id", [coachId, memberId]),
+    supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", [coachId, memberId]),
     supabase
       .from("coach_members")
       .select("coach_id")
@@ -54,14 +61,24 @@ export default async function ReviewConversationPage({
 
   const messages = (messageResult.data ?? []) as Message[];
   if (!messageResult.error && messages.length === 0) notFound();
-  const names = new Map((peopleResult.data ?? []).map((person) => [person.id as string, person.display_name as string]));
-  const flaggedCount = messages.filter((message) => detectFlags(message.body).length > 0).length;
+  const names = new Map(
+    (peopleResult.data ?? []).map((person) => [
+      person.id as string,
+      person.display_name as string,
+    ]),
+  );
+  const flaggedCount = messages.filter(
+    (message) => detectFlags(message.body).length > 0,
+  ).length;
   const coachName = names.get(coachId) ?? "Unknown coach";
   const memberName = names.get(memberId) ?? "Unknown member";
 
   return (
     <div className="space-y-6">
-      <Link href={`/admin/messages${highlight ? `?q=${encodeURIComponent(highlight)}` : ""}`} className="text-link text-sm">
+      <Link
+        href={`/admin/messages${highlight ? `?q=${encodeURIComponent(highlight)}` : ""}`}
+        className="text-link text-sm"
+      >
         Back to conversations
       </Link>
       <div>
@@ -70,8 +87,13 @@ export default async function ReviewConversationPage({
         </h1>
         <p className="mt-2 text-sm text-muted">
           Coach: {coachName} · Member: {memberName} ·{" "}
-          {connectionResult.data ? "Still connected" : "No longer connected"} · {messages.length} messages ·{" "}
-          {flaggedCount > 0 && <span className="font-semibold text-danger">{flaggedCount} flagged · </span>}
+          {connectionResult.data ? "Still connected" : "No longer connected"} ·{" "}
+          {messages.length} messages ·{" "}
+          {flaggedCount > 0 && (
+            <span className="font-semibold text-danger">
+              {flaggedCount} flagged ·{" "}
+            </span>
+          )}
           Read-only
         </p>
       </div>
@@ -84,22 +106,33 @@ export default async function ReviewConversationPage({
         <ol className="space-y-3 rounded-lg border border-border bg-surface p-4">
           {messages.map((message) => {
             const fromCoach = message.sender_id === coachId;
-            const matches = highlight && message.body.toLowerCase().includes(highlight);
+            const matches =
+              highlight && message.body.toLowerCase().includes(highlight);
             const flags = detectFlags(message.body);
             return (
-              <li key={message.id} className={`flex flex-col ${fromCoach ? "items-start" : "items-end"}`}>
+              <li
+                key={message.id}
+                className={`flex flex-col ${fromCoach ? "items-start" : "items-end"}`}
+              >
                 <span className="mb-1 text-xs text-muted">
-                  {fromCoach ? `${coachName} (coach)` : `${memberName} (member)`} · {formatUtc(message.created_at)}
+                  {fromCoach
+                    ? `${coachName} (coach)`
+                    : `${memberName} (member)`}{" "}
+                  · {formatUtc(message.created_at)}
                 </span>
                 <p
                   className={`max-w-[85%] whitespace-pre-line break-words rounded-2xl px-4 py-2 sm:max-w-[70%] ${
-                    matches ? "bg-accent text-accent-foreground" : "bg-surface-raised"
+                    matches
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-surface-raised"
                   } ${flags.length ? "ring-2 ring-danger" : ""}`}
                 >
                   {message.body}
                 </p>
                 {flags.length > 0 && (
-                  <span className="mt-1 text-xs font-semibold text-danger">Flagged: {describeFlags(flags)}</span>
+                  <span className="mt-1 text-xs font-semibold text-danger">
+                    Flagged: {describeFlags(flags)}
+                  </span>
                 )}
               </li>
             );

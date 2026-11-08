@@ -1,3 +1,4 @@
+import { ReviewForm } from "@/components/review-form";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -118,6 +119,15 @@ export default async function CoachPage({
       }
     | undefined;
   const canJoinFree = coach.join_mode !== "paid";
+  const { data: myReview } =
+    isMember && isJoined
+      ? await supabase
+          .from("coach_reviews")
+          .select("rating, body, hidden")
+          .eq("coach_id", coach.id)
+          .eq("member_id", profile.id)
+          .maybeSingle<{ rating: number; body: string; hidden: boolean }>()
+      : { data: null };
   const links = SOCIAL_LINKS.flatMap(({ key, label }) => {
     const url = coach[key];
     return typeof url === "string" && url ? [{ label, url }] : [];
@@ -263,6 +273,17 @@ export default async function CoachPage({
               </p>
             </>
           )}
+        </section>
+      )}
+
+      {isMember && isJoined && (
+        <section className="space-y-3">
+          <h2 className="text-2xl">Review {coach.display_name}</h2>
+          <ReviewForm
+            coachId={coach.id}
+            coachName={coach.display_name}
+            existing={myReview}
+          />
         </section>
       )}
 

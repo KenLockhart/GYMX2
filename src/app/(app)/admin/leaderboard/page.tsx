@@ -134,7 +134,14 @@ export default async function LeaderboardPage({
         <Board
           title="Most active members"
           note={`Points: task done ${MEMBER_POINTS.tasks} · session RSVP ${MEMBER_POINTS.sessions} · message ${MEMBER_POINTS.messages} · memo ${MEMBER_POINTS.memos} · habit ${MEMBER_POINTS.habits}`}
-          columns={["Tasks done", "Sessions", "Messages", "Memos", "Habits", "Score"]}
+          columns={[
+            "Tasks done",
+            "Sessions",
+            "Messages",
+            "Memos",
+            "Habits",
+            "Score",
+          ]}
           rows={boards.members.map((row) => ({
             key: row.id,
             name: row.name,
