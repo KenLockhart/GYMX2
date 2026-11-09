@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FeedList } from "@/components/feed-list";
 import { PostComposer } from "@/components/post-composer";
 import { allBadges } from "@/lib/achievements";
@@ -60,7 +61,10 @@ export default async function CommunityPage({
           <span className="font-semibold text-foreground">
             {personalized ? "personalized" : "standard GYMX2"}
           </span>{" "}
-          feed, newest first.
+          feed.{" "}
+          <Link href="/community/preferences" className="text-link">
+            Newsfeed preferences
+          </Link>
         </p>
       </div>
       <PostComposer

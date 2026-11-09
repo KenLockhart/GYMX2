@@ -1,12 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   deletePost,
   toggleLike,
   updatePost,
 } from "@/app/(app)/community/actions";
+import {
+  setFollow,
+  setHidden,
+  setMute,
+} from "@/app/(app)/community/preferences/actions";
 import { PillarTag } from "@/components/game-parts";
 import {
   audienceLabel,
@@ -75,14 +81,19 @@ export function PostCard({
   post: initial,
   viewerRole,
   onDeleted,
+  onMuted,
   linkToPost = true,
 }: {
   post: PostDTO;
   viewerRole: string;
   onDeleted?: (id: string) => void;
+  // Lets the feed drop the muted person's other posts.
+  onMuted?: (authorId: string, postId: string) => void;
   linkToPost?: boolean;
 }) {
+  const router = useRouter();
   const [post, setPost] = useState(initial);
+  const [dismissed, setDismissed] = useState<"hidden" | "muted" | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ body: post.body, kind: post.kind });
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +126,53 @@ export function PostCard({
         likeCount: result.count ?? current.likeCount,
       }));
     });
+  }
+
+  function follow() {
+    const next = !post.followingAuthor;
+    setPost((current) => ({ ...current, followingAuthor: next }));
+    start(async () => {
+      const result = await setFollow(post.author.id, next);
+      if (result.error) {
+        setPost((current) => ({ ...current, followingAuthor: !next }));
+        setError(result.error);
+      }
+    });
+  }
+
+  function dismiss(how: "hidden" | "muted", undo = false) {
+    setError(null);
+    start(async () => {
+      const result =
+        how === "hidden"
+          ? await setHidden(post.id, !undo)
+          : await setMute(post.author.id, !undo);
+      if (result.error) return setError(result.error);
+      setDismissed(undo ? null : how);
+      if (how === "muted" && !undo) onMuted?.(post.author.id, post.id);
+      // Bring back the person's other posts.
+      if (how === "muted" && undo) router.refresh();
+    });
+  }
+
+  if (dismissed) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface p-4 text-sm text-muted">
+        <span>
+          {dismissed === "hidden"
+            ? "Post hidden. You won't see it in your feed."
+            : `You muted ${post.author.name}. Their posts won't show in your feed.`}
+        </span>
+        <button
+          type="button"
+          onClick={() => dismiss(dismissed, true)}
+          disabled={pending}
+          className="shrink-0 cursor-pointer font-semibold text-foreground hover:text-accent"
+        >
+          Undo
+        </button>
+      </div>
+    );
   }
 
   function save() {
@@ -150,6 +208,17 @@ export function PostCard({
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-semibold">{post.author.name}</span>
+            {!post.mine && (
+              <button
+                type="button"
+                onClick={follow}
+                disabled={pending}
+                aria-pressed={post.followingAuthor}
+                className={`cursor-pointer text-xs font-semibold hover:text-foreground ${post.followingAuthor ? "text-muted" : "text-accent"}`}
+              >
+                {post.followingAuthor ? "Following" : "Follow"}
+              </button>
+            )}
             {post.author.role === "coach" && (
               <span className="rounded bg-accent px-1.5 text-[10px] font-bold uppercase text-accent-foreground">
                 Coach
@@ -175,6 +244,27 @@ export function PostCard({
             {post.editedAt && " · edited"}
           </p>
         </div>
+        {!post.mine && (
+          <div className="flex shrink-0 gap-3 text-xs">
+            <button
+              type="button"
+              onClick={() => dismiss("hidden")}
+              disabled={pending}
+              className="cursor-pointer text-muted hover:text-foreground"
+            >
+              Hide
+            </button>
+            <button
+              type="button"
+              onClick={() => dismiss("muted")}
+              disabled={pending}
+              aria-label={`Mute ${post.author.name}`}
+              className="cursor-pointer text-muted hover:text-foreground"
+            >
+              Mute
+            </button>
+          </div>
+        )}
         {post.mine && !editing && (
           <div className="flex shrink-0 gap-3 text-xs">
             <button

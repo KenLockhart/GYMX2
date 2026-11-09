@@ -39,27 +39,42 @@ export async function toPostDTOs(
     ),
   ];
 
-  const [{ data: profiles }, { data: media }, { data: likes }] =
-    await Promise.all([
-      admin.from("profiles").select("id, display_name, role").in("id", people),
-      // Row security: media only for posts this person can see.
-      supabase
-        .from("post_media")
-        .select("post_id, kind, path, video_uid, position, width, height")
-        .in(
-          "post_id",
-          rows.map((row) => row.id),
-        )
-        .order("position"),
-      supabase
-        .from("post_likes")
-        .select("post_id")
-        .eq("user_id", viewerId)
-        .in(
-          "post_id",
-          rows.map((row) => row.id),
-        ),
-    ]);
+  const [
+    { data: profiles },
+    { data: media },
+    { data: likes },
+    { data: follows },
+  ] = await Promise.all([
+    admin.from("profiles").select("id, display_name, role").in("id", people),
+    // Row security: media only for posts this person can see.
+    supabase
+      .from("post_media")
+      .select("post_id, kind, path, video_uid, position, width, height")
+      .in(
+        "post_id",
+        rows.map((row) => row.id),
+      )
+      .order("position"),
+    supabase
+      .from("post_likes")
+      .select("post_id")
+      .eq("user_id", viewerId)
+      .in(
+        "post_id",
+        rows.map((row) => row.id),
+      ),
+    supabase
+      .from("follows")
+      .select("followed_id")
+      .eq("follower_id", viewerId)
+      .in(
+        "followed_id",
+        rows.map((row) => row.author_id),
+      ),
+  ]);
+  const following = new Set(
+    (follows ?? []).map((row) => row.followed_id as string),
+  );
   const liked = new Set((likes ?? []).map((like) => like.post_id as string));
   const names = new Map(
     (profiles ?? []).map((person) => [person.id as string, person]),
@@ -142,6 +157,7 @@ export async function toPostDTOs(
       video: videos.get(row.id) ?? null,
       mine: row.author_id === viewerId,
       likedByMe: liked.has(row.id),
+      followingAuthor: following.has(row.author_id),
     };
   });
 }
