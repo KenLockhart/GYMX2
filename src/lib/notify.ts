@@ -132,6 +132,8 @@ export async function notifyNewMessage(messageId: string) {
     .eq("id", messageId)
     .maybeSingle<MessageRow>();
   if (!message) return;
+  // A photo-only message has no text to show.
+  if (!message.body.trim()) message.body = "Sent a photo.";
   await Promise.all([notifyRecipient(message), pushNewMessage(message)]);
   await alertAdminsIfFlagged(message);
 }
@@ -144,6 +146,14 @@ function pushNewMessage(message: MessageRow) {
       message.sender_id === message.coach_id
         ? message.member_id
         : message.coach_id;
+    // Direct-message push can be turned off in Profile, Notifications.
+    const { data: setting } = await createAdminClient()
+      .from("notification_settings")
+      .select("push")
+      .eq("user_id", recipientId)
+      .eq("type", "message")
+      .maybeSingle();
+    if (setting && !setting.push) return;
     const sender = await loadRecipient(message.sender_id);
     await sendPush([recipientId], {
       title: sender?.name ?? "New message",

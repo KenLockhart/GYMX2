@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Chat } from "@/components/chat";
 import { requireAccount } from "@/lib/auth";
+import { attachPhotos } from "@/lib/message-photos";
 import { createClient } from "@/lib/supabase/server";
 import type { Message } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
@@ -10,14 +11,20 @@ import { loadContacts } from "../contacts";
 
 export const metadata: Metadata = { title: "Conversation" };
 
-export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ConversationPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { profile } = await requireAccount();
   if (profile.role === "admin") redirect("/admin/messages");
   const { id } = await params;
   if (!idSchema.safeParse(id).success) notFound();
 
   const isCoach = profile.role === "coach";
-  const pair = isCoach ? { coach_id: profile.id, member_id: id } : { coach_id: id, member_id: profile.id };
+  const pair = isCoach
+    ? { coach_id: profile.id, member_id: id }
+    : { coach_id: id, member_id: profile.id };
 
   const supabase = await createClient();
   const [{ contacts }, messageResult] = await Promise.all([
@@ -36,9 +43,13 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   ]);
 
   const contact = contacts.find((person) => person.id === id);
-  const rows = (messageResult.data ?? []) as unknown as (Message & { other: { display_name: string } | null })[];
+  const rows = (messageResult.data ?? []) as unknown as (Message & {
+    other: { display_name: string } | null;
+  })[];
   const displayName =
-    contact?.display_name ?? rows[0]?.other?.display_name ?? (rows.length > 0 ? "Former contact" : undefined);
+    contact?.display_name ??
+    rows[0]?.other?.display_name ??
+    (rows.length > 0 ? "Former contact" : undefined);
   // Only people the viewer is connected with, or has talked to before, have a conversation page.
   if (!displayName) notFound();
 
@@ -47,7 +58,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     await supabase.rpc("mark_conversation_read", { other_user_id: id });
   }
 
-  const messages: Message[] = rows.reverse().map((row) => ({
+  const plain: Message[] = rows.reverse().map((row) => ({
     id: row.id,
     coach_id: row.coach_id,
     member_id: row.member_id,
@@ -56,6 +67,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     read_at: row.read_at,
     created_at: row.created_at,
   }));
+  const messages = await attachPhotos(plain);
 
   return (
     <div className="space-y-6">

@@ -47,6 +47,8 @@ export function summarizeConversations(
 
 export function preview(body: string, length = 80) {
   const oneLine = body.replace(/\s+/g, " ").trim();
+  // A photo-only message has no text.
+  if (!oneLine) return "Photo";
   return oneLine.length > length ? `${oneLine.slice(0, length - 1)}…` : oneLine;
 }
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/app/(auth)/actions";
 import { BrandLink } from "@/components/brand-link";
+import { NotificationBell } from "@/components/notification-bell";
 import { requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,8 +14,14 @@ export default async function AppLayout({
 
   // Unread messages are ones the other person sent. Row security limits this to the viewer's conversations.
   let unread = 0;
+  const supabase = await createClient();
+  // Community notifications: row security limits this to the viewer's own.
+  const { count: unreadNotifications } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient_id", profile.id)
+    .is("read_at", null);
   if (profile.role !== "admin") {
-    const supabase = await createClient();
     const { count } = await supabase
       .from("messages")
       .select("id", { count: "exact", head: true })
@@ -108,6 +115,10 @@ export default async function AppLayout({
                 </Link>
               </>
             )}
+            <NotificationBell
+              me={profile.id}
+              initialCount={unreadNotifications ?? 0}
+            />
             <Link href="/profile" className="hover:text-accent">
               Profile
             </Link>

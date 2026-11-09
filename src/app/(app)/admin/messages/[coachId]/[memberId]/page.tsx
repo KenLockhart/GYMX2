@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { describeFlags, detectFlags } from "@/lib/message-flags";
+import { loadMessagePhotos } from "@/lib/message-photos";
 import { createClient } from "@/lib/supabase/server";
 import type { Message } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
@@ -61,6 +62,7 @@ export default async function ReviewConversationPage({
 
   const messages = (messageResult.data ?? []) as Message[];
   if (!messageResult.error && messages.length === 0) notFound();
+  const photos = await loadMessagePhotos(messages.map((m) => m.id));
   const names = new Map(
     (peopleResult.data ?? []).map((person) => [
       person.id as string,
@@ -127,8 +129,29 @@ export default async function ReviewConversationPage({
                       : "bg-surface-raised"
                   } ${flags.length ? "ring-2 ring-danger" : ""}`}
                 >
-                  {message.body}
+                  {message.body || (
+                    <span className="italic text-muted">Photo</span>
+                  )}
                 </p>
+                {photos[message.id] && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {photos[message.id].map((url, index) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage link */}
+                        <img
+                          src={url}
+                          alt={`Photo ${index + 1}`}
+                          className="size-32 rounded object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
                 {flags.length > 0 && (
                   <span className="mt-1 text-xs font-semibold text-danger">
                     Flagged: {describeFlags(flags)}

@@ -79,6 +79,8 @@ export type Message = {
   body: string;
   read_at: string | null;
   created_at: string;
+  // Signed links to attached photos, when there are any.
+  photos?: string[];
 };
 
 export type ArmoryItem = {
