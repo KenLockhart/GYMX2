@@ -15,6 +15,8 @@ const roleIntro: Record<UserRole, string> = {
     "You're in. Join a coach to start getting Tasks and sessions, and keep daily notes in your Memos.",
   coach:
     "You're set up as a coach. Upload videos to your library, give Tasks to your members and schedule sessions.",
+  moderator:
+    "You help keep GYMX2 Community safe. Reported posts and comments will appear in your review queue.",
   admin:
     "You manage GYMX2. Review coach requests and member roles from the admin area.",
 };

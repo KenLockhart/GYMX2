@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const email = z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address."));
+const email = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email("Enter a valid email address."));
 const password = z
   .string()
   .min(8, "Use at least 8 characters for your password.")
@@ -47,7 +51,10 @@ export const newPasswordSchema = z.object({ password });
 
 export const profileSchema = z.object({
   display_name: displayName,
-  bio: z.string().trim().max(1000, "Use 1,000 characters or fewer for your bio."),
+  bio: z
+    .string()
+    .trim()
+    .max(1000, "Use 1,000 characters or fewer for your bio."),
   coach_requested: z.boolean(),
   instagram_url: socialLink("Instagram"),
   tiktok_url: socialLink("TikTok"),
@@ -59,7 +66,7 @@ export const profileSchema = z.object({
 
 export const setRoleSchema = z.object({
   user_id: z.uuid(),
-  role: z.enum(["member", "coach", "admin"]),
+  role: z.enum(["member", "coach", "moderator", "admin"]),
 });
 
 export const emailLinkTypeSchema = z.enum(["email", "recovery"]);
@@ -73,22 +80,34 @@ const isoDate = z.iso.date("Choose a valid date.");
 
 export const videoSchema = z.object({
   title: taskOrVideoTitle,
-  description: z.string().trim().max(2000, "Use 2,000 characters or fewer for the description."),
+  description: z
+    .string()
+    .trim()
+    .max(2000, "Use 2,000 characters or fewer for the description."),
 });
 
 export const taskSchema = z.object({
   video_id: z.uuid("Choose a video."),
   title: taskOrVideoTitle,
-  instructions: z.string().trim().max(2000, "Use 2,000 characters or fewer for the instructions."),
+  instructions: z
+    .string()
+    .trim()
+    .max(2000, "Use 2,000 characters or fewer for the instructions."),
   due_on: z.union([z.literal("").transform(() => null), isoDate]),
   member_ids: z.array(z.uuid()).min(1, "Choose at least one member.").max(200),
-  pillar: z.enum(["mind", "body", "spirit"], { error: "Choose Mind, Body or Spirit." }),
+  pillar: z.enum(["mind", "body", "spirit"], {
+    error: "Choose Mind, Body or Spirit.",
+  }),
 });
 
 export const memoSchema = z.object({
   id: z.union([z.literal("").transform(() => null), z.uuid()]),
   memo_date: isoDate,
-  body: z.string().trim().min(1, "Write a note first.").max(5000, "Use 5,000 characters or fewer."),
+  body: z
+    .string()
+    .trim()
+    .min(1, "Write a note first.")
+    .max(5000, "Use 5,000 characters or fewer."),
   shared_with_coaches: z.boolean(),
 });
 
@@ -116,19 +135,35 @@ export const sessionSchema = z
   .object({
     id: z.union([z.literal("").transform(() => null), z.uuid()]),
     title: taskOrVideoTitle,
-    notes: z.string().trim().max(2000, "Use 2,000 characters or fewer for the notes."),
-    location: z.string().trim().max(200, "Use 200 characters or fewer for the location."),
+    notes: z
+      .string()
+      .trim()
+      .max(2000, "Use 2,000 characters or fewer for the notes."),
+    location: z
+      .string()
+      .trim()
+      .max(200, "Use 200 characters or fewer for the location."),
     meeting_url: optionalHttpsUrl,
-    starts_at: z.iso.datetime({ offset: true, error: "Choose a date and start time." }),
+    starts_at: z.iso.datetime({
+      offset: true,
+      error: "Choose a date and start time.",
+    }),
     ends_at: z.iso.datetime({ offset: true, error: "Choose an end time." }),
-    member_ids: z.array(z.uuid()).min(1, "Invite at least one member.").max(200),
+    member_ids: z
+      .array(z.uuid())
+      .min(1, "Invite at least one member.")
+      .max(200),
   })
   .refine((value) => Date.parse(value.ends_at) > Date.parse(value.starts_at), {
     error: "The session must end after it starts.",
   })
-  .refine((value) => Date.parse(value.ends_at) - Date.parse(value.starts_at) <= MAX_SESSION_MS, {
-    error: "A session can last up to 24 hours.",
-  });
+  .refine(
+    (value) =>
+      Date.parse(value.ends_at) - Date.parse(value.starts_at) <= MAX_SESSION_MS,
+    {
+      error: "A session can last up to 24 hours.",
+    },
+  );
 
 export const sessionResponseSchema = z.object({
   session_id: z.uuid(),
@@ -137,84 +172,132 @@ export const sessionResponseSchema = z.object({
 
 export const messageSchema = z.object({
   other_user_id: z.uuid("Choose who to message."),
-  body: z.string().trim().min(1, "Write a message first.").max(4000, "Use 4,000 characters or fewer."),
+  body: z
+    .string()
+    .trim()
+    .min(1, "Write a message first.")
+    .max(4000, "Use 4,000 characters or fewer."),
 });
 
-const armoryTitle = z.string().trim().min(1, "Enter a title.").max(120, "Use 120 characters or fewer for the title.");
-const armoryDescription = z.string().trim().max(4000, "Use 4,000 characters or fewer for the description.");
-const armoryCategory = z.enum(["ebook", "gear", "program", "other"], { error: "Choose a category." });
+const armoryTitle = z
+  .string()
+  .trim()
+  .min(1, "Enter a title.")
+  .max(120, "Use 120 characters or fewer for the title.");
+const armoryDescription = z
+  .string()
+  .trim()
+  .max(4000, "Use 4,000 characters or fewer for the description.");
+const armoryCategory = z.enum(["ebook", "gear", "program", "other"], {
+  error: "Choose a category.",
+});
 const blankToNull = z.literal("").transform(() => null);
 // Stored paths look like "<owner id>/<random>-<name>". The owner part is checked again by the database.
-const storagePath = z.string().regex(/^[0-9a-f-]{36}\/[\w.-]{1,200}$/, "That upload didn't work. Please try again.");
+const storagePath = z
+  .string()
+  .regex(
+    /^[0-9a-f-]{36}\/[\w.-]{1,200}$/,
+    "That upload didn't work. Please try again.",
+  );
 
-export const armoryItemSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("link"),
-    id: z.union([blankToNull, z.uuid()]),
-    category: armoryCategory,
-    title: armoryTitle,
-    description: armoryDescription,
-    price_cents: z.number().int().min(0).max(10_000_000).nullable(),
-    buy_url: z
-      .string()
-      .trim()
-      .max(1000, "The link is too long.")
-      .refine((value) => isHttpsUrl(value), { error: "Add the full shop link, starting with https://" }),
-    image_path: z.union([blankToNull, storagePath]),
-    visible_to_all: z.boolean(),
-  }),
-  z.object({
-    kind: z.literal("download"),
-    id: z.union([blankToNull, z.uuid()]),
-    category: armoryCategory,
-    title: armoryTitle,
-    description: armoryDescription,
-    file_path: z.string().min(1, "Upload the file people will download.").pipe(storagePath),
-    file_name: z.string().trim().min(1, "Upload the file people will download.").max(200),
-    image_path: z.union([blankToNull, storagePath]),
-    visible_to_all: z.boolean(),
-  }),
-  z.object({
-    kind: z.literal("paid"),
-    id: z.union([blankToNull, z.uuid()]),
-    category: armoryCategory,
-    title: armoryTitle,
-    description: armoryDescription,
-    price_cents: z
-      .number({ error: "Enter a price of at least $1.00." })
-      .int()
-      .min(100, "Enter a price of at least $1.00.")
-      .max(10_000_000, "That price is too high."),
-    file_path: z.string().min(1, "Upload the file buyers will download.").pipe(storagePath),
-    file_name: z.string().trim().min(1, "Upload the file buyers will download.").max(200),
-    image_path: z.union([blankToNull, storagePath]),
-    visible_to_all: z.boolean(),
-  }),
-  z.object({
-    kind: z.literal("product"),
-    id: z.union([blankToNull, z.uuid()]),
-    category: armoryCategory,
-    title: armoryTitle,
-    description: armoryDescription,
-    price_cents: z
-      .number({ error: "Enter a price of at least $1.00." })
-      .int()
-      .min(100, "Enter a price of at least $1.00.")
-      .max(10_000_000, "That price is too high."),
-    shipping_cents: z
-      .number({ error: "Enter the shipping fee like 5.99, or 0 for free shipping." })
-      .int()
-      .min(0)
-      .max(100_000, "That shipping fee is too high."),
-    sizes: z.array(z.string().min(1).max(20)).max(20, "Use 20 sizes or fewer."),
-    image_path: z.union([blankToNull, storagePath]),
-    visible_to_all: z.boolean(),
-  }),
-]).refine((item) => !(item.category === "gear" && (item.kind === "download" || item.kind === "paid")), {
-  // Gear is shipped, so buyers must never get a file instead. The database enforces this too.
-  error: 'Gear ships to the buyer, so it can\'t be a download. Choose "Sell gear" or "Buy it elsewhere".',
-  path: ["category"],
-});
+export const armoryItemSchema = z
+  .discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("link"),
+      id: z.union([blankToNull, z.uuid()]),
+      category: armoryCategory,
+      title: armoryTitle,
+      description: armoryDescription,
+      price_cents: z.number().int().min(0).max(10_000_000).nullable(),
+      buy_url: z
+        .string()
+        .trim()
+        .max(1000, "The link is too long.")
+        .refine((value) => isHttpsUrl(value), {
+          error: "Add the full shop link, starting with https://",
+        }),
+      image_path: z.union([blankToNull, storagePath]),
+      visible_to_all: z.boolean(),
+    }),
+    z.object({
+      kind: z.literal("download"),
+      id: z.union([blankToNull, z.uuid()]),
+      category: armoryCategory,
+      title: armoryTitle,
+      description: armoryDescription,
+      file_path: z
+        .string()
+        .min(1, "Upload the file people will download.")
+        .pipe(storagePath),
+      file_name: z
+        .string()
+        .trim()
+        .min(1, "Upload the file people will download.")
+        .max(200),
+      image_path: z.union([blankToNull, storagePath]),
+      visible_to_all: z.boolean(),
+    }),
+    z.object({
+      kind: z.literal("paid"),
+      id: z.union([blankToNull, z.uuid()]),
+      category: armoryCategory,
+      title: armoryTitle,
+      description: armoryDescription,
+      price_cents: z
+        .number({ error: "Enter a price of at least $1.00." })
+        .int()
+        .min(100, "Enter a price of at least $1.00.")
+        .max(10_000_000, "That price is too high."),
+      file_path: z
+        .string()
+        .min(1, "Upload the file buyers will download.")
+        .pipe(storagePath),
+      file_name: z
+        .string()
+        .trim()
+        .min(1, "Upload the file buyers will download.")
+        .max(200),
+      image_path: z.union([blankToNull, storagePath]),
+      visible_to_all: z.boolean(),
+    }),
+    z.object({
+      kind: z.literal("product"),
+      id: z.union([blankToNull, z.uuid()]),
+      category: armoryCategory,
+      title: armoryTitle,
+      description: armoryDescription,
+      price_cents: z
+        .number({ error: "Enter a price of at least $1.00." })
+        .int()
+        .min(100, "Enter a price of at least $1.00.")
+        .max(10_000_000, "That price is too high."),
+      shipping_cents: z
+        .number({
+          error: "Enter the shipping fee like 5.99, or 0 for free shipping.",
+        })
+        .int()
+        .min(0)
+        .max(100_000, "That shipping fee is too high."),
+      sizes: z
+        .array(z.string().min(1).max(20))
+        .max(20, "Use 20 sizes or fewer."),
+      image_path: z.union([blankToNull, storagePath]),
+      visible_to_all: z.boolean(),
+    }),
+  ])
+  .refine(
+    (item) =>
+      !(
+        item.category === "gear" &&
+        (item.kind === "download" || item.kind === "paid")
+      ),
+    {
+      // Gear is shipped, so buyers must never get a file instead. The database enforces this too.
+      error:
+        'Gear ships to the buyer, so it can\'t be a download. Choose "Sell gear" or "Buy it elsewhere".',
+      path: ["category"],
+    },
+  );
 
 export const purchaseRequestSchema = z.object({
   item_id: z.uuid(),
@@ -223,7 +306,10 @@ export const purchaseRequestSchema = z.object({
 
 export const shipOrderSchema = z.object({
   purchase_id: z.uuid(),
-  tracking: z.string().trim().max(100, "Use 100 characters or fewer for the tracking number."),
+  tracking: z
+    .string()
+    .trim()
+    .max(100, "Use 100 characters or fewer for the tracking number."),
 });
 
 export const uploadRequestSchema = z.object({
@@ -235,7 +321,10 @@ export const uploadRequestSchema = z.object({
 export const affiliateApplicationSchema = z.object({
   code: z
     .string()
-    .regex(/^[a-z0-9][a-z0-9-]{2,23}$/, "Use 3 to 24 lowercase letters, numbers or dashes, starting with a letter or number."),
+    .regex(
+      /^[a-z0-9][a-z0-9-]{2,23}$/,
+      "Use 3 to 24 lowercase letters, numbers or dashes, starting with a letter or number.",
+    ),
   application: z
     .string()
     .trim()
@@ -245,7 +334,10 @@ export const affiliateApplicationSchema = z.object({
 
 const optionalPercent = z.union([
   z.literal("").transform(() => null),
-  z.coerce.number({ error: "Enter a percentage like 10." }).min(0).max(100, "Use a percentage up to 100."),
+  z.coerce
+    .number({ error: "Enter a percentage like 10." })
+    .min(0)
+    .max(100, "Use a percentage up to 100."),
 ]);
 
 const optionalDollars = z.union([
@@ -264,7 +356,10 @@ export const affiliateRatesSchema = z.object({
 });
 
 export const programSettingsSchema = z.object({
-  sale_percent: z.coerce.number({ error: "Enter the sale percentage." }).min(0).max(100),
+  sale_percent: z.coerce
+    .number({ error: "Enter the sale percentage." })
+    .min(0)
+    .max(100),
   sale_base: z.enum(["platform_share", "sale_price"]),
   signup_bonus: z.coerce
     .number({ error: "Enter the sign-up bonus." })
@@ -272,7 +367,11 @@ export const programSettingsSchema = z.object({
     .max(1000)
     .transform((dollars) => Math.round(dollars * 100)),
   hold_days: z.coerce.number().int("Use whole days.").min(0).max(365),
-  attribution_months: z.coerce.number().int("Use whole months.").min(1).max(120),
+  attribution_months: z.coerce
+    .number()
+    .int("Use whole months.")
+    .min(1)
+    .max(120),
   cookie_days: z.coerce.number().int("Use whole days.").min(1).max(365),
   min_payout: z.coerce
     .number({ error: "Enter the minimum payout." })
@@ -283,15 +382,23 @@ export const programSettingsSchema = z.object({
 
 export const planSchema = z.object({
   id: z.union([z.literal("").transform(() => null), z.uuid()]),
-  name: z.string().trim().min(1, "Name the plan.").max(60, "Use 60 characters or fewer for the name."),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name the plan.")
+    .max(60, "Use 60 characters or fewer for the name."),
   description: z.string().trim().max(1000, "Use 1,000 characters or fewer."),
   price: z
     .string()
     .trim()
     .transform((value) => value.replace(/[$,\s]/g, ""))
-    .refine((value) => /^\d+(\.\d{1,2})?$/.test(value), { error: "Enter a monthly price like 29 or 29.99." })
+    .refine((value) => /^\d+(\.\d{1,2})?$/.test(value), {
+      error: "Enter a monthly price like 29 or 29.99.",
+    })
     .transform((value) => Math.round(Number(value) * 100))
-    .refine((cents) => cents >= 100 && cents <= 100000, { error: "Use a monthly price from $1 to $1,000." }),
+    .refine((cents) => cents >= 100 && cents <= 100000, {
+      error: "Use a monthly price from $1 to $1,000.",
+    }),
   trial: z.boolean(),
   active: z.boolean(),
 });
