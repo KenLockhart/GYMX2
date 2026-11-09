@@ -42,6 +42,7 @@ export async function createUpload(input: {
   length: string;
   title: string;
   creatorId: string;
+  maxDurationSeconds?: number;
 }) {
   const response = await streamRequest("?direct_user=true", {
     method: "POST",
@@ -52,7 +53,9 @@ export async function createUpload(input: {
       "Upload-Metadata": encodeUploadMetadata({
         name: input.title,
         requiresignedurls: null,
-        maxDurationSeconds: String(MAX_DURATION_SECONDS),
+        maxDurationSeconds: String(
+          input.maxDurationSeconds ?? MAX_DURATION_SECONDS,
+        ),
         expiry: new Date(Date.now() + UPLOAD_WINDOW_MS).toISOString(),
       }),
     },
@@ -158,4 +161,12 @@ export async function deleteLiveInput(uid: string) {
       `Cloudflare couldn't close the live room (${response.status}).`,
     );
   }
+}
+
+// Who started an upload (set from the signed-in person when the upload began).
+export async function getVideoCreator(uid: string) {
+  const response = await streamRequest(`/${uid}`);
+  if (!response.ok) return null;
+  const { result } = await response.json();
+  return (result?.creator as string | undefined) ?? null;
 }
