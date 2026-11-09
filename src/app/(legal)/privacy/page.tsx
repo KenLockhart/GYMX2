@@ -36,7 +36,15 @@ export default function PrivacyPage() {
         <li>
           <strong>What you do on GYMX2:</strong> coaches you join, tasks and
           their progress, memos, calendar sessions and your responses, and
-          messages between coaches and members.
+          messages between coaches and members, including photos you attach to
+          them.
+        </li>
+        <li>
+          <strong>Community:</strong> the posts, photos, videos and comments you
+          share, your likes, who you follow and mute, posts you hide, your
+          newsfeed and notification settings, and reports you send. We use
+          follows, likes and your settings only to order your own feed and send
+          you notifications.
         </li>
         <li>
           <strong>Tracking:</strong> the habits you check off, body measurements
@@ -100,13 +108,13 @@ export default function PrivacyPage() {
       <p>
         Messages on GYMX2 are private between a coach and a member, but they are
         not end-to-end encrypted. GYMX2 admins can read coach–member
-        conversations to keep members safe, investigate reports, and stop
-        coaches from moving members off the platform in breach of our Terms.
-        GYMX2 automatically checks messages for things like phone numbers, email
-        addresses and payment apps, and points admins to those conversations.
-        Admins can read but cannot send, change or delete messages in your
-        conversations. Please don&rsquo;t share passwords, card numbers or other
-        sensitive information in messages.
+        conversations, including attached photos, to keep members safe,
+        investigate reports, and stop coaches from moving members off the
+        platform in breach of our Terms. GYMX2 automatically checks messages for
+        things like phone numbers, email addresses and payment apps, and points
+        admins to those conversations. Admins can read but cannot send, change
+        or delete messages in your conversations. Please don&rsquo;t share
+        passwords, card numbers or other sensitive information in messages.
       </p>
 
       <h2>Who sees your information</h2>
@@ -117,10 +125,27 @@ export default function PrivacyPage() {
           with them.
         </li>
         <li>
-          <strong>Coach groups:</strong> each coach has a group chat with all of
-          their members. Everyone in the group sees your name and what you post
-          there. The coach can remove posts, and GYMX2 admins can read groups
-          for the same safety reasons as messages.
+          <strong>Community posts</strong> are seen by the audience you pick for
+          each one: everyone signed in to GYMX2, one coach&rsquo;s community, or
+          only you. Your name, likes and comments are seen by whoever can see
+          the post. Posts set to only you are never shown to anyone else,
+          including moderators and admins. Who you follow and mute, what you
+          hide and your feed settings are private to you.
+        </li>
+        <li>
+          <strong>Coach communities:</strong> each coach has a community with
+          posts and a group chat for all of their members. Everyone in it sees
+          your name and what you post there. The coach can remove posts, and
+          GYMX2 admins can read coach communities for the same safety reasons as
+          messages.
+        </li>
+        <li>
+          <strong>Reports and moderation:</strong> when you report something,
+          the person you report isn&rsquo;t told who you are. Moderators see
+          reported shared posts and comments but never direct messages, coach
+          communities or private posts. Admins see who sent a report. GYMX2
+          automatically flags posts that mention phone numbers, emails or
+          payment apps for review.
         </li>
         <li>
           <strong>Live sessions:</strong> when a coach streams a session live,
@@ -160,7 +185,8 @@ export default function PrivacyPage() {
       <p>
         If you turn on notifications for a device, your browser gives us an
         address to send them to. We use it only to send GYMX2 notifications
-        (such as new messages, group posts, live sessions and program days),
+        (such as new messages, likes, comments and replies, group posts, live
+        sessions and program days, as you choose in your notification settings),
         through your browser maker&rsquo;s push service (for example Apple,
         Google or Mozilla). The notification text passes through that service
         encrypted. Turn notifications off on your Profile page or in your device

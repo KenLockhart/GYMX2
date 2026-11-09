@@ -28,7 +28,7 @@ export default function TermsPage() {
         account.
       </p>
 
-      <h2>2. Members, coaches and admins</h2>
+      <h2>2. Members, coaches, moderators and admins</h2>
       <ul>
         <li>
           <strong>Members</strong> join coaches, watch their videos, complete
@@ -38,6 +38,12 @@ export default function TermsPage() {
           <strong>Coaches</strong> are independent. They are not GYMX2
           employees, and GYMX2 does not supervise their training, advice or
           products. An admin approves each coach before they can coach on GYMX2.
+        </li>
+        <li>
+          <strong>Moderators</strong> are people GYMX2 trusts to review reported
+          posts and comments in the shared Community feed. They can remove posts
+          and comments there, but they can&rsquo;t see direct messages, coach
+          communities or anything you keep to yourself.
         </li>
         <li>
           <strong>Admins</strong> run the platform. They approve coaches, keep
@@ -80,8 +86,35 @@ export default function TermsPage() {
           send spam, scams or malware, or try to break into accounts or the
           site;
         </li>
-        <li>copy, resell or share paid content you bought for your own use.</li>
+        <li>copy, resell or share paid content you bought for your own use;</li>
+        <li>
+          post someone else&rsquo;s photo, video or personal details without
+          their permission; or
+        </li>
+        <li>
+          post medical claims, extreme diets or dangerous challenges, or shame
+          anyone about their body.
+        </li>
       </ul>
+
+      <h3>Community</h3>
+      <p>
+        In Community you choose who sees each post: everyone signed in to GYMX2,
+        the members of one of your coaches&rsquo; communities, or only you.
+        Comments and likes are seen by everyone who can see the post. Progress
+        posts start as only you, so sharing progress photos is always your
+        choice. Photos from your private progress tracker are copied, never
+        moved, when you share one.
+      </p>
+      <p>
+        Anyone can report a post or comment. Moderators and admins review
+        reports on the shared feed; each coach can remove posts in their own
+        community, and admins can review any shared post. We may remove posts or
+        comments, limit features or suspend accounts that break these terms. If
+        something of yours is removed, we&rsquo;ll tell you, with a reason when
+        one is given. Reporting someone in bad faith is itself a breach of these
+        terms.
+      </p>
 
       <h2>5. Coaches: keep members on GYMX2</h2>
       <p>

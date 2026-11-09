@@ -123,6 +123,59 @@ const SECTIONS: {
     order: "created_at",
   },
   {
+    name: "community_posts",
+    table: "posts",
+    columns:
+      "kind, body, audience, pillar, like_count, comment_count, created_at, edited_at, removed_at, removed_reason, post_media(path, position)",
+    owner: "author_id",
+    order: "created_at",
+  },
+  {
+    name: "community_comments",
+    table: "post_comments",
+    columns: "post_id, body, created_at, edited_at, removed_at, removed_reason",
+    owner: "author_id",
+    order: "created_at",
+  },
+  {
+    name: "community_likes",
+    table: "post_likes",
+    columns: "post_id, created_at",
+    owner: "user_id",
+    order: "created_at",
+  },
+  {
+    name: "community_following",
+    table: "follows",
+    columns: "followed:profiles!followed_id(display_name), created_at",
+    owner: "follower_id",
+  },
+  {
+    name: "community_muted",
+    table: "mutes",
+    columns: "muted:profiles!muted_id(display_name), created_at",
+    owner: "user_id",
+  },
+  {
+    name: "community_feed_preferences",
+    table: "feed_preferences",
+    columns: "mode, sort, topic_weights, preferred_coaches, updated_at",
+    owner: "user_id",
+  },
+  {
+    name: "community_reports_you_sent",
+    table: "content_reports",
+    columns: "post_id, comment_id, reason, details, status, created_at",
+    owner: "reporter_id",
+    order: "created_at",
+  },
+  {
+    name: "notification_settings",
+    table: "notification_settings",
+    columns: "type, in_app, push, email",
+    owner: "user_id",
+  },
+  {
     name: "programs_started",
     table: "program_enrollments",
     columns:
@@ -251,7 +304,11 @@ export async function buildDataExport(user: { id: string; email: string }) {
         .limit(20000);
       if (section.order) query = query.order(section.order);
       const { data, error } = await query;
-      if (error) console.error(`Data export section ${section.name} failed`, error.message);
+      if (error)
+        console.error(
+          `Data export section ${section.name} failed`,
+          error.message,
+        );
       // A section that fails (or a feature that isn't set up) is left out rather than failing the export.
       return [section.name, error ? undefined : data] as const;
     }),

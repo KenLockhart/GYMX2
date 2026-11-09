@@ -69,6 +69,9 @@ h2 {
   .legal h2 {
     @apply mt-10 mb-3 text-2xl;
   }
+  .legal h3 {
+    @apply mt-6 mb-2 text-xl;
+  }
   .legal p,
   .legal ul {
     @apply mb-4 leading-relaxed text-foreground/90;
