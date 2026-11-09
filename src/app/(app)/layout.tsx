@@ -84,7 +84,7 @@ export default async function AppLayout({
               Community
             </Link>
             <Link href="/groups" className="hover:text-accent">
-              Groups
+              {profile.role === "coach" ? "My community" : "Coach communities"}
             </Link>
             <Link href="/programs" className="hover:text-accent">
               Programs

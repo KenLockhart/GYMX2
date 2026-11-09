@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   deletePost,
+  removePost,
   toggleLike,
   updatePost,
 } from "@/app/(app)/community/actions";
@@ -175,6 +176,19 @@ export function PostCard({
     );
   }
 
+  function moderate() {
+    const reason = window.prompt(
+      "Remove this post from your community? Add a short reason for the author (optional).",
+    );
+    if (reason === null) return;
+    setError(null);
+    start(async () => {
+      const result = await removePost(post.id, reason);
+      if (result.error) return setError(result.error);
+      onDeleted?.(post.id);
+    });
+  }
+
   function save() {
     setError(null);
     start(async () => {
@@ -240,7 +254,17 @@ export function PostCard({
             ) : (
               <time dateTime={post.createdAt}>{timeAgo(post.createdAt)}</time>
             )}{" "}
-            · {audienceLabel(post)}
+            ·{" "}
+            {post.audience === "coach_community" && post.coach ? (
+              <Link
+                href={`/groups/${post.coach.id}`}
+                className="hover:underline"
+              >
+                {audienceLabel(post)}
+              </Link>
+            ) : (
+              audienceLabel(post)
+            )}
             {post.editedAt && " · edited"}
           </p>
         </div>
@@ -254,6 +278,16 @@ export function PostCard({
             >
               Hide
             </button>
+            {post.canRemove && (
+              <button
+                type="button"
+                onClick={moderate}
+                disabled={pending}
+                className="cursor-pointer text-muted hover:text-danger"
+              >
+                Remove
+              </button>
+            )}
             <button
               type="button"
               onClick={() => dismiss("muted")}

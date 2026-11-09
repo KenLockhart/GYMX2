@@ -5,7 +5,7 @@ import { requireAccount } from "@/lib/auth";
 import { loadGroups } from "@/lib/groups";
 import { preview } from "@/lib/messages";
 
-export const metadata: Metadata = { title: "Groups" };
+export const metadata: Metadata = { title: "Coach communities" };
 
 export default async function GroupsPage() {
   const { profile } = await requireAccount();
@@ -18,11 +18,11 @@ export default async function GroupsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-5xl">Groups</h1>
+        <h1 className="text-5xl">Coach communities</h1>
         <p className="mt-2 max-w-xl text-muted">
           {isAdmin
-            ? "Every coach's group chat. You can read them but not post."
-            : "Each coach you join has a group chat with all of their members. Cheer each other on."}
+            ? "Every coach's community: posts and chat. You can read them but not post."
+            : "Each coach you join has a community with all of their members: announcements, challenges, posts and a group chat."}
         </p>
       </div>
       {groups.length === 0 ? (
@@ -31,7 +31,7 @@ export default async function GroupsPage() {
             "No coaches yet."
           ) : (
             <>
-              Join a coach to get into their group.{" "}
+              Join a coach to get into their community.{" "}
               <Link href="/coaches" className="text-link">
                 Find a coach
               </Link>
@@ -48,7 +48,7 @@ export default async function GroupsPage() {
                 className="block p-4 hover:bg-surface-raised"
               >
                 <p className="font-semibold">
-                  {group.coachName}&apos;s group{" "}
+                  {group.coachName}&apos;s community{" "}
                   <span className="text-sm font-normal text-muted">
                     · {group.memberCount}{" "}
                     {group.memberCount === 1 ? "member" : "members"}
@@ -57,7 +57,7 @@ export default async function GroupsPage() {
                 <p className="truncate text-sm text-muted">
                   {group.lastPost
                     ? preview(group.lastPost.body)
-                    : "No posts yet"}
+                    : "No chat messages yet"}
                 </p>
               </Link>
             </li>
