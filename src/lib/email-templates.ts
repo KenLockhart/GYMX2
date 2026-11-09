@@ -1,7 +1,32 @@
 // The emails GYMX2 sends. Each returns a subject plus HTML and plain-text bodies.
 // Kept free of server code so they can be tested on their own.
 
-export type Email = { subject: string; html: string; text: string };
+export type Email = {
+  subject: string;
+  html: string;
+  text: string;
+  // Which automatic email this is and the parts admins can reword (see email-catalog.ts).
+  key?: string;
+  vars?: Record<string, string>;
+  parts?: EmailParts;
+};
+
+type EmailParts = {
+  subject: string;
+  heading: string;
+  blocks: Block[];
+  button: { label: string; url: string };
+  footer: string;
+};
+
+// Admin wording for one automatic email. Empty fields keep the default.
+export type EmailCopy = {
+  subject: string;
+  heading: string;
+  intro: string;
+  button_label: string;
+  note: string;
+};
 
 export function escapeHtml(value: string) {
   return value
@@ -33,7 +58,7 @@ function render({
   blocks: Block[];
   button: { label: string; url: string };
   footer: string;
-}): Omit<Email, "subject"> {
+}): { html: string; text: string } {
   const htmlBlocks = blocks
     .map((block) => {
       if (block.kind === "p")
@@ -72,6 +97,56 @@ ${htmlBlocks}
   ].join("\n\n");
 
   return { html, text };
+}
+
+function build(
+  key: string,
+  vars: Record<string, string>,
+  parts: EmailParts,
+): Email {
+  return { subject: parts.subject, ...render(parts), key, vars, parts };
+}
+
+// Swaps {placeholders} for this email's values; unknown ones are left as typed.
+export function fillPlaceholders(
+  template: string,
+  vars: Record<string, string>,
+) {
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in vars ? vars[name] : match,
+  );
+}
+
+// Applies an admin's wording to an email: subject, heading, the opening paragraph, the
+// button label and an extra note before the button. Details like addresses, quotes and
+// links always stay.
+export function customizeEmail(
+  email: Email,
+  copy: Partial<EmailCopy> | null | undefined,
+): Email {
+  if (!copy || !email.parts) return email;
+  const vars = email.vars ?? {};
+  const fill = (value: string | undefined, fallback: string) =>
+    value && value.trim() ? fillPlaceholders(value.trim(), vars) : fallback;
+  const blocks = [...email.parts.blocks];
+  if (copy.intro && copy.intro.trim()) {
+    const intro: Block = { kind: "p", text: fill(copy.intro, "") };
+    if (blocks[0]?.kind === "p") blocks[0] = intro;
+    else blocks.unshift(intro);
+  }
+  if (copy.note && copy.note.trim())
+    blocks.push({ kind: "p", text: fill(copy.note, "") });
+  const parts: EmailParts = {
+    ...email.parts,
+    subject: oneLine(fill(copy.subject, email.parts.subject), 120),
+    heading: fill(copy.heading, email.parts.heading),
+    blocks,
+    button: {
+      ...email.parts.button,
+      label: fill(copy.button_label, email.parts.button.label),
+    },
+  };
+  return { ...email, subject: parts.subject, ...render(parts), parts };
 }
 
 const ORDER_FOOTER = "You're getting this because of an order on GYMX2.";
@@ -132,11 +207,18 @@ export function newSaleEmail(input: {
     });
   }
 
-  return {
-    subject: input.needsShipping
-      ? `New order to ship: ${oneLine(input.itemTitle)}`
-      : `You made a sale: ${oneLine(input.itemTitle)}`,
-    ...render({
+  return build(
+    input.needsShipping ? "sale.ship" : "sale.digital",
+    {
+      buyer: input.buyerName,
+      item: input.itemTitle,
+      amount: money(input.amountCents),
+      size: input.size ?? "",
+    },
+    {
+      subject: input.needsShipping
+        ? `New order to ship: ${oneLine(input.itemTitle)}`
+        : `You made a sale: ${oneLine(input.itemTitle)}`,
       heading: input.needsShipping
         ? "You have an order to ship"
         : "You made a sale",
@@ -146,8 +228,8 @@ export function newSaleEmail(input: {
         url: `${input.siteUrl}/armory/sales`,
       },
       footer: ORDER_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function orderShippedEmail(input: {
@@ -171,17 +253,23 @@ export function orderShippedEmail(input: {
         },
   ];
 
-  return {
-    subject: `Your order shipped: ${oneLine(input.itemTitle)}`,
-    ...render({
+  return build(
+    "order.shipped",
+    {
+      seller: input.sellerName,
+      item: input.itemTitle,
+      tracking: input.tracking ?? "",
+    },
+    {
+      subject: `Your order shipped: ${oneLine(input.itemTitle)}`,
       heading: "Your order is on its way",
       blocks,
       button: link
         ? { label: "Track your package", url: link }
         : { label: "Open the Armory", url: `${input.siteUrl}/armory` },
       footer: ORDER_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function newMessageEmail(input: {
@@ -192,9 +280,11 @@ export function newMessageEmail(input: {
 }): Email {
   const preview =
     input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
-  return {
-    subject: `New message from ${oneLine(input.senderName, 60)}`,
-    ...render({
+  return build(
+    "message.new",
+    { sender: input.senderName },
+    {
+      subject: `New message from ${oneLine(input.senderName, 60)}`,
       heading: `${input.senderName} sent you a message`,
       blocks: [{ kind: "quote", text: preview }],
       button: {
@@ -202,8 +292,8 @@ export function newMessageEmail(input: {
         url: `${input.siteUrl}${input.conversationPath}`,
       },
       footer: `We only email about the first unread message in a conversation. ${UPDATES_FOOTER}`,
-    }),
-  };
+    },
+  );
 }
 
 export type SessionChange = "invited" | "updated" | "cancelled";
@@ -240,9 +330,11 @@ export function sessionEmail(input: {
     },
   }[input.change];
 
-  return {
-    subject: copy.subject,
-    ...render({
+  return build(
+    `session.${input.change}`,
+    { coach: input.coachName, title: input.title, when: input.when },
+    {
+      subject: copy.subject,
       heading: copy.heading,
       blocks: [
         { kind: "p", text: copy.intro },
@@ -264,8 +356,8 @@ export function sessionEmail(input: {
               url: `${input.siteUrl}/calendar/${input.sessionId}`,
             },
       footer: UPDATES_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function flaggedMessageEmail(input: {
@@ -282,9 +374,15 @@ export function flaggedMessageEmail(input: {
     : `${input.memberName} (member)`;
   const preview =
     input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
-  return {
-    subject: `Flagged message: ${oneLine(input.coachName, 40)} and ${oneLine(input.memberName, 40)}`,
-    ...render({
+  return build(
+    "message.flagged",
+    {
+      coach: input.coachName,
+      member: input.memberName,
+      reasons: input.reasons,
+    },
+    {
+      subject: `Flagged message: ${oneLine(input.coachName, 40)} and ${oneLine(input.memberName, 40)}`,
       heading: "A message was flagged",
       blocks: [
         {
@@ -303,8 +401,8 @@ export function flaggedMessageEmail(input: {
       },
       footer:
         "You get this because you're a GYMX2 admin. We send at most one per conversation each day.",
-    }),
-  };
+    },
+  );
 }
 
 export function refundEmail(input: {
@@ -349,11 +447,13 @@ export function refundEmail(input: {
         },
       ];
 
-  return {
-    subject: buyer
-      ? `Refund for ${oneLine(input.itemTitle)}`
-      : `Order refunded: ${oneLine(input.itemTitle)}`,
-    ...render({
+  return build(
+    buyer ? "refund.buyer" : "refund.seller",
+    { item: input.itemTitle, amount, buyer: input.buyerName },
+    {
+      subject: buyer
+        ? `Refund for ${oneLine(input.itemTitle)}`
+        : `Order refunded: ${oneLine(input.itemTitle)}`,
       heading: buyer ? "Your refund is on its way" : "An order was refunded",
       blocks,
       button: buyer
@@ -363,17 +463,19 @@ export function refundEmail(input: {
           }
         : { label: "See your sales", url: `${input.siteUrl}/armory/sales` },
       footer: ORDER_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function accountDeletedEmail(input: {
   siteUrl: string;
   name: string;
 }): Email {
-  return {
-    subject: "Your GYMX2 account was deleted",
-    ...render({
+  return build(
+    "account.deleted",
+    { name: input.name },
+    {
+      subject: "Your GYMX2 account was deleted",
       heading: "Your account is deleted",
       blocks: [
         {
@@ -391,8 +493,8 @@ export function accountDeletedEmail(input: {
       ],
       button: { label: "Visit GYMX2", url: input.siteUrl },
       footer: "This is the last email you'll get from GYMX2.",
-    }),
-  };
+    },
+  );
 }
 
 export function affiliateDecisionEmail(input: {
@@ -402,11 +504,13 @@ export function affiliateDecisionEmail(input: {
   link: string;
   terms: string[];
 }): Email {
-  return {
-    subject: input.approved
-      ? "You're a GYMX2 affiliate"
-      : "Your GYMX2 affiliate application",
-    ...render({
+  return build(
+    input.approved ? "affiliate.approved" : "affiliate.declined",
+    { name: input.name, link: input.link },
+    {
+      subject: input.approved
+        ? "You're a GYMX2 affiliate"
+        : "Your GYMX2 affiliate application",
       heading: input.approved
         ? "Welcome to the affiliate program"
         : "About your affiliate application",
@@ -438,8 +542,8 @@ export function affiliateDecisionEmail(input: {
       },
       footer:
         "You're getting this because you applied to the GYMX2 affiliate program.",
-    }),
-  };
+    },
+  );
 }
 
 export function affiliatePayoutEmail(input: {
@@ -449,9 +553,11 @@ export function affiliatePayoutEmail(input: {
   count: number;
 }): Email {
   const amount = money(input.amountCents);
-  return {
-    subject: `You've been paid ${amount}`,
-    ...render({
+  return build(
+    "affiliate.payout",
+    { name: input.name, amount, count: String(input.count) },
+    {
+      subject: `You've been paid ${amount}`,
       heading: "Your affiliate payout is on its way",
       blocks: [
         {
@@ -465,8 +571,8 @@ export function affiliatePayoutEmail(input: {
       ],
       button: { label: "See your earnings", url: `${input.siteUrl}/affiliate` },
       footer: "You're getting this because you're a GYMX2 affiliate.",
-    }),
-  };
+    },
+  );
 }
 
 export function sessionReminderEmail(input: {
@@ -481,11 +587,17 @@ export function sessionReminderEmail(input: {
   }[];
 }): Email {
   const one = input.sessions.length === 1 ? input.sessions[0] : null;
-  return {
-    subject: one
-      ? `Tomorrow: ${oneLine(one.title)}`
-      : `You have ${input.sessions.length} sessions tomorrow`,
-    ...render({
+  return build(
+    "reminder.session",
+    {
+      name: input.name,
+      title: input.sessions[0]?.title ?? "",
+      count: String(input.sessions.length),
+    },
+    {
+      subject: one
+        ? `Tomorrow: ${oneLine(one.title)}`
+        : `You have ${input.sessions.length} sessions tomorrow`,
       heading: one ? "Your session is tomorrow" : "Your sessions tomorrow",
       blocks: [
         { kind: "p", text: `Hi ${input.name}, here's what's coming up.` },
@@ -506,8 +618,8 @@ export function sessionReminderEmail(input: {
           }
         : { label: "Open your calendar", url: `${input.siteUrl}/calendar` },
       footer: UPDATES_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function liveNowEmail(input: {
@@ -517,9 +629,11 @@ export function liveNowEmail(input: {
   title: string;
   sessionId: string;
 }): Email {
-  return {
-    subject: `${oneLine(input.coachName)} is live: ${oneLine(input.title)}`,
-    ...render({
+  return build(
+    "live.now",
+    { name: input.name, coach: input.coachName, title: input.title },
+    {
+      subject: `${oneLine(input.coachName)} is live: ${oneLine(input.title)}`,
       heading: "Your session is live",
       blocks: [
         {
@@ -532,8 +646,8 @@ export function liveNowEmail(input: {
         url: `${input.siteUrl}/calendar/${input.sessionId}/live`,
       },
       footer: UPDATES_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function taskDueEmail(input: {
@@ -542,11 +656,17 @@ export function taskDueEmail(input: {
   tasks: { title: string; coachName: string }[];
 }): Email {
   const one = input.tasks.length === 1 ? input.tasks[0] : null;
-  return {
-    subject: one
-      ? `Due tomorrow: ${oneLine(one.title)}`
-      : `${input.tasks.length} Tasks are due tomorrow`,
-    ...render({
+  return build(
+    "reminder.task",
+    {
+      name: input.name,
+      task: input.tasks[0]?.title ?? "",
+      count: String(input.tasks.length),
+    },
+    {
+      subject: one
+        ? `Due tomorrow: ${oneLine(one.title)}`
+        : `${input.tasks.length} Tasks are due tomorrow`,
       heading: one ? "A Task is due tomorrow" : "Tasks due tomorrow",
       blocks: [
         {
@@ -562,17 +682,19 @@ export function taskDueEmail(input: {
       ],
       button: { label: "Open your Tasks", url: `${input.siteUrl}/tasks` },
       footer: UPDATES_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function checkinReminderEmail(input: {
   siteUrl: string;
   name: string;
 }): Email {
-  return {
-    subject: "How did your week go?",
-    ...render({
+  return build(
+    "reminder.checkin",
+    { name: input.name },
+    {
+      subject: "How did your week go?",
       heading: "Time for your weekly check-in",
       blocks: [
         {
@@ -582,8 +704,8 @@ export function checkinReminderEmail(input: {
       ],
       button: { label: "Check in", url: `${input.siteUrl}/checkin` },
       footer: UPDATES_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function streakReminderEmail(input: {
@@ -592,9 +714,11 @@ export function streakReminderEmail(input: {
   days: number;
   coach: boolean;
 }): Email {
-  return {
-    subject: `🔥 Keep your ${input.days}-day streak alive`,
-    ...render({
+  return build(
+    "reminder.streak",
+    { name: input.name, days: String(input.days) },
+    {
+      subject: `🔥 Keep your ${input.days}-day streak alive`,
       heading: `Your ${input.days}-day streak ends tonight`,
       blocks: [
         {
@@ -612,8 +736,8 @@ export function streakReminderEmail(input: {
         ? { label: "Open GYMX2", url: `${input.siteUrl}/dashboard` }
         : { label: "Open your Tasks", url: `${input.siteUrl}/tasks` },
       footer: UPDATES_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function weeklyDigestEmail(input: {
@@ -655,15 +779,22 @@ export function weeklyDigestEmail(input: {
       { kind: "lines", lines: input.upcoming },
     );
   }
-  return {
-    subject: "Your GYMX2 week",
-    ...render({
+  return build(
+    "digest.weekly",
+    {
+      name: input.name,
+      level: input.level,
+      points: String(input.points),
+      streak: String(input.streak),
+    },
+    {
+      subject: "Your GYMX2 week",
       heading: "A new week starts now",
       blocks,
       button: { label: "See your progress", url: `${input.siteUrl}/progress` },
       footer: UPDATES_FOOTER,
-    }),
-  };
+    },
+  );
 }
 
 export function membershipChangeEmail(input: {
@@ -675,11 +806,17 @@ export function membershipChangeEmail(input: {
   trial: boolean;
 }): Email {
   const started = input.change === "started";
-  return {
-    subject: started
-      ? `New ${input.trial ? "trial" : "member"}: ${oneLine(input.memberName, 40)} joined ${oneLine(input.planName, 40)}`
-      : `Membership ended: ${oneLine(input.memberName, 40)}`,
-    ...render({
+  return build(
+    started ? "membership.started" : "membership.ended",
+    {
+      member: input.memberName,
+      plan: input.planName,
+      price: money(input.priceCents),
+    },
+    {
+      subject: started
+        ? `New ${input.trial ? "trial" : "member"}: ${oneLine(input.memberName, 40)} joined ${oneLine(input.planName, 40)}`
+        : `Membership ended: ${oneLine(input.memberName, 40)}`,
       heading: started ? "You have a new subscriber" : "A membership ended",
       blocks: started
         ? [
@@ -699,6 +836,6 @@ export function membershipChangeEmail(input: {
           ],
       button: { label: "See your members", url: `${input.siteUrl}/plans` },
       footer: "You're getting this because you offer memberships on GYMX2.",
-    }),
-  };
+    },
+  );
 }

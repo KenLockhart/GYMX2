@@ -19,7 +19,9 @@ const siteUrl = "https://gymx2.com";
 
 describe("escapeHtml", () => {
   it("escapes markup", () => {
-    expect(escapeHtml(`<b>"Tom" & 'Jo'</b>`)).toBe("&lt;b&gt;&quot;Tom&quot; &amp; &#39;Jo&#39;&lt;/b&gt;");
+    expect(escapeHtml(`<b>"Tom" & 'Jo'</b>`)).toBe(
+      "&lt;b&gt;&quot;Tom&quot; &amp; &#39;Jo&#39;&lt;/b&gt;",
+    );
   });
 });
 
@@ -55,14 +57,22 @@ describe("newSaleEmail", () => {
   it("tells the seller what to ship and where", () => {
     const email = newSaleEmail(gear);
     expect(email.subject).toBe("New order to ship: Rep the Brand Tee");
-    expect(email.text).toContain("Sam bought Rep the Brand Tee (size M) for $55.94.");
+    expect(email.text).toContain(
+      "Sam bought Rep the Brand Tee (size M) for $55.94.",
+    );
     expect(email.text).toContain("Sam Smith\n1 Main St\nAtlanta, GA 30301");
     expect(email.text).toContain("GYMX2's fee is $5.00.");
     expect(email.html).toContain("https://gymx2.com/armory/sales");
   });
 
   it("skips shipping and fees when not needed", () => {
-    const email = newSaleEmail({ ...gear, needsShipping: false, feeCents: 0, size: null, addressLines: [] });
+    const email = newSaleEmail({
+      ...gear,
+      needsShipping: false,
+      feeCents: 0,
+      size: null,
+      addressLines: [],
+    });
     expect(email.subject).toBe("You made a sale: Rep the Brand Tee");
     expect(email.text).not.toContain("Ship it to");
     expect(email.text).not.toContain("fee");
@@ -86,11 +96,19 @@ describe("orderShippedEmail", () => {
     });
     expect(email.subject).toBe("Your order shipped: Tee");
     expect(email.text).toContain("Coach Ken shipped your Tee (size L).");
-    expect(email.text).toContain("Track your package: https://www.ups.com/track?tracknum=1Z999AA10123456784");
+    expect(email.text).toContain(
+      "Track your package: https://www.ups.com/track?tracknum=1Z999AA10123456784",
+    );
   });
 
   it("works without tracking", () => {
-    const email = orderShippedEmail({ siteUrl, itemTitle: "Tee", sellerName: "Ken", size: null, tracking: null });
+    const email = orderShippedEmail({
+      siteUrl,
+      itemTitle: "Tee",
+      sellerName: "Ken",
+      size: null,
+      tracking: null,
+    });
     expect(email.text).toContain("No tracking number was added.");
     expect(email.text).toContain("https://gymx2.com/armory");
   });
@@ -110,13 +128,23 @@ describe("newMessageEmail", () => {
   });
 
   it("shortens long messages", () => {
-    const email = newMessageEmail({ siteUrl, senderName: "Ken", body: "a".repeat(800), conversationPath: "/m" });
+    const email = newMessageEmail({
+      siteUrl,
+      senderName: "Ken",
+      body: "a".repeat(800),
+      conversationPath: "/m",
+    });
     expect(email.text).toContain(`${"a".repeat(499)}…`);
     expect(email.text).not.toContain("a".repeat(500));
   });
 
   it("keeps the subject on one line", () => {
-    const email = newMessageEmail({ siteUrl, senderName: "Ken\nBcc: x", body: "hi", conversationPath: "/m" });
+    const email = newMessageEmail({
+      siteUrl,
+      senderName: "Ken\nBcc: x",
+      body: "hi",
+      conversationPath: "/m",
+    });
     expect(email.subject).not.toContain("\n");
   });
 });
@@ -135,16 +163,24 @@ describe("sessionEmail", () => {
   it("invites with the details and an RSVP link", () => {
     const email = sessionEmail({ ...base, change: "invited" });
     expect(email.subject).toBe("Coach Ken invited you: Leg day");
-    expect(email.text).toContain("When: Mon, Nov 9, 6:00 PM – 7:00 PM EST\nWhere: Main gym");
+    expect(email.text).toContain(
+      "When: Mon, Nov 9, 6:00 PM – 7:00 PM EST\nWhere: Main gym",
+    );
     expect(email.text).toContain("https://gymx2.com/calendar/s1");
   });
 
   it("says when a session changed", () => {
-    expect(sessionEmail({ ...base, change: "updated" }).subject).toBe("Session changed: Leg day");
+    expect(sessionEmail({ ...base, change: "updated" }).subject).toBe(
+      "Session changed: Leg day",
+    );
   });
 
   it("cancels without asking for an RSVP", () => {
-    const email = sessionEmail({ ...base, change: "cancelled", meetingUrl: "https://zoom.us/j/1" });
+    const email = sessionEmail({
+      ...base,
+      change: "cancelled",
+      meetingUrl: "https://zoom.us/j/1",
+    });
     expect(email.subject).toBe("Session cancelled: Leg day");
     expect(email.text).not.toContain("Let your coach know");
     expect(email.text).toContain("https://gymx2.com/calendar\n");
@@ -163,14 +199,22 @@ describe("flaggedMessageEmail", () => {
       reviewPath: "/admin/messages/c/m",
     });
     expect(email.subject).toBe("Flagged message: Coach Ken and Sam");
-    expect(email.text).toContain("Coach Ken (coach) sent a message that mentions: phone number, payment app.");
+    expect(email.text).toContain(
+      "Coach Ken (coach) sent a message that mentions: phone number, payment app.",
+    );
     expect(email.text).toContain("> Venmo me, 404-555-0123");
     expect(email.text).toContain("https://gymx2.com/admin/messages/c/m");
   });
 });
 
 describe("refundEmail", () => {
-  const base = { siteUrl, itemTitle: "Tee", amountCents: 3500, buyerName: "Sam", orderCancelled: true };
+  const base = {
+    siteUrl,
+    itemTitle: "Tee",
+    amountCents: 3500,
+    buyerName: "Sam",
+    orderCancelled: true,
+  };
 
   it("tells the buyer the amount and that nothing will ship", () => {
     const email = refundEmail({ ...base, audience: "buyer" });
@@ -201,10 +245,20 @@ describe("reminder emails", () => {
     const email = sessionReminderEmail({
       siteUrl,
       name: "Sam",
-      sessions: [{ id: "s1", title: "Leg day", when: "Tue, Nov 10, 7:00 AM EST", where: "Main gym", coachName: "Ken" }],
+      sessions: [
+        {
+          id: "s1",
+          title: "Leg day",
+          when: "Tue, Nov 10, 7:00 AM EST",
+          where: "Main gym",
+          coachName: "Ken",
+        },
+      ],
     });
     expect(email.subject).toBe("Tomorrow: Leg day");
-    expect(email.text).toContain("Leg day with Ken\nTue, Nov 10, 7:00 AM EST\nMain gym");
+    expect(email.text).toContain(
+      "Leg day with Ken\nTue, Nov 10, 7:00 AM EST\nMain gym",
+    );
     expect(email.text).toContain("https://gymx2.com/calendar/s1");
   });
 
@@ -222,9 +276,10 @@ describe("reminder emails", () => {
   });
 
   it("nudges a streak", () => {
-    expect(streakReminderEmail({ siteUrl, name: "Sam", days: 6, coach: false }).subject).toBe(
-      "🔥 Keep your 6-day streak alive",
-    );
+    expect(
+      streakReminderEmail({ siteUrl, name: "Sam", days: 6, coach: false })
+        .subject,
+    ).toBe("🔥 Keep your 6-day streak alive");
   });
 
   it("sums up the week", () => {
@@ -242,8 +297,72 @@ describe("reminder emails", () => {
       challenges: ["Finish 3 Tasks"],
       upcoming: ["Leg day · Tue, Nov 10, 7:00 AM EST"],
     });
-    expect(email.text).toContain("last week you finished 3 of 4 challenges. New badges: 💪 Strong Body.");
+    expect(email.text).toContain(
+      "last week you finished 3 of 4 challenges. New badges: 💪 Strong Body.",
+    );
     expect(email.text).toContain("Level: Warrior (180 points, 220 to Elite)");
     expect(email.text).toContain("Coming up:");
+  });
+});
+
+describe("admin email wording", () => {
+  it("rewords subject, heading, opening, button and adds a note with placeholders", async () => {
+    const { checkinReminderEmail, customizeEmail } =
+      await import("./email-templates");
+    const original = checkinReminderEmail({
+      siteUrl: "https://gymx2.com",
+      name: "Jordan",
+    });
+    expect(original.key).toBe("reminder.checkin");
+    const custom = customizeEmail(original, {
+      subject: "{name}, how was your week?",
+      heading: "",
+      intro: "Hey {name}! Two minutes, then back to life. {unknown}",
+      button_label: "Do my check-in",
+      note: "Reply to your coach if anything's up.",
+    });
+    expect(custom.subject).toBe("Jordan, how was your week?");
+    expect(custom.html).toContain("Time for your weekly check-in");
+    expect(custom.html).toContain(
+      "Hey Jordan! Two minutes, then back to life. {unknown}",
+    );
+    expect(custom.html).not.toContain("take a minute to rate");
+    expect(custom.html).toContain("Do my check-in");
+    expect(custom.text).toContain(
+      "Reply to your coach if anything&#39;s up.".replace("&#39;", "'"),
+    );
+    expect(custom.html).toContain("https://gymx2.com/checkin");
+  });
+
+  it("escapes admin text and keeps defaults when nothing is set", async () => {
+    const { liveNowEmail, customizeEmail } = await import("./email-templates");
+    const original = liveNowEmail({
+      siteUrl: "https://gymx2.com",
+      name: "J",
+      coachName: "Ken",
+      title: "HIIT",
+      sessionId: "s",
+    });
+    expect(customizeEmail(original, null)).toBe(original);
+    const custom = customizeEmail(original, {
+      heading: "<b>Live</b>",
+      subject: "",
+      intro: "",
+      button_label: "",
+      note: "",
+    });
+    expect(custom.html).toContain("&lt;b&gt;Live&lt;/b&gt;");
+    expect(custom.subject).toBe(original.subject);
+  });
+});
+
+describe("email catalog", () => {
+  it("has a sample for every automatic email and every key is unique", async () => {
+    const { EMAIL_CATALOG } = await import("./email-catalog");
+    const keys = EMAIL_CATALOG.map((entry) => entry.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const entry of EMAIL_CATALOG) {
+      expect(entry.sample("https://gymx2.com").key).toBe(entry.key);
+    }
   });
 });
