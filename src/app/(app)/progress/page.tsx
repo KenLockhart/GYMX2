@@ -141,7 +141,12 @@ export default async function ProgressPage() {
                   <p className="font-semibold">{badge.name}</p>
                   <p className="text-sm text-muted">{badge.description}</p>
                   {badge.earned && earnedAt.get(badge.key) && (
-                    <p className="text-xs text-accent">Earned {formatDay(earnedAt.get(badge.key) as string)}</p>
+                    <p className="text-xs text-accent">
+                      Earned {formatDay(earnedAt.get(badge.key) as string)} ·{" "}
+                      <Link href={`/community?badge=${badge.key}`} className="underline hover:text-foreground">
+                        Share
+                      </Link>
+                    </p>
                   )}
                 </div>
               </li>

@@ -67,7 +67,21 @@ export type PostDTO = {
     status: "ready" | "processing" | "failed";
   } | null;
   mine: boolean;
+  likedByMe: boolean;
 };
+
+export type CommentDTO = {
+  id: string;
+  postId: string;
+  parentId: string | null;
+  body: string;
+  author: PostAuthor;
+  createdAt: string;
+  editedAt: string | null;
+  mine: boolean;
+};
+
+export const COMMENT_MAX = 2000;
 
 // "3m", "5h", "2d", then a date.
 export function timeAgo(iso: string, now = new Date()) {

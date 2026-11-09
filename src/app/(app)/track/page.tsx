@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ActionForm,
@@ -426,12 +427,17 @@ export default async function TrackPage() {
           <PhotoGallery
             photos={photos}
             renderDelete={(photo) => (
-              <ActionForm action={deleteProgressPhoto} confirmMessage="Delete this photo for good?">
-                <input type="hidden" name="photo_id" value={photo.id} />
-                <SubmitButton pendingText="Deleting..." className="text-xs text-muted hover:text-danger">
-                  Delete
-                </SubmitButton>
-              </ActionForm>
+              <div className="flex items-center gap-3">
+                <Link href={`/community?photo=${photo.id}`} className="text-xs text-muted hover:text-accent">
+                  Share
+                </Link>
+                <ActionForm action={deleteProgressPhoto} confirmMessage="Delete this photo for good?">
+                  <input type="hidden" name="photo_id" value={photo.id} />
+                  <SubmitButton pendingText="Deleting..." className="text-xs text-muted hover:text-danger">
+                    Delete
+                  </SubmitButton>
+                </ActionForm>
+              </div>
             )}
           />
         )}

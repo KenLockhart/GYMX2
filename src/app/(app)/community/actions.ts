@@ -2,9 +2,12 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { requireAccount } from "@/lib/auth";
 import {
+  COMMENT_MAX,
+  type CommentDTO,
   MAX_PHOTO_BYTES,
   MAX_POST_PHOTOS,
   PHOTO_TYPES,
@@ -12,7 +15,8 @@ import {
   POST_KIND_VALUES,
   type PostDTO,
 } from "@/lib/community";
-import { loadFeed } from "@/lib/community-server";
+import { loadAuthors, loadFeed } from "@/lib/community-server";
+import { communityMembers, notifyCommunity } from "@/lib/community-notify";
 import { describeFlags, detectFlags } from "@/lib/message-flags";
 import { deleteVideo, getVideoCreator } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -78,9 +82,15 @@ const postSchema = z
       .string()
       .regex(/^[a-f0-9]{32}$/)
       .nullable(),
+    // A Track progress photo to share. The original stays private; a copy is posted.
+    progressPhotoId: idSchema.nullable().optional(),
   })
   .refine(
-    (post) => post.body.length > 0 || post.photos.length > 0 || post.videoUid,
+    (post) =>
+      post.body.length > 0 ||
+      post.photos.length > 0 ||
+      post.videoUid ||
+      post.progressPhotoId,
     {
       message: "Write something or add a photo or video",
     },
@@ -88,6 +98,14 @@ const postSchema = z
   .refine((post) => !(post.photos.length && post.videoUid), {
     message: "Add photos or one video, not both",
   })
+  .refine((post) => !(post.progressPhotoId && post.videoUid), {
+    message: "Add photos or one video, not both",
+  })
+  .refine(
+    (post) =>
+      post.photos.length + (post.progressPhotoId ? 1 : 0) <= MAX_POST_PHOTOS,
+    { message: `Up to ${MAX_POST_PHOTOS} photos per post.` },
+  )
   .refine(
     (post) => (post.audience === "coach_community") === Boolean(post.coachId),
     {
@@ -138,6 +156,12 @@ export async function createPost(
   if (post.videoUid && (await getVideoCreator(post.videoUid)) !== profile.id) {
     return { error: "That video upload didn't work. Please try again." };
   }
+  const photos = [...post.photos];
+  if (post.progressPhotoId) {
+    const copy = await copyProgressPhoto(profile.id, post.progressPhotoId);
+    if (!copy) return { error: "We couldn't share that progress photo." };
+    photos.unshift(copy);
+  }
 
   const { data: created, error } = await supabase
     .from("posts")
@@ -162,7 +186,7 @@ export async function createPost(
   }
 
   const media = [
-    ...post.photos.map((photo, position) => ({
+    ...photos.map((photo, position) => ({
       post_id: created.id,
       kind: "photo",
       path: photo.path,
@@ -187,6 +211,10 @@ export async function createPost(
       .insert(media);
     if (mediaError) {
       await supabase.from("posts").delete().eq("id", created.id);
+      const copies = photos
+        .filter((photo) => photo.path.split("/")[1]?.startsWith("progress-"))
+        .map((photo) => photo.path);
+      if (copies.length) await admin.storage.from(BUCKET).remove(copies);
       return { error: "We couldn't attach your media. Please try again." };
     }
   }
@@ -199,8 +227,53 @@ export async function createPost(
       .update({ flag_reasons: describeFlags(flags).slice(0, 200) })
       .eq("id", created.id);
 
+  if (post.kind === "announcement" && post.audience !== "only_me") {
+    const coachId = post.coachId ?? profile.id;
+    after(async () => {
+      if (coachId !== profile.id) return;
+      notifyCommunity({
+        recipients: await communityMembers(coachId),
+        type: "announcement",
+        actorId: profile.id,
+        actorName: profile.display_name,
+        postId: created.id,
+        link: `/community/post/${created.id}`,
+        groupKey: `announcement:${created.id}`,
+        title: `${profile.display_name} posted an announcement`,
+        body: post.body.slice(0, 120) || "Tap to read it.",
+      });
+    });
+  }
+
   revalidatePath("/community");
   return { id: created.id };
+}
+
+// Copies one of the person's own progress photos into their community folder, so deleting the
+// post never touches the private original (and deleting the original never breaks the post).
+async function copyProgressPhoto(userId: string, photoId: string) {
+  const supabase = await createClient();
+  const { data: photo } = await supabase
+    .from("progress_photos")
+    .select("path")
+    .eq("id", photoId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!photo) return null;
+  const admin = createAdminClient();
+  const { data: file } = await admin.storage
+    .from("progress-photos")
+    .download(photo.path as string);
+  if (!file) return null;
+  const extension = extensionOf(photo.path as string);
+  const contentType = PHOTO_TYPES[extension];
+  if (!contentType) return null;
+  const path = `${userId}/progress-${randomUUID()}/0.${extension}`;
+  const { error } = await admin.storage
+    .from(BUCKET)
+    .upload(path, file, { contentType });
+  if (error) return null;
+  return { path, width: null, height: null };
 }
 
 const editSchema = z.object({
@@ -273,4 +346,234 @@ export async function loadMorePosts(
   const coach = coachId && idSchema.safeParse(coachId).success ? coachId : null;
   const { posts, more } = await loadFeed(profile.id, safeOffset, coach);
   return { posts, more };
+}
+
+// Likes ---------------------------------------------------------------------------------------
+
+export async function toggleLike(
+  postId: string,
+): Promise<{ error?: string; liked?: boolean; count?: number }> {
+  const { profile } = await requireAccount();
+  const id = idSchema.safeParse(postId);
+  if (!id.success) return { error: "That post wasn't found." };
+  const supabase = await createClient();
+  // Row security: you can only see, and so like, posts you're allowed to see.
+  const { data: post } = await supabase
+    .from("posts")
+    .select("id, author_id")
+    .eq("id", id.data)
+    .maybeSingle();
+  if (!post) return { error: "That post wasn't found." };
+
+  const { data: removed } = await supabase
+    .from("post_likes")
+    .delete()
+    .eq("post_id", id.data)
+    .eq("user_id", profile.id)
+    .select("post_id");
+  let liked = false;
+  if (!removed?.length) {
+    const { error } = await supabase
+      .from("post_likes")
+      .insert({ post_id: id.data, user_id: profile.id });
+    if (error && error.code !== "23505")
+      return { error: "That didn't work. Please try again." };
+    liked = true;
+  }
+  const { data: fresh } = await supabase
+    .from("posts")
+    .select("like_count")
+    .eq("id", id.data)
+    .maybeSingle();
+
+  if (liked)
+    after(() =>
+      notifyCommunity({
+        recipients: [post.author_id as string],
+        type: "like",
+        actorId: profile.id,
+        actorName: profile.display_name,
+        postId: id.data,
+        link: `/community/post/${id.data}`,
+        groupKey: `like:${id.data}`,
+        title: "New like",
+        body: `${profile.display_name} liked your post.`,
+      }),
+    );
+  return {
+    liked,
+    count: (fresh?.like_count as number | undefined) ?? undefined,
+  };
+}
+
+// Comments ------------------------------------------------------------------------------------
+
+const RECENT_COMMENT_LIMIT = 30; // comments per 5 minutes
+
+const commentSchema = z.object({
+  postId: idSchema,
+  parentId: idSchema.nullable(),
+  body: z
+    .string()
+    .trim()
+    .min(1, "Write something first")
+    .max(
+      COMMENT_MAX,
+      `Keep comments under ${COMMENT_MAX.toLocaleString()} characters`,
+    ),
+});
+
+const COMMENT_COLUMNS =
+  "id, post_id, parent_id, author_id, body, created_at, edited_at";
+
+export async function addComment(
+  input: unknown,
+): Promise<{ error?: string; comment?: CommentDTO }> {
+  const { profile } = await requireAccount();
+  const parsed = commentSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { postId, parentId, body } = parsed.data;
+  const supabase = await createClient();
+
+  const { count } = await supabase
+    .from("post_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("author_id", profile.id)
+    .gte("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString());
+  if ((count ?? 0) >= RECENT_COMMENT_LIMIT)
+    return { error: "You're commenting a lot. Try again in a few minutes." };
+
+  // Row security decides whether this person can see (and so comment on) the post.
+  const { data: post } = await supabase
+    .from("posts")
+    .select("id, author_id, kind")
+    .eq("id", postId)
+    .maybeSingle();
+  if (!post) return { error: "That post wasn't found." };
+
+  let parentAuthor: string | null = null;
+  if (parentId) {
+    const { data: parent } = await supabase
+      .from("post_comments")
+      .select("author_id, parent_id")
+      .eq("id", parentId)
+      .eq("post_id", postId)
+      .maybeSingle();
+    if (!parent || parent.parent_id)
+      return { error: "You can reply to a comment, not to a reply." };
+    parentAuthor = parent.author_id as string;
+  }
+
+  const { data: row, error } = await supabase
+    .from("post_comments")
+    .insert({
+      post_id: postId,
+      author_id: profile.id,
+      parent_id: parentId,
+      body,
+    })
+    .select(COMMENT_COLUMNS)
+    .single();
+  if (error || !row)
+    return {
+      error:
+        error?.code === "42501"
+          ? "You can't comment on that post."
+          : "We couldn't post that comment. Please try again.",
+    };
+
+  const link = `/community/post/${postId}#comments`;
+  const preview = body.slice(0, 120);
+  after(async () => {
+    const postAuthor = post.author_id as string;
+    if (postAuthor !== parentAuthor)
+      await notifyCommunity({
+        recipients: [postAuthor],
+        type: post.kind === "progress" ? "progress_reply" : "comment",
+        actorId: profile.id,
+        actorName: profile.display_name,
+        postId,
+        commentId: row.id as string,
+        link,
+        groupKey: `comment:${postId}`,
+        title: `${profile.display_name} commented on your post`,
+        body: preview,
+      });
+    if (parentAuthor)
+      await notifyCommunity({
+        recipients: [parentAuthor],
+        type: "reply",
+        actorId: profile.id,
+        actorName: profile.display_name,
+        postId,
+        commentId: row.id as string,
+        link,
+        groupKey: `reply:${parentId}`,
+        title: `${profile.display_name} replied to you`,
+        body: preview,
+      });
+  });
+
+  return {
+    comment: {
+      id: row.id as string,
+      postId: row.post_id as string,
+      parentId: row.parent_id as string | null,
+      body: row.body as string,
+      author: {
+        id: profile.id,
+        name: profile.display_name,
+        role: profile.role,
+      },
+      createdAt: row.created_at as string,
+      editedAt: row.edited_at as string | null,
+      mine: true,
+    },
+  };
+}
+
+export async function updateComment(
+  commentId: string,
+  body: string,
+): Promise<{ error?: string }> {
+  const { profile } = await requireAccount();
+  const id = idSchema.safeParse(commentId);
+  const text = commentSchema.shape.body.safeParse(body);
+  if (!id.success) return { error: "That comment wasn't found." };
+  if (!text.success) return { error: text.error.issues[0].message };
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("post_comments")
+    .update({ body: text.data, edited_at: new Date().toISOString() })
+    .eq("id", id.data)
+    .eq("author_id", profile.id)
+    .select("id");
+  return data?.length ? {} : { error: "You can't edit that comment." };
+}
+
+export async function deleteComment(
+  commentId: string,
+): Promise<{ error?: string }> {
+  const { profile } = await requireAccount();
+  const id = idSchema.safeParse(commentId);
+  if (!id.success) return { error: "That comment wasn't found." };
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("post_comments")
+    .delete()
+    .eq("id", id.data)
+    .eq("author_id", profile.id)
+    .select("id");
+  return data?.length ? {} : { error: "You can't delete that comment." };
+}
+
+// Names for comments that arrive live. Only display names and roles, which every member sees.
+export async function commentAuthors(
+  ids: string[],
+): Promise<Record<string, { id: string; name: string; role: string }>> {
+  await requireAccount();
+  const valid = (Array.isArray(ids) ? ids : [])
+    .slice(0, 50)
+    .filter((id) => idSchema.safeParse(id).success);
+  return Object.fromEntries(await loadAuthors(valid));
 }

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CommentThread } from "@/components/comment-thread";
 import { PostCard } from "@/components/post-card";
 import { requireAccount } from "@/lib/auth";
-import { loadPost } from "@/lib/community-server";
+import { loadComments, loadPost } from "@/lib/community-server";
 import { idSchema } from "@/lib/validation";
 
 export const metadata: Metadata = { title: "Post" };
@@ -19,6 +20,7 @@ export default async function PostPage({
   // Row security: a post you're not allowed to see looks the same as one that doesn't exist.
   const post = await loadPost(profile.id, id);
   if (!post) notFound();
+  const comments = await loadComments(post.id, profile.id);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -26,9 +28,7 @@ export default async function PostPage({
         Back to Community
       </Link>
       <PostCard post={post} viewerRole={profile.role} linkToPost={false} />
-      <p className="text-sm text-muted">
-        Comments and likes arrive in the next update.
-      </p>
+      <CommentThread postId={post.id} initialComments={comments} />
     </div>
   );
 }

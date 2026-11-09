@@ -80,6 +80,9 @@ export default async function AppLayout({
                 )}
               </Link>
             )}
+            <Link href="/community" className="hover:text-accent">
+              Community
+            </Link>
             <Link href="/groups" className="hover:text-accent">
               Groups
             </Link>
