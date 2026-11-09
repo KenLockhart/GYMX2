@@ -17,6 +17,7 @@ import {
 } from "@/lib/community";
 import { loadAuthors, loadFeed } from "@/lib/community-server";
 import { communityMembers, notifyCommunity } from "@/lib/community-notify";
+import { REPORT_DETAILS_MAX, REPORT_REASONS } from "@/lib/reports";
 import { describeFlags, detectFlags } from "@/lib/message-flags";
 import { deleteVideo, getVideoCreator } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -627,5 +628,136 @@ export async function removePost(
     }),
   );
   revalidatePath("/community");
+  revalidatePath("/moderation");
+  return {};
+}
+
+// Reports ---------------------------------------------------------------------------------------
+
+const reportSchema = z
+  .object({
+    postId: idSchema.nullable(),
+    commentId: idSchema.nullable(),
+    reason: z.enum(
+      REPORT_REASONS.map((item) => item.value) as [string, ...string[]],
+      "Choose a reason",
+    ),
+    details: z
+      .string()
+      .trim()
+      .max(REPORT_DETAILS_MAX, "Keep the details under 1,000 characters"),
+  })
+  .refine((report) => Boolean(report.postId) !== Boolean(report.commentId), {
+    message: "Choose a post or a comment to report",
+  });
+
+const REPORTS_PER_DAY = 20;
+
+export async function reportContent(
+  input: unknown,
+): Promise<{ error?: string }> {
+  const { profile } = await requireAccount();
+  const parsed = reportSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("content_reports")
+    .select("id", { count: "exact", head: true })
+    .eq("reporter_id", profile.id)
+    .gte(
+      "created_at",
+      new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    );
+  if ((count ?? 0) >= REPORTS_PER_DAY)
+    return { error: "You've sent a lot of reports today. Try again tomorrow." };
+  // Row security: people can only report posts and comments they can see.
+  const { error } = await supabase.from("content_reports").insert({
+    reporter_id: profile.id,
+    post_id: parsed.data.postId,
+    comment_id: parsed.data.commentId,
+    reason: parsed.data.reason,
+    details: parsed.data.details,
+  });
+  if (error?.code === "23505") return {}; // Already reported and still open.
+  if (error)
+    return { error: "We couldn't send that report. Please try again." };
+  return {};
+}
+
+// Moderators (shared feed), admins (any shared post) and coaches (their own community).
+export async function removeComment(
+  commentId: string,
+  reason: string,
+): Promise<{ error?: string }> {
+  const { profile } = await requireAccount();
+  const id = idSchema.safeParse(commentId);
+  const why = z
+    .string()
+    .trim()
+    .max(500)
+    .safeParse(reason ?? "");
+  if (!id.success) return { error: "That comment wasn't found." };
+  if (!why.success) return { error: "Keep the reason under 500 characters." };
+  const supabase = await createClient();
+  const { data: comment } = await supabase
+    .from("post_comments")
+    .select("id, author_id, post_id")
+    .eq("id", id.data)
+    .maybeSingle();
+  if (!comment) return { error: "That comment wasn't found." };
+  const { error } = await supabase.rpc("remove_comment", {
+    target_comment_id: id.data,
+    reason: why.data,
+  });
+  if (error)
+    return {
+      error:
+        error.code === "42501"
+          ? "You can't remove this comment."
+          : "We couldn't remove that comment. Please try again.",
+    };
+  after(() =>
+    notifyCommunity({
+      recipients: [comment.author_id as string],
+      type: "removed",
+      actorId: profile.id,
+      actorName: profile.display_name,
+      postId: comment.post_id as string,
+      commentId: id.data,
+      link: `/community/post/${comment.post_id}`,
+      groupKey: `removed:${id.data}`,
+      title: "A comment of yours was removed",
+      body: why.data
+        ? `Reason: ${why.data}`
+        : "It broke the community guidelines.",
+    }),
+  );
+  revalidatePath("/moderation");
+  return {};
+}
+
+export async function dismissReports(
+  reportIds: string[],
+): Promise<{ error?: string }> {
+  await requireAccount();
+  const ids = (Array.isArray(reportIds) ? reportIds : [])
+    .slice(0, 100)
+    .filter((id) => idSchema.safeParse(id).success);
+  if (ids.length === 0) return { error: "Nothing to dismiss." };
+  const supabase = await createClient();
+  for (const id of ids) {
+    // The database checks the right to handle each report.
+    const { error } = await supabase.rpc("dismiss_report", {
+      target_report_id: id,
+    });
+    if (error)
+      return {
+        error:
+          error.code === "42501"
+            ? "You can't handle this report."
+            : "We couldn't dismiss that. Please try again.",
+      };
+  }
+  revalidatePath("/moderation");
   return {};
 }

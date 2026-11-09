@@ -1,5 +1,6 @@
 "use client";
 
+import { ReportButton } from "@/components/report-button";
 import { useEffect, useState, useTransition } from "react";
 import {
   addComment,
@@ -151,7 +152,7 @@ function CommentItem({
           <p className="whitespace-pre-line break-words">{comment.body}</p>
         )}
       </div>
-      <p className="flex gap-3 px-3 text-xs text-muted">
+      <div className="flex flex-wrap gap-3 px-3 text-xs text-muted">
         {onReply && (
           <button
             type="button"
@@ -187,8 +188,14 @@ function CommentItem({
             </button>
           </>
         )}
+        {!comment.mine && (
+          <ReportButton
+            commentId={comment.id}
+            label={`comment by ${comment.author.name}`}
+          />
+        )}
         {error && <span className="text-danger">{error}</span>}
-      </p>
+      </div>
       {replies}
     </li>
   );

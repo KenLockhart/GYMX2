@@ -38,6 +38,13 @@ export async function requireAdmin() {
   return account;
 }
 
+// Moderators review reported posts in the shared feed; admins review everything.
+export async function requireModerator() {
+  const account = await requireAccount();
+  if (account.profile.role !== "moderator" && account.profile.role !== "admin") redirect("/dashboard");
+  return account;
+}
+
 // Coaches sell to their members; admins can add GYMX2's own items.
 export async function requireCoachOrAdmin() {
   const account = await requireAccount();

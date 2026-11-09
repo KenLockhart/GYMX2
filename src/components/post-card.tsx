@@ -15,6 +15,7 @@ import {
   setMute,
 } from "@/app/(app)/community/preferences/actions";
 import { PillarTag } from "@/components/game-parts";
+import { ReportButton } from "@/components/report-button";
 import {
   audienceLabel,
   kindLabel,
@@ -382,7 +383,7 @@ export function PostCard({
       <PhotoGrid photos={post.photos} />
       {post.video && <Video video={post.video} />}
 
-      <footer className="flex items-center gap-4 border-t border-border pt-3 text-sm text-muted">
+      <footer className="flex flex-wrap items-center gap-4 border-t border-border pt-3 text-sm text-muted">
         <button
           type="button"
           onClick={like}
@@ -412,6 +413,14 @@ export function PostCard({
               {post.commentCount}
             </span>
           </a>
+        )}
+        {!post.mine && (
+          <span className="ml-auto">
+            <ReportButton
+              postId={post.id}
+              label={`post by ${post.author.name}`}
+            />
+          </span>
         )}
       </footer>
       {error && (

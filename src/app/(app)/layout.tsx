@@ -21,6 +21,15 @@ export default async function AppLayout({
     .select("id", { count: "exact", head: true })
     .eq("recipient_id", profile.id)
     .is("read_at", null);
+  // Open reports for moderators and admins (row security limits moderators to the shared feed).
+  let openReports = 0;
+  if (profile.role === "moderator" || profile.role === "admin") {
+    const { count } = await supabase
+      .from("content_reports")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "open");
+    openReports = count ?? 0;
+  }
   if (profile.role !== "admin") {
     const { count } = await supabase
       .from("messages")
@@ -122,6 +131,20 @@ export default async function AppLayout({
             <Link href="/profile" className="hover:text-accent">
               Profile
             </Link>
+            {(profile.role === "moderator" || profile.role === "admin") && (
+              <Link
+                href="/moderation"
+                className="inline-flex items-center gap-1.5 hover:text-accent"
+              >
+                Reports
+                {openReports > 0 && (
+                  <span className="rounded-full bg-danger px-1.5 text-xs font-bold text-background">
+                    {openReports}
+                    <span className="sr-only"> open</span>
+                  </span>
+                )}
+              </Link>
+            )}
             {profile.role === "admin" && (
               <Link href="/admin" className="hover:text-accent">
                 Admin
