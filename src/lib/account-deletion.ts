@@ -67,10 +67,43 @@ async function removeStoredFiles(userId: string) {
   }
 }
 
+// Community photos sit one folder deeper (<person>/<upload>/<n>.jpg), and message photos too.
+async function removeCommunityFiles(userId: string) {
+  const admin = createAdminClient();
+  const { data: media } = await admin
+    .from("post_media")
+    .select("path, posts!inner(author_id)")
+    .eq("posts.author_id", userId)
+    .not("path", "is", null);
+  const { data: attachments } = await admin
+    .from("message_attachments")
+    .select("path, messages!inner(sender_id)")
+    .eq("messages.sender_id", userId);
+  const paths = [...(media ?? []), ...(attachments ?? [])].map(
+    (row) => row.path as string,
+  );
+  for (let start = 0; start < paths.length; start += 500) {
+    await admin.storage
+      .from("community-media")
+      .remove(paths.slice(start, start + 500));
+  }
+}
+
 async function removeVideos(userId: string) {
   if (!isStreamConfigured()) return;
-  const { data } = await createAdminClient().from("videos").select("cloudflare_uid").eq("coach_id", userId);
-  for (const video of data ?? []) await deleteVideo(video.cloudflare_uid as string);
+  const admin = createAdminClient();
+  const [{ data }, { data: postVideos }] = await Promise.all([
+    admin.from("videos").select("cloudflare_uid").eq("coach_id", userId),
+    admin
+      .from("post_media")
+      .select("video_uid, posts!inner(author_id)")
+      .eq("posts.author_id", userId)
+      .not("video_uid", "is", null),
+  ]);
+  for (const video of data ?? [])
+    await deleteVideo(video.cloudflare_uid as string);
+  for (const video of postVideos ?? [])
+    await deleteVideo(video.video_uid as string);
 }
 
 async function removePayoutAccount(userId: string) {
@@ -80,15 +113,21 @@ async function removePayoutAccount(userId: string) {
     .select("stripe_account_id")
     .eq("coach_id", userId)
     .maybeSingle();
-  if (data?.stripe_account_id) await getStripe().accounts.del(data.stripe_account_id as string);
+  if (data?.stripe_account_id)
+    await getStripe().accounts.del(data.stripe_account_id as string);
 }
 
 // Deletes the person and everything that belongs to them. Files and videos outside the database
 // go first, each on a best-effort basis, so a hiccup at Cloudflare or Stripe never leaves an
 // account half-deleted. Orders they bought stay, without their name.
-export async function deleteAccount(person: { id: string; email: string; name: string }) {
+export async function deleteAccount(person: {
+  id: string;
+  email: string;
+  name: string;
+}) {
   for (const [label, step] of [
     ["files", () => removeStoredFiles(person.id)],
+    ["community files", () => removeCommunityFiles(person.id)],
     ["videos", () => removeVideos(person.id)],
     ["memberships", () => cancelAllMemberships(person.id)],
     ["payout account", () => removePayoutAccount(person.id)],
@@ -106,6 +145,9 @@ export async function deleteAccount(person: { id: string; email: string; name: s
     return false;
   }
 
-  await sendEmail(person.email, accountDeletedEmail({ siteUrl: getSiteUrl(), name: person.name }));
+  await sendEmail(
+    person.email,
+    accountDeletedEmail({ siteUrl: getSiteUrl(), name: person.name }),
+  );
   return true;
 }
