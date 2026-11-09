@@ -17,6 +17,7 @@ export function RoleForm({ user }: { user: AdminUser }) {
         >
           <option value="member">Member</option>
           <option value="coach">Coach</option>
+          <option value="moderator">Moderator</option>
           <option value="admin">Admin</option>
         </select>
         <SubmitButton
