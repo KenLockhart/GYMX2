@@ -68,6 +68,7 @@ export type PostDTO = {
   } | null;
   mine: boolean;
   likedByMe: boolean;
+  followingAuthor: boolean;
 };
 
 export type CommentDTO = {

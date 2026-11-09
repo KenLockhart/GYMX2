@@ -67,6 +67,13 @@ export function FeedList({
           onDeleted={(id) =>
             setPosts((current) => current.filter((item) => item.id !== id))
           }
+          onMuted={(authorId, keepId) =>
+            setPosts((current) =>
+              current.filter(
+                (item) => item.id === keepId || item.author.id !== authorId,
+              ),
+            )
+          }
         />
       ))}
       {more && (
