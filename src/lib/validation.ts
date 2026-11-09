@@ -179,6 +179,12 @@ export const messageSchema = z.object({
     .max(4000, "Use 4,000 characters or fewer."),
 });
 
+// With photos attached, the text is optional.
+export const messageWithPhotosSchema = z.object({
+  other_user_id: z.uuid("Choose who to message."),
+  body: z.string().trim().max(4000, "Use 4,000 characters or fewer."),
+});
+
 const armoryTitle = z
   .string()
   .trim()

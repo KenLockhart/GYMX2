@@ -4,7 +4,10 @@ import { deletionBlocker } from "@/lib/account-deletion";
 import { requireAccount } from "@/lib/auth";
 import { GoalsForm, SpecialtiesForm } from "@/components/goals-form";
 import { PublicPageForm } from "@/components/public-page-form";
+import { NotificationSettingsForm } from "@/components/notification-settings-form";
 import { PushToggle } from "@/components/push-toggle";
+import { NOTIFICATION_SETTINGS } from "@/lib/notifications";
+import { createClient } from "@/lib/supabase/server";
 import { suggestSlug } from "@/lib/public-pages";
 import { updateGoals, updateSpecialties } from "../welcome/actions";
 import { DeleteAccountForm } from "./delete-account-form";
@@ -15,6 +18,19 @@ export const metadata: Metadata = { title: "Your profile" };
 export default async function ProfilePage() {
   const { profile, email } = await requireAccount();
   const blocker = await deletionBlocker(profile);
+  const supabase = await createClient();
+  const { data: savedSettings } = await supabase
+    .from("notification_settings")
+    .select("type, in_app, push")
+    .eq("user_id", profile.id);
+  const notificationSettings = NOTIFICATION_SETTINGS.map((meta) => {
+    const saved = (savedSettings ?? []).find((row) => row.type === meta.type);
+    return {
+      type: meta.type,
+      inApp: (saved?.in_app as boolean | undefined) ?? true,
+      push: (saved?.push as boolean | undefined) ?? meta.defaultPush,
+    };
+  });
 
   return (
     <div className="space-y-10">
@@ -118,6 +134,13 @@ export default async function ProfilePage() {
         <PushToggle
           publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
         />
+        <h3 className="pt-4 text-xl">Community notifications</h3>
+        <p className="max-w-xl text-sm text-muted">
+          Choose what shows in your notifications (the bell in the menu) and
+          what sends to your phone. Phone notifications also need to be turned
+          on above.
+        </p>
+        <NotificationSettingsForm initial={notificationSettings} />
       </section>
 
       {profile.role !== "admin" && (
