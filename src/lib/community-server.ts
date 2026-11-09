@@ -158,6 +158,10 @@ export async function toPostDTOs(
       mine: row.author_id === viewerId,
       likedByMe: liked.has(row.id),
       followingAuthor: following.has(row.author_id),
+      canRemove:
+        row.author_id !== viewerId &&
+        row.audience === "coach_community" &&
+        row.coach_id === viewerId,
     };
   });
 }

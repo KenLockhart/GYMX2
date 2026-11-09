@@ -357,9 +357,9 @@ export function notifyGroupPost(post: {
     await sendPush(
       everyone.filter((id) => id !== post.sender_id),
       {
-        title: `${coach?.name ?? "Your coach"}'s group`,
+        title: `${coach?.name ?? "Your coach"}'s community chat`,
         body: `${sender?.name ?? "Someone"}: ${post.body}`,
-        url: `/groups/${post.coach_id}`,
+        url: `/groups/${post.coach_id}?tab=chat`,
         tag: `group-${post.coach_id}`,
       },
     );

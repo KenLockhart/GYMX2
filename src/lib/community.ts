@@ -69,6 +69,8 @@ export type PostDTO = {
   mine: boolean;
   likedByMe: boolean;
   followingAuthor: boolean;
+  // A coach may remove posts in their own community.
+  canRemove: boolean;
 };
 
 export type CommentDTO = {

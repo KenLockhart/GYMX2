@@ -577,3 +577,55 @@ export async function commentAuthors(
     .filter((id) => idSchema.safeParse(id).success);
   return Object.fromEntries(await loadAuthors(valid));
 }
+
+// A coach removing a post from their own community. The database checks the right to do it
+// (private.can_moderate) and closes any open reports on the post.
+export async function removePost(
+  postId: string,
+  reason: string,
+): Promise<{ error?: string }> {
+  const { profile } = await requireAccount();
+  const id = idSchema.safeParse(postId);
+  const why = z
+    .string()
+    .trim()
+    .max(500)
+    .safeParse(reason ?? "");
+  if (!id.success) return { error: "That post wasn't found." };
+  if (!why.success) return { error: "Keep the reason under 500 characters." };
+  const supabase = await createClient();
+  const { data: post } = await supabase
+    .from("posts")
+    .select("id, author_id")
+    .eq("id", id.data)
+    .maybeSingle();
+  if (!post) return { error: "That post wasn't found." };
+  const { error } = await supabase.rpc("remove_post", {
+    target_post_id: id.data,
+    reason: why.data,
+  });
+  if (error)
+    return {
+      error:
+        error.code === "42501"
+          ? "You can't remove this post."
+          : "We couldn't remove that post. Please try again.",
+    };
+  after(() =>
+    notifyCommunity({
+      recipients: [post.author_id as string],
+      type: "removed",
+      actorId: profile.id,
+      actorName: profile.display_name,
+      postId: id.data,
+      link: "/community",
+      groupKey: `removed:${id.data}`,
+      title: "A post of yours was removed",
+      body: why.data
+        ? `Reason: ${why.data}`
+        : "It broke the community guidelines.",
+    }),
+  );
+  revalidatePath("/community");
+  return {};
+}
