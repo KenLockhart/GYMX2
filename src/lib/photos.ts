@@ -37,3 +37,22 @@ export async function loadProgressPhotos(userId: string, limit = 60): Promise<Pr
   const urls = new Map((signed ?? []).map((item) => [item.path, item.signedUrl]));
   return rows.map((row) => ({ id: row.id, day: row.day, pose: row.pose, url: urls.get(row.path) ?? null }));
 }
+
+// One of the person's own progress photos, for sharing to the community.
+export async function loadProgressPhotoById(
+  userId: string,
+  photoId: string,
+): Promise<{ id: string; url: string } | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("progress_photos")
+    .select("id, path")
+    .eq("id", photoId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data) return null;
+  const { data: signed } = await createAdminClient()
+    .storage.from("progress-photos")
+    .createSignedUrl(data.path as string, 60 * 60);
+  return signed ? { id: data.id as string, url: signed.signedUrl } : null;
+}

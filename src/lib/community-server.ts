@@ -1,5 +1,5 @@
 import "server-only";
-import { FEED_PAGE_SIZE, type PostDTO } from "@/lib/community";
+import { FEED_PAGE_SIZE, type CommentDTO, type PostDTO } from "@/lib/community";
 import { getPlayerUrl, getVideoState } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -39,18 +39,28 @@ export async function toPostDTOs(
     ),
   ];
 
-  const [{ data: profiles }, { data: media }] = await Promise.all([
-    admin.from("profiles").select("id, display_name, role").in("id", people),
-    // Row security: media only for posts this person can see.
-    supabase
-      .from("post_media")
-      .select("post_id, kind, path, video_uid, position, width, height")
-      .in(
-        "post_id",
-        rows.map((row) => row.id),
-      )
-      .order("position"),
-  ]);
+  const [{ data: profiles }, { data: media }, { data: likes }] =
+    await Promise.all([
+      admin.from("profiles").select("id, display_name, role").in("id", people),
+      // Row security: media only for posts this person can see.
+      supabase
+        .from("post_media")
+        .select("post_id, kind, path, video_uid, position, width, height")
+        .in(
+          "post_id",
+          rows.map((row) => row.id),
+        )
+        .order("position"),
+      supabase
+        .from("post_likes")
+        .select("post_id")
+        .eq("user_id", viewerId)
+        .in(
+          "post_id",
+          rows.map((row) => row.id),
+        ),
+    ]);
+  const liked = new Set((likes ?? []).map((like) => like.post_id as string));
   const names = new Map(
     (profiles ?? []).map((person) => [person.id as string, person]),
   );
@@ -131,6 +141,7 @@ export async function toPostDTOs(
         })),
       video: videos.get(row.id) ?? null,
       mine: row.author_id === viewerId,
+      likedByMe: liked.has(row.id),
     };
   });
 }
@@ -193,4 +204,65 @@ export async function postableCommunities(viewer: {
   ).flatMap((row) =>
     row.coach ? [{ id: row.coach.id, name: row.coach.display_name }] : [],
   );
+}
+
+// Display names for people in the community. Members can't read each other's profiles, so the
+// server shares just the name and role.
+export async function loadAuthors(ids: string[]) {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0)
+    return new Map<string, { id: string; name: string; role: string }>();
+  const { data } = await createAdminClient()
+    .from("profiles")
+    .select("id, display_name, role")
+    .in("id", unique);
+  return new Map(
+    (data ?? []).map((person) => [
+      person.id as string,
+      {
+        id: person.id as string,
+        name: person.display_name as string,
+        role: person.role as string,
+      },
+    ]),
+  );
+}
+
+export async function loadComments(
+  postId: string,
+  viewerId: string,
+): Promise<CommentDTO[]> {
+  const supabase = await createClient();
+  // Row security: only comments on posts this person can see.
+  const { data } = await supabase
+    .from("post_comments")
+    .select("id, post_id, parent_id, author_id, body, created_at, edited_at")
+    .eq("post_id", postId)
+    .is("removed_at", null)
+    .order("created_at")
+    .limit(500);
+  const rows = (data ?? []) as {
+    id: string;
+    post_id: string;
+    parent_id: string | null;
+    author_id: string;
+    body: string;
+    created_at: string;
+    edited_at: string | null;
+  }[];
+  const authors = await loadAuthors(rows.map((row) => row.author_id));
+  return rows.map((row) => ({
+    id: row.id,
+    postId: row.post_id,
+    parentId: row.parent_id,
+    body: row.body,
+    author: authors.get(row.author_id) ?? {
+      id: row.author_id,
+      name: "Former member",
+      role: "member",
+    },
+    createdAt: row.created_at,
+    editedAt: row.edited_at,
+    mine: row.author_id === viewerId,
+  }));
 }

@@ -46,18 +46,29 @@ export function PostComposer({
   communities,
   defaultAudience = "everyone",
   defaultCoachId = null,
+  initialBody = "",
+  initialKind = "general",
+  progressPhoto = null,
 }: {
   role: string;
   communities: Community[];
   defaultAudience?: Audience;
   defaultCoachId?: string | null;
+  initialBody?: string;
+  initialKind?: PostKind;
+  // A Track progress photo being shared.
+  progressPhoto?: { id: string; url: string } | null;
 }) {
   const router = useRouter();
   const photoInput = useRef<HTMLInputElement>(null);
   const videoInput = useRef<HTMLInputElement>(null);
-  const [body, setBody] = useState("");
-  const [kind, setKind] = useState<PostKind>("general");
-  const [audience, setAudience] = useState<Audience>(defaultAudience);
+  const [body, setBody] = useState(initialBody);
+  const [kind, setKind] = useState<PostKind>(initialKind);
+  const [shared, setShared] = useState(progressPhoto);
+  // Progress is private unless the person chooses otherwise.
+  const [audience, setAudience] = useState<Audience>(
+    initialKind === "progress" ? "only_me" : defaultAudience,
+  );
   const [coachId, setCoachId] = useState<string | null>(
     defaultCoachId ?? communities[0]?.id ?? null,
   );
@@ -160,7 +171,7 @@ export function PostComposer({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
-    if (!body.trim() && photos.length === 0 && !video)
+    if (!body.trim() && photos.length === 0 && !video && !shared)
       return setError("Write something or add a photo or video.");
     setError(null);
     setProgress(0);
@@ -174,13 +185,16 @@ export function PostComposer({
         coachId: audience === "coach_community" ? coachId : null,
         photos: uploaded,
         videoUid,
+        progressPhotoId: shared?.id ?? null,
       });
       if (result.error) throw new Error(result.error);
       photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
       setBody("");
       setPhotos([]);
       setVideo(null);
+      setShared(null);
       setKind("general");
+      if (shared) router.replace("/community");
       router.refresh();
     } catch (failure) {
       setError(
@@ -213,6 +227,35 @@ export function PostComposer({
         placeholder="Share a workout, a win or something that's motivating you..."
         className="field-input"
       />
+
+      {shared && (
+        <div className="flex items-center gap-3 text-sm">
+          {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage link */}
+          <img
+            src={shared.url}
+            alt="Progress photo to share"
+            className="size-20 rounded object-cover"
+          />
+          <span className="text-muted">
+            Your progress photo. A copy is shared; the original stays private in
+            Track.
+          </span>
+          <button
+            type="button"
+            onClick={() => setShared(null)}
+            disabled={busy}
+            className="cursor-pointer text-muted hover:text-danger"
+          >
+            Remove
+          </button>
+        </div>
+      )}
+      {kind === "progress" && (
+        <p className="text-xs text-muted">
+          Progress posts start as Only me. Choose your coach community or
+          Everyone if you want to share it.
+        </p>
+      )}
 
       {photos.length > 0 && (
         <ul className="flex flex-wrap gap-2">
@@ -295,7 +338,12 @@ export function PostComposer({
         <select
           aria-label="Post type"
           value={kind}
-          onChange={(event) => setKind(event.target.value as PostKind)}
+          onChange={(event) => {
+            const next = event.target.value as PostKind;
+            setKind(next);
+            if (next === "progress" && audience === "everyone")
+              setAudience("only_me");
+          }}
           disabled={busy}
           className="field-input w-auto py-2 text-sm"
         >

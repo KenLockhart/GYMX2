@@ -167,3 +167,16 @@ describe("coachProgress", () => {
     expect(progress.streak.current).toBe(2);
   });
 });
+
+describe("allBadges", () => {
+  it("lists every badge once, with a name and description to share", async () => {
+    const { allBadges } = await import("./achievements");
+    const badges = allBadges();
+    expect(badges.length).toBeGreaterThan(0);
+    expect(new Set(badges.map((badge) => badge.key)).size).toBe(badges.length);
+    for (const badge of badges) {
+      expect(badge.name).toBeTruthy();
+      expect(badge.description).toBeTruthy();
+    }
+  });
+});

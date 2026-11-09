@@ -591,3 +591,11 @@ export function coachProgress(
       .map((badge) => badge.key),
   };
 }
+
+// Every badge's name and description, for sharing an earned badge.
+export function allBadges(): Badge[] {
+  const byKey = new Map<string, Badge>();
+  for (const { key, name, description, icon } of [...MEMBER_BADGES, ...COACH_BADGES])
+    if (!byKey.has(key)) byKey.set(key, { key, name, description, icon });
+  return [...byKey.values()];
+}

@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { deletePost, updatePost } from "@/app/(app)/community/actions";
+import {
+  deletePost,
+  toggleLike,
+  updatePost,
+} from "@/app/(app)/community/actions";
 import { PillarTag } from "@/components/game-parts";
 import {
   audienceLabel,
@@ -84,6 +88,34 @@ export function PostCard({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const announcement = post.kind === "announcement";
+
+  const [liking, startLike] = useTransition();
+  function like() {
+    // Show the change at once; the server's count wins when it answers.
+    const wasLiked = post.likedByMe;
+    setPost((current) => ({
+      ...current,
+      likedByMe: !wasLiked,
+      likeCount: Math.max(0, current.likeCount + (wasLiked ? -1 : 1)),
+    }));
+    startLike(async () => {
+      const result = await toggleLike(post.id);
+      if (result.error || result.liked === undefined) {
+        setPost((current) => ({
+          ...current,
+          likedByMe: wasLiked,
+          likeCount: initial.likeCount,
+        }));
+        setError(result.error ?? "That didn't work.");
+        return;
+      }
+      setPost((current) => ({
+        ...current,
+        likedByMe: result.liked!,
+        likeCount: result.count ?? current.likeCount,
+      }));
+    });
+  }
 
   function save() {
     setError(null);
@@ -226,23 +258,36 @@ export function PostCard({
       <PhotoGrid photos={post.photos} />
       {post.video && <Video video={post.video} />}
 
-      <footer className="flex gap-4 text-sm text-muted">
-        <span>
-          {post.likeCount} {post.likeCount === 1 ? "like" : "likes"}
-        </span>
+      <footer className="flex items-center gap-4 border-t border-border pt-3 text-sm text-muted">
+        <button
+          type="button"
+          onClick={like}
+          disabled={liking}
+          aria-pressed={post.likedByMe}
+          className={`cursor-pointer font-semibold hover:text-foreground ${post.likedByMe ? "text-accent" : ""}`}
+        >
+          {post.likedByMe ? "♥ Liked" : "♡ Like"}
+          <span className="ml-1.5 font-normal text-muted">
+            {post.likeCount}
+          </span>
+        </button>
         {linkToPost ? (
           <Link
-            href={`/community/post/${post.id}`}
-            className="hover:text-foreground"
+            href={`/community/post/${post.id}#comments`}
+            className="font-semibold hover:text-foreground"
           >
-            {post.commentCount}{" "}
-            {post.commentCount === 1 ? "comment" : "comments"}
+            Comment
+            <span className="ml-1.5 font-normal text-muted">
+              {post.commentCount}
+            </span>
           </Link>
         ) : (
-          <span>
-            {post.commentCount}{" "}
-            {post.commentCount === 1 ? "comment" : "comments"}
-          </span>
+          <a href="#comments" className="font-semibold hover:text-foreground">
+            Comment
+            <span className="ml-1.5 font-normal text-muted">
+              {post.commentCount}
+            </span>
+          </a>
         )}
       </footer>
       {error && (
