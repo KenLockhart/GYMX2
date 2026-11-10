@@ -75,6 +75,22 @@ export default async function CoachesPage() {
           and message them. They&apos;ll see your name and bio, but never your
           email.
         </p>
+        <Link
+          href="/coaches/sample"
+          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-accent/60 bg-accent/5 px-4 py-3 text-sm hover:bg-accent/10"
+        >
+          <span>
+            <span className="font-semibold text-accent">
+              New coach profiles are coming.
+            </span>{" "}
+            <span className="text-muted">
+              Preview the design with Coach Jasmine, a sample profile.
+            </span>
+          </span>
+          <span aria-hidden className="text-accent">
+            →
+          </span>
+        </Link>
       </div>
 
       {coachResult.error || joinedResult.error ? (
