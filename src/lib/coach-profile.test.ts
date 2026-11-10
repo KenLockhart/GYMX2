@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatPrice,
   MATCH_CATEGORIES,
+  type MatchCategory,
   startingMonthlyPrice,
   weightedTotal,
 } from "./coach-profile";
@@ -42,9 +43,11 @@ describe("Coach Jasmine sample", () => {
   });
 
   it("has a match total that agrees with its category scores", () => {
-    expect(weightedTotal(SAMPLE_COACH.match!.categories)).toBe(
-      SAMPLE_COACH.match!.total,
-    );
+    expect(
+      weightedTotal(
+        SAMPLE_COACH.match!.categories as Record<MatchCategory, number>,
+      ),
+    ).toBe(SAMPLE_COACH.match!.total);
   });
 
   it("covers the profile reference values", () => {

@@ -133,6 +133,9 @@ export default async function AdminPage() {
           <Link href="/admin/credentials" className="btn-secondary">
             Credentials
           </Link>
+          <Link href="/admin/matching" className="btn-secondary">
+            Match weights
+          </Link>
           <Link href="/admin/reviews" className="btn-secondary">
             Reviews
           </Link>

@@ -10,6 +10,9 @@ import { matchCoaches } from "@/lib/onboarding";
 import { joinCoach, leaveCoach } from "./actions";
 import { BadgeRow } from "@/components/game-parts";
 import { loadBadges } from "@/lib/achievements-data";
+import { readDraft } from "@/lib/coach-draft";
+import { computeMatch } from "@/lib/matching";
+import { loadMatchWeights, loadMyAnswers } from "@/lib/matching-server";
 
 export const metadata: Metadata = { title: "Coaches" };
 
@@ -44,9 +47,30 @@ export default async function CoachesPage() {
       coaches.length,
     ).map((match) => [match.id, match]),
   );
-  // Best matches first, then everyone else alphabetically.
+  // Compatibility for coaches with an approved profile, from the member's own answers.
+  const [answers, weights, { data: published }] = await Promise.all([
+    loadMyAnswers(profile.id),
+    loadMatchWeights(),
+    supabase.from("coach_profiles_public").select("coach_id, data"),
+  ]);
+  const compatibility = new Map<
+    string,
+    { total: number | null; eligible: boolean }
+  >();
+  if (answers)
+    for (const row of published ?? []) {
+      const result = computeMatch(answers, readDraft(row.data), weights);
+      compatibility.set(row.coach_id as string, {
+        total: result.eligible ? result.total : null,
+        eligible: result.eligible,
+      });
+    }
+  // Scored matches first (highest first), then goal matches, then everyone else alphabetically.
   coaches.sort(
-    (a, b) => (matched.get(b.id)?.score ?? 0) - (matched.get(a.id)?.score ?? 0),
+    (a, b) =>
+      (compatibility.get(b.id)?.total ?? -1) -
+        (compatibility.get(a.id)?.total ?? -1) ||
+      (matched.get(b.id)?.score ?? 0) - (matched.get(a.id)?.score ?? 0),
   );
   // The cheapest open plan per coach, for "Plans from $X/month".
   const { data: planData } = await supabase
@@ -136,10 +160,20 @@ export default async function CoachesPage() {
                       {coach.display_name}
                     </Link>
                     <BadgeRow badges={badges.get(coach.id) ?? []} max={5} />
-                    {(matched.get(coach.id)?.shared.length ?? 0) > 0 && (
+                    {compatibility.get(coach.id)?.total != null ? (
                       <span className="rounded bg-accent px-1.5 py-0.5 text-xs font-bold uppercase text-accent-foreground">
-                        Good match
+                        {compatibility.get(coach.id)!.total}% match
                       </span>
+                    ) : compatibility.get(coach.id)?.eligible === false ? (
+                      <span className="rounded border border-border px-1.5 py-0.5 text-xs text-muted">
+                        Not a match right now
+                      </span>
+                    ) : (
+                      (matched.get(coach.id)?.shared.length ?? 0) > 0 && (
+                        <span className="rounded bg-accent px-1.5 py-0.5 text-xs font-bold uppercase text-accent-foreground">
+                          Good match
+                        </span>
+                      )
                     )}
                   </div>
                   {coach.bio && (

@@ -266,7 +266,23 @@ export function CheckList({ items }: { items: string[] }) {
 }
 
 // A horizontal bar for a 0 to 100 score.
-export function ScoreBar({ label, value }: { label: string; value: number }) {
+export function ScoreBar({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | null;
+}) {
+  if (value === null)
+    return (
+      <div>
+        <div className="flex items-baseline justify-between gap-3 text-sm">
+          <span>{label}</span>
+          <span className="text-xs text-muted">Not enough info</span>
+        </div>
+        <div className="mt-1.5 h-2 rounded-full border border-dashed border-border" />
+      </div>
+    );
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 text-sm">

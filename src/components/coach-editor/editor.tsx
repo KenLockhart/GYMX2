@@ -307,6 +307,18 @@ export function CoachProfileEditor({
                 values={draft.formats}
                 onChange={(v) => update("formats", v)}
               />
+              <SelectInput
+                label="How do you describe yourself? (optional)"
+                value={draft.identity}
+                options={[
+                  { value: "woman", label: "Woman" },
+                  { value: "man", label: "Man" },
+                  { value: "nonbinary", label: "Non-binary" },
+                ]}
+                emptyLabel="Prefer not to say"
+                onChange={(v) => update("identity", v)}
+                hint="Never shown on your profile. Some members ask for a coach who is a woman or a man; this lets them find you."
+              />
               <RadioCards
                 legend="Taking new clients?"
                 options={[
