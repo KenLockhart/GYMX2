@@ -197,7 +197,8 @@ const SECTIONS: {
   {
     name: "intros_booked",
     table: "coach_intro_bookings",
-    columns: "coach:profiles!coach_id(display_name), message, status, created_at, cancelled_at",
+    columns:
+      "coach:profiles!coach_id(display_name), message, status, created_at, cancelled_at",
     owner: "member_id",
   },
   {
@@ -205,6 +206,25 @@ const SECTIONS: {
     table: "coach_intro_slots",
     columns: "starts_at, minutes, format, location, meeting_url, created_at",
     owner: "coach_id",
+  },
+  {
+    name: "review_reports_sent",
+    table: "review_reports",
+    columns: "reason, details, status, created_at",
+    owner: "reporter_id",
+  },
+  {
+    name: "coach_reports_sent",
+    table: "coach_reports",
+    columns:
+      "coach:profiles!coach_id(display_name), reason, details, status, created_at",
+    owner: "reporter_id",
+  },
+  {
+    name: "coaches_blocked",
+    table: "coach_blocks",
+    columns: "coach:profiles!coach_id(display_name), created_at",
+    owner: "member_id",
   },
   {
     name: "coaches_saved",
@@ -244,7 +264,7 @@ const SECTIONS: {
     name: "reviews_written",
     table: "coach_reviews",
     columns:
-      "rating, body, hidden, created_at, coach:profiles!coach_id(display_name)",
+      "rating, rating_communication, rating_knowledge, rating_motivation, rating_results, rating_value, body, reply, hidden, created_at, coach:profiles!coach_id(display_name)",
     owner: "member_id",
   },
   {

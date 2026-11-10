@@ -25,6 +25,7 @@ export async function loadDiscoveryCards(viewer: {
     { data: joined },
     { data: saved },
     { data: passed },
+    { data: blocks },
     answers,
     weights,
   ] = await Promise.all([
@@ -59,6 +60,12 @@ export async function loadDiscoveryCards(viewer: {
           .select("coach_id")
           .eq("member_id", viewer.id)
       : Promise.resolve({ data: [] }),
+    isMember
+      ? supabase
+          .from("coach_blocks")
+          .select("coach_id")
+          .eq("member_id", viewer.id)
+      : Promise.resolve({ data: [] }),
     isMember ? loadMyAnswers(viewer.id) : Promise.resolve(null),
     isMember ? loadMatchWeights() : Promise.resolve(null),
   ]);
@@ -84,6 +91,7 @@ export async function loadDiscoveryCards(viewer: {
   );
   const joinedSet = new Set((joined ?? []).map((r) => r.coach_id as string));
   const savedSet = new Set((saved ?? []).map((r) => r.coach_id as string));
+  const blockedSet = new Set((blocks ?? []).map((r) => r.coach_id as string));
   const passedSet = new Set((passed ?? []).map((r) => r.coach_id as string));
 
   const photoPaths = (published ?? []).flatMap((r) =>
@@ -150,6 +158,7 @@ export async function loadDiscoveryCards(viewer: {
       joined: joinedSet.has(id),
       saved: savedSet.has(id),
       passed: passedSet.has(id),
+      blocked: blockedSet.has(id),
     } satisfies CoachCard;
   });
 }

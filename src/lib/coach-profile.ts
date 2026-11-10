@@ -152,6 +152,8 @@ export type CoachProfileView = {
   reviews: {
     categories: { label: string; score: number }[];
     items: {
+      // Real reviews carry their id, for reporting. Sample reviews don't.
+      id?: string;
       author: string;
       date: string;
       format: string;

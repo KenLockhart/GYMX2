@@ -140,7 +140,7 @@ export function CoachProfileEditor({
   }
 
   const completion = profileCompletion(draft, Boolean(photoUrl));
-  const warnings = profileWarnings(draft);
+  const warnings = profileWarnings(draft, credentials);
   const index = STEPS.findIndex((s) => s.key === step);
   const stepDone = (key: StepKey) => {
     const checks = PROFILE_CHECKS.filter((c) => c.step === key);

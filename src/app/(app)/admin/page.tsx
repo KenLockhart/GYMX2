@@ -139,6 +139,9 @@ export default async function AdminPage() {
           <Link href="/admin/reviews" className="btn-secondary">
             Reviews
           </Link>
+          <Link href="/admin/reports" className="btn-secondary">
+            Review and coach reports
+          </Link>
           <Link href="/admin/emails" className="btn-secondary">
             Emails
           </Link>

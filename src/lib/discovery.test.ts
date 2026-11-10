@@ -31,6 +31,7 @@ function card(id: string, change: Partial<CoachCard> = {}): CoachCard {
     joined: false,
     saved: false,
     passed: false,
+    blocked: false,
     ...change,
   };
 }

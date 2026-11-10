@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CoachProfileEditor } from "@/components/coach-editor/editor";
 import { requireCoach } from "@/lib/auth";
 import { loadDraft, signedCoachPhoto } from "@/lib/coach-profile-server";
@@ -23,15 +24,28 @@ export default async function CoachProfileEditorPage() {
     loadOwnCredentials(profile.id),
   ]);
   return (
-    <CoachProfileEditor
-      coachId={profile.id}
-      coachName={profile.display_name}
-      initial={draft.draft}
-      initialPhotoUrl={photoUrl}
-      initialStatus={draft.status}
-      reviewNote={draft.reviewNote}
-      published={Boolean(published)}
-      initialCredentials={credentials}
-    />
+    <>
+      <nav
+        aria-label="Coach profile tools"
+        className="mb-6 flex flex-wrap gap-2 text-sm"
+      >
+        <Link href="/profile/coach/reviews" className="btn-secondary px-4 py-2">
+          Your reviews
+        </Link>
+        <Link href="/calendar/intros" className="btn-secondary px-4 py-2">
+          Intro times
+        </Link>
+      </nav>
+      <CoachProfileEditor
+        coachId={profile.id}
+        coachName={profile.display_name}
+        initial={draft.draft}
+        initialPhotoUrl={photoUrl}
+        initialStatus={draft.status}
+        reviewNote={draft.reviewNote}
+        published={Boolean(published)}
+        initialCredentials={credentials}
+      />
+    </>
   );
 }

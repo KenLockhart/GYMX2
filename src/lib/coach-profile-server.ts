@@ -12,6 +12,7 @@ import {
   overallVerification,
 } from "@/lib/credentials";
 import { reviewerName } from "@/lib/public-pages";
+import { categoryAverages, type ReviewCategoryColumn } from "@/lib/reviews";
 import {
   loadMatchWeights,
   loadMyAnswers,
@@ -58,22 +59,27 @@ export async function loadDraft(coachId: string, seedBio = "") {
   };
 }
 
-// Ratings and the latest reviews, shown with the reviewer's first name and last initial.
+// Ratings, category averages and the latest reviews, shown with the reviewer's first name and
+// last initial, and the coach's reply.
 export async function loadCoachReviews(coachId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("coach_reviews")
-    .select("rating, body, created_at, member:profiles!member_id(display_name)")
+    .select(
+      "id, rating, body, created_at, reply, rating_communication, rating_knowledge, rating_motivation, rating_results, rating_value, member:profiles!member_id(display_name)",
+    )
     .eq("coach_id", coachId)
     .eq("hidden", false)
     .order("created_at", { ascending: false })
-    .limit(50);
-  const rows = (data ?? []) as unknown as {
+    .limit(200);
+  const rows = (data ?? []) as unknown as ({
+    id: string;
     rating: number;
     body: string;
     created_at: string;
+    reply: string | null;
     member: { display_name: string } | null;
-  }[];
+  } & Record<ReviewCategoryColumn, number | null>)[];
   const rating = rows.length
     ? {
         average:
@@ -86,6 +92,7 @@ export async function loadCoachReviews(coachId: string) {
   const items: CoachProfileView["reviews"]["items"] = rows
     .slice(0, 10)
     .map((row) => ({
+      id: row.id,
       author: reviewerName(row.member?.display_name ?? "A member"),
       date: new Date(row.created_at).toLocaleDateString("en-US", {
         month: "long",
@@ -96,9 +103,9 @@ export async function loadCoachReviews(coachId: string) {
       goal: "",
       rating: row.rating,
       body: row.body,
-      reply: null,
+      reply: row.reply,
     }));
-  return { rating, items };
+  return { rating, items, categories: categoryAverages(rows) };
 }
 
 function monthYear(value: string) {
@@ -182,6 +189,7 @@ export async function buildView(
     photoUrl,
     rating: reviews.rating,
     reviews: reviews.items,
+    reviewCategories: reviews.categories,
     credentials: creds.credentials,
     verification: creds.verification,
   });

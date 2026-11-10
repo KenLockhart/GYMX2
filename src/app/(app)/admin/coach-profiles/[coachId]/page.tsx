@@ -42,7 +42,15 @@ export default async function ReviewCoachProfilePage({
     draft.photoPath,
   );
   const completion = profileCompletion(draft.draft, Boolean(draft.photoPath));
-  const warnings = profileWarnings(draft.draft);
+  // Admins can read every credential, so the certification check sees what the coach submitted.
+  const { data: credentialRows } = await supabase
+    .from("coach_credentials")
+    .select("status")
+    .eq("coach_id", coachId);
+  const warnings = profileWarnings(
+    draft.draft,
+    (credentialRows ?? []) as { status: string }[],
+  );
 
   return (
     <div className="space-y-6">

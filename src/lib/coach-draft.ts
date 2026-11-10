@@ -325,11 +325,47 @@ const RISKY = [
   },
 ];
 
-export function profileWarnings(draft: CoachDraft) {
+// Claims members can't check, flagged for the coach and for the admin who reviews the profile.
+const UNCHECKABLE = [
+  {
+    pattern:
+      /(#\s?1\b|\bnumber one\b|\bbest (coach|trainer|in)\b|\btop[- ]rated\b)/i,
+    message:
+      'Avoid rankings members can\'t check, like "#1", "best in" or "top-rated". Let reviews speak for you.',
+  },
+  {
+    pattern:
+      /\b(lose|drop|shed)\s+\d+\s*(lbs?|pounds|kg|kilos?)\s+(in|within)\s+\d+\s*(days?|weeks?)\b/i,
+    message:
+      'Avoid promising a set result in a set time ("lose 20 lbs in 30 days"). Results vary from person to person.',
+  },
+  {
+    pattern: /\b(fda|clinically) (approved|proven)\b/i,
+    message: 'Remove "FDA approved" or "clinically proven" claims.',
+  },
+];
+
+const CERTIFIED = /\b(certified|certification|licensed|accredited)\b/i;
+
+// Warnings about a profile's wording. With the coach's credentials, it also asks for proof of
+// any certification or license the profile mentions.
+export function profileWarnings(
+  draft: CoachDraft,
+  credentials?: { status: string }[],
+) {
   const all = JSON.stringify(draft);
-  return RISKY.filter((rule) => rule.pattern.test(all)).map(
-    (rule) => rule.message,
-  );
+  const warnings = [...RISKY, ...UNCHECKABLE]
+    .filter((rule) => rule.pattern.test(all))
+    .map((rule) => rule.message);
+  if (
+    credentials &&
+    CERTIFIED.test(all) &&
+    !credentials.some((c) => c.status !== "rejected")
+  )
+    warnings.push(
+      "Your profile mentions a certification or license. Add it under Qualifications so GYMX2 can check it.",
+    );
+  return warnings;
 }
 
 function cleanParagraphs(value: string) {
@@ -348,6 +384,7 @@ export function toCoachView(
     photoUrl: string | null;
     rating: { average: number; count: number } | null;
     reviews: CoachProfileView["reviews"]["items"];
+    reviewCategories?: CoachProfileView["reviews"]["categories"];
     credentials?: CoachProfileView["credentials"];
     verification?: CredentialStatus;
   },
@@ -459,7 +496,10 @@ export function toCoachView(
       return value ? [{ label: field.label, value }] : [];
     }),
     credentials: extras.credentials ?? [],
-    reviews: { categories: [], items: extras.reviews },
+    reviews: {
+      categories: extras.reviewCategories ?? [],
+      items: extras.reviews,
+    },
     video: null,
     intro: null,
   };

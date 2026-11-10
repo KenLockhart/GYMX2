@@ -297,6 +297,8 @@ export function CoachProfile({
   actions,
   pricingExtra,
   reviewsExtra,
+  reviewExtra,
+  footerExtra,
 }: {
   profile: CoachProfileView;
   // Real coaches: Join, Message or See plans, shown in the hero, the side card and the phone bar.
@@ -304,6 +306,9 @@ export function CoachProfile({
   // Real coaches: the membership checkout and the review form.
   pricingExtra?: ReactNode;
   reviewsExtra?: ReactNode;
+  // Real coaches: per-review controls (Report) and the report and block links at the end.
+  reviewExtra?: (reviewId: string) => ReactNode;
+  footerExtra?: ReactNode;
 }) {
   const loves = [
     { tag: "Primary", value: profile.loveLanguages.primary },
@@ -813,7 +818,7 @@ export function CoachProfile({
               <ul className="space-y-3">
                 {profile.reviews.items.map((review) => (
                   <li
-                    key={review.author + review.date}
+                    key={review.id ?? review.author + review.date}
                     className="space-y-3 rounded-2xl border border-border bg-surface p-5"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -829,20 +834,22 @@ export function CoachProfile({
                     </p>
                     <p>{review.body}</p>
                     {review.reply && (
-                      <p className="rounded-xl border-l-2 border-accent bg-surface-raised p-3 text-sm">
+                      <p className="whitespace-pre-line rounded-xl border-l-2 border-accent bg-surface-raised p-3 text-sm">
                         <span className="font-semibold">
                           Reply from {profile.firstName}:
                         </span>{" "}
                         {review.reply}
                       </p>
                     )}
+                    {review.id && reviewExtra?.(review.id)}
                   </li>
                 ))}
               </ul>
               {reviewsExtra}
               <p className="text-xs text-muted">
-                Only members who joined {profile.firstName} can review her, once
-                each. Coaches can reply but can&apos;t edit or remove reviews.
+                Only members who joined {profile.firstName} can leave a review,
+                once each. Coaches can reply but can&apos;t edit or remove
+                reviews. Category scores appear once three members rate them.
               </p>
             </Section>
           )}
@@ -919,6 +926,7 @@ export function CoachProfile({
               )}
             </Section>
           )}
+          {footerExtra}
         </div>
 
         <aside

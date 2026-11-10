@@ -17,6 +17,7 @@ import { hasAccess, membershipStatusLabel } from "@/lib/memberships";
 import { isStripeTestMode, stripePublishableKey } from "@/lib/stripe";
 import { CoachProfile as RichProfile } from "@/components/coach-profile/coach-profile-view";
 import { loadPublishedView } from "@/lib/coach-profile-server";
+import { CoachSafetyLinks, ReportReviewButton } from "@/components/safety";
 
 export const metadata: Metadata = { title: "Coach" };
 
@@ -125,15 +126,56 @@ export default async function CoachPage({
     isMember && isJoined
       ? await supabase
           .from("coach_reviews")
-          .select("rating, body, hidden")
+          .select(
+            "rating, body, hidden, rating_communication, rating_knowledge, rating_motivation, rating_results, rating_value",
+          )
           .eq("coach_id", coach.id)
           .eq("member_id", profile.id)
-          .maybeSingle<{ rating: number; body: string; hidden: boolean }>()
+          .maybeSingle<
+            { rating: number; body: string; hidden: boolean } & Record<
+              string,
+              number | null
+            >
+          >()
       : { data: null };
   const links = SOCIAL_LINKS.flatMap(({ key, label }) => {
     const url = coach[key];
     return typeof url === "string" && url ? [{ label, url }] : [];
   });
+
+  // Blocks are private to the member who made them.
+  const { data: blockRow } = isMember
+    ? await supabase
+        .from("coach_blocks")
+        .select("coach_id")
+        .eq("member_id", profile.id)
+        .eq("coach_id", coach.id)
+        .maybeSingle()
+    : { data: null };
+  const blocked = Boolean(blockRow);
+  const firstName =
+    coach.display_name.replace(/^Coach\s+/i, "").split(/\s+/)[0] ||
+    coach.display_name;
+  const safety =
+    profile.id === coach.id ? undefined : (
+      <CoachSafetyLinks
+        coachId={coach.id}
+        firstName={firstName}
+        canBlock={isMember}
+        blocked={blocked}
+        joined={isJoined}
+      />
+    );
+  const blockedNotice = blocked ? (
+    <p
+      role="status"
+      className="rounded-lg border border-border bg-surface p-4 text-sm"
+    >
+      You blocked {coach.display_name}. They can&apos;t be joined or booked and
+      don&apos;t show in your coach search. They aren&apos;t told. Unblock at
+      the bottom of this page.
+    </p>
+  ) : null;
 
   const view = await loadPublishedView(
     { id: coach.id, display_name: coach.display_name },
@@ -145,7 +187,7 @@ export default async function CoachPage({
         <Link href="/profile/coach" className="btn-secondary">
           Edit your profile
         </Link>
-      ) : isMember ? (
+      ) : isMember && !blocked ? (
         <div className="flex flex-wrap items-start gap-2">
           {isJoined && (
             <Link href={`/messages/${coach.id}`} className="btn-primary">
@@ -190,6 +232,7 @@ export default async function CoachPage({
             Back to coaches
           </Link>
         )}
+        {blockedNotice}
         {returned && membership && (
           <p
             role="status"
@@ -207,8 +250,10 @@ export default async function CoachPage({
         <RichProfile
           profile={view}
           actions={actions}
+          reviewExtra={(reviewId) => <ReportReviewButton reviewId={reviewId} />}
+          footerExtra={safety}
           pricingExtra={
-            showPlans && (plans.length > 0 || membership) ? (
+            !blocked && showPlans && (plans.length > 0 || membership) ? (
               <section className="space-y-3">
                 <h3 className="text-xl font-semibold">Join a membership</h3>
                 {membership ? (
@@ -344,6 +389,7 @@ export default async function CoachPage({
           Back to coaches
         </Link>
       )}
+      {blockedNotice}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-accent">
@@ -359,7 +405,7 @@ export default async function CoachPage({
             </p>
           )}
         </div>
-        {isMember && (
+        {isMember && !blocked && (
           <div className="flex shrink-0 flex-wrap items-start gap-2">
             {isJoined && (
               <Link href={`/messages/${coach.id}`} className="btn-primary">
@@ -524,6 +570,7 @@ export default async function CoachPage({
           </ul>
         )}
       </section>
+      {safety}
     </div>
   );
 }
