@@ -195,6 +195,18 @@ const SECTIONS: {
     owner: "member_id",
   },
   {
+    name: "intros_booked",
+    table: "coach_intro_bookings",
+    columns: "coach:profiles!coach_id(display_name), message, status, created_at, cancelled_at",
+    owner: "member_id",
+  },
+  {
+    name: "intro_times_offered",
+    table: "coach_intro_slots",
+    columns: "starts_at, minutes, format, location, meeting_url, created_at",
+    owner: "coach_id",
+  },
+  {
     name: "coaches_saved",
     table: "coach_favorites",
     columns: "coach:profiles!coach_id(display_name), created_at",

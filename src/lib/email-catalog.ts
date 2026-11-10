@@ -7,6 +7,7 @@ import {
   checkinReminderEmail,
   communityEmail,
   flaggedMessageEmail,
+  introEmail,
   liveNowEmail,
   membershipChangeEmail,
   newMessageEmail,
@@ -48,6 +49,14 @@ const session = {
   when: "Sat, Nov 14 · 9:00–10:00 AM ET",
   location: "Lake Eola Park",
   meetingUrl: null,
+  sessionId: "sample",
+};
+
+const intro = {
+  when: "Tue, Nov 17 · 6:00–6:20 PM ET",
+  format: "Video call",
+  location: "",
+  meetingUrl: "https://meet.example.com/jasmine",
   sessionId: "sample",
 };
 
@@ -301,6 +310,54 @@ export const EMAIL_CATALOG: CatalogEntry[] = [
     optional: true,
     sample: (siteUrl) =>
       sessionEmail({ siteUrl, change: "cancelled", ...session }),
+  },
+  {
+    key: "intro.booked_coach",
+    name: "Intro booked (to the coach)",
+    group: "Sessions",
+    to: "The coach",
+    when: "A member books a free intro",
+    optional: true,
+    sample: (siteUrl) =>
+      introEmail({
+        siteUrl,
+        change: "booked_coach",
+        otherName: "Taylor R.",
+        message: "Hi! I'm getting back into lifting after a knee injury.",
+        ...intro,
+      }),
+  },
+  {
+    key: "intro.booked_member",
+    name: "Intro booked (to the member)",
+    group: "Sessions",
+    to: "The member",
+    when: "They book a free intro",
+    optional: true,
+    sample: (siteUrl) =>
+      introEmail({
+        siteUrl,
+        change: "booked_member",
+        otherName: "Coach Jasmine",
+        message: "",
+        ...intro,
+      }),
+  },
+  {
+    key: "intro.cancelled",
+    name: "Intro cancelled",
+    group: "Sessions",
+    to: "The coach or member",
+    when: "The other person cancels a free intro",
+    optional: true,
+    sample: (siteUrl) =>
+      introEmail({
+        siteUrl,
+        change: "cancelled",
+        otherName: "Taylor R.",
+        message: "",
+        ...intro,
+      }),
   },
   {
     key: "live.now",

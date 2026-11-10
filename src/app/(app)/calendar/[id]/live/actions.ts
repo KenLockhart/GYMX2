@@ -63,13 +63,11 @@ export async function prepareBroadcast(
       const input = await createLiveInput(
         `GYMX2 · ${session.title}`.slice(0, 120),
       );
-      const { error } = await admin
-        .from("session_live")
-        .insert({
-          session_id: session.id,
-          input_uid: input.uid,
-          playback_url: input.playbackUrl,
-        });
+      const { error } = await admin.from("session_live").insert({
+        session_id: session.id,
+        input_uid: input.uid,
+        playback_url: input.playbackUrl,
+      });
       if (error) throw error;
       uid = input.uid;
     }

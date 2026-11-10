@@ -17,6 +17,8 @@ import {
   loadMyAnswers,
   toMatchSummary,
 } from "@/lib/matching-server";
+import { formatIntroFormats } from "@/lib/intros";
+import { loadOpenSlots } from "@/lib/intros-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -154,13 +156,26 @@ export async function buildView(
   viewer?: { id: string; role: string },
 ) {
   const isMember = viewer?.role === "member" && viewer.id !== coach.id;
-  const [photoUrl, reviews, creds, answers, weights] = await Promise.all([
-    signedCoachPhoto(photoPath),
-    loadCoachReviews(coach.id),
-    loadPublicCredentials(coach.id),
-    isMember ? loadMyAnswers(viewer!.id) : Promise.resolve(null),
-    isMember ? loadMatchWeights() : Promise.resolve(null),
-  ]);
+  const [photoUrl, reviews, creds, answers, weights, slots, saved] =
+    await Promise.all([
+      signedCoachPhoto(photoPath),
+      loadCoachReviews(coach.id),
+      loadPublicCredentials(coach.id),
+      isMember ? loadMyAnswers(viewer!.id) : Promise.resolve(null),
+      isMember ? loadMatchWeights() : Promise.resolve(null),
+      viewer ? loadOpenSlots(coach.id) : Promise.resolve([]),
+      isMember
+        ? createClient().then((db) =>
+            db
+              .from("coach_favorites")
+              .select("coach_id")
+              .eq("member_id", viewer!.id)
+              .eq("coach_id", coach.id)
+              .maybeSingle()
+              .then(({ data }) => Boolean(data)),
+          )
+        : Promise.resolve(undefined),
+    ]);
   const view = toCoachView(draft, {
     id: coach.id,
     name: coach.display_name,
@@ -170,6 +185,19 @@ export async function buildView(
     credentials: creds.credentials,
     verification: creds.verification,
   });
+  if (slots.length) {
+    view.intro = {
+      title: "Free intro session",
+      priceCents: 0,
+      minutes: slots[0].minutes,
+      formats: formatIntroFormats(slots.map((slot) => slot.format)),
+      cancellation:
+        "Free to cancel from your calendar any time before it starts.",
+      questions: [],
+      nextSlot: slots[0].startsAt,
+    };
+  }
+  if (saved !== undefined) view.saved = saved;
   if (isMember) {
     if (answers && weights)
       view.match = toMatchSummary(answers, draft, weights);

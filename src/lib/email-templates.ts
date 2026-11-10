@@ -298,6 +298,92 @@ export function newMessageEmail(input: {
 
 export type SessionChange = "invited" | "updated" | "cancelled";
 
+export type IntroChange = "booked_coach" | "booked_member" | "cancelled";
+
+// Free intro sessions: the coach hears about a booking (with the member's message), the member
+// gets a confirmation, and whoever didn't cancel hears about a cancellation.
+export function introEmail(input: {
+  siteUrl: string;
+  change: IntroChange;
+  // The other person: the member for the coach's emails, the coach for the member's.
+  otherName: string;
+  when: string;
+  format: string;
+  location: string;
+  meetingUrl: string | null;
+  message: string;
+  sessionId: string | null;
+}): Email {
+  const details = [`When: ${input.when}`, `How: ${input.format}`];
+  if (input.location) details.push(`Where: ${input.location}`);
+  if (input.meetingUrl) details.push(`Join online: ${input.meetingUrl}`);
+  const name = input.otherName;
+  const short = oneLine(name, 40);
+  const message =
+    input.message.length > 1000
+      ? `${input.message.slice(0, 999)}…`
+      : input.message;
+  const calendar = input.sessionId
+    ? `${input.siteUrl}/calendar/${input.sessionId}`
+    : `${input.siteUrl}/calendar`;
+  const vars = { name, when: input.when };
+  if (input.change === "booked_coach")
+    return build("intro.booked_coach", vars, {
+      subject: `New intro booked: ${short}`,
+      heading: `${name} booked a free intro`,
+      blocks: [
+        {
+          kind: "p",
+          text: `${name} found you on GYMX2 and booked a free intro session with you.`,
+        },
+        { kind: "lines", lines: details },
+        ...(message
+          ? [
+              { kind: "p" as const, text: `Their message:` },
+              { kind: "quote" as const, text: message },
+            ]
+          : []),
+        {
+          kind: "p",
+          text: "It's on your calendar. If you can't make it, cancel it there so they can pick another time.",
+        },
+      ],
+      button: {
+        label: "See your intros",
+        url: `${input.siteUrl}/calendar/intros`,
+      },
+      footer: UPDATES_FOOTER,
+    });
+  if (input.change === "booked_member")
+    return build("intro.booked_member", vars, {
+      subject: `Your intro with ${short} is booked`,
+      heading: "Your free intro is booked",
+      blocks: [
+        {
+          kind: "p",
+          text: `You're booked in for a free intro with ${name}. It doesn't start a membership.`,
+        },
+        { kind: "lines", lines: details },
+        {
+          kind: "p",
+          text: "Can't make it? Cancel from your calendar any time before it starts.",
+        },
+      ],
+      button: { label: "Open in your calendar", url: calendar },
+      footer: UPDATES_FOOTER,
+    });
+  return build("intro.cancelled", vars, {
+    subject: `Intro cancelled: ${short}`,
+    heading: "An intro was cancelled",
+    blocks: [
+      { kind: "p", text: `${name} cancelled your free intro session.` },
+      { kind: "lines", lines: details.slice(0, 2) },
+    ],
+    button: { label: "Open your calendar", url: `${input.siteUrl}/calendar` },
+    footer: UPDATES_FOOTER,
+  });
+}
+
 export function sessionEmail(input: {
   siteUrl: string;
   change: SessionChange;
