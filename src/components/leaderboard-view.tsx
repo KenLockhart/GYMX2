@@ -601,8 +601,8 @@ export function LeaderboardView({
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden xl:min-h-32 2xl:min-h-40">
-        <TrophyArt className="absolute top-0 right-0 hidden rounded-2xl xl:block xl:h-32 xl:w-72 2xl:h-40 2xl:w-[26rem]" />
+      <div className="relative overflow-hidden xl:min-h-36 2xl:min-h-44">
+        <TrophyArt className="absolute top-0 right-0 hidden xl:block xl:h-36 xl:w-[15rem] 2xl:h-44 2xl:w-[18.25rem]" />
         <p className="text-xs font-bold uppercase tracking-widest text-accent">
           Admin / Insights
         </p>
