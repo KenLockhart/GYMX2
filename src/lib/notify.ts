@@ -5,6 +5,7 @@ import { loadRecipient, sendEmail } from "@/lib/email";
 import { describeFlags, detectFlags } from "@/lib/message-flags";
 import {
   flaggedMessageEmail,
+  introEmail,
   liveNowEmail,
   newMessageEmail,
   newSaleEmail,
@@ -381,5 +382,97 @@ export function notifyGroupPost(post: {
         tag: `group-${post.coach_id}`,
       },
     );
+  });
+}
+
+// Free intros: on booking, the coach hears about it (with the member's message) and the member
+// gets a confirmation; on cancelling, the other person hears about it.
+export function notifyIntro(bookingId: string, change: "booked" | "cancelled") {
+  return safely(`intro ${change}`, async () => {
+    const { data } = await createAdminClient()
+      .from("coach_intro_bookings")
+      .select(
+        "id, coach_id, member_id, message, session_id, cancelled_by, slot:coach_intro_slots!slot_id(starts_at, minutes, format, location, meeting_url)",
+      )
+      .eq("id", bookingId)
+      .maybeSingle();
+    const booking = data as unknown as {
+      coach_id: string;
+      member_id: string;
+      message: string;
+      session_id: string | null;
+      cancelled_by: string | null;
+      slot: {
+        starts_at: string;
+        minutes: number;
+        format: "online" | "in_person";
+        location: string;
+        meeting_url: string | null;
+      } | null;
+    } | null;
+    if (!booking?.slot) return;
+    const [coach, member] = await Promise.all([
+      loadRecipient(booking.coach_id),
+      loadRecipient(booking.member_id),
+    ]);
+    const ends = new Date(
+      new Date(booking.slot.starts_at).getTime() +
+        booking.slot.minutes * 60_000,
+    ).toISOString();
+    const base = {
+      siteUrl: getSiteUrl(),
+      when: formatEmailSessionTime(booking.slot.starts_at, ends),
+      format: booking.slot.format === "online" ? "Video call" : "In person",
+      location: booking.slot.location,
+      meetingUrl: booking.slot.meeting_url,
+      message: booking.message,
+      sessionId: booking.session_id,
+    };
+    const coachName = coach?.name ?? "Your coach";
+    const memberName = member?.name ?? "A member";
+
+    if (change === "booked") {
+      if (coach?.wantsUpdates)
+        await sendEmail(
+          coach.email,
+          introEmail({
+            ...base,
+            change: "booked_coach",
+            otherName: memberName,
+          }),
+        );
+      if (member?.wantsUpdates)
+        await sendEmail(
+          member.email,
+          introEmail({
+            ...base,
+            change: "booked_member",
+            otherName: coachName,
+          }),
+        );
+      await sendPush([booking.coach_id], {
+        title: `New intro: ${memberName}`,
+        body: base.when,
+        url: "/calendar/intros",
+        tag: `intro-${bookingId}`,
+      });
+      return;
+    }
+    // Tell whoever didn't cancel.
+    const toCoach = booking.cancelled_by !== booking.coach_id;
+    const recipient = toCoach ? coach : member;
+    const recipientId = toCoach ? booking.coach_id : booking.member_id;
+    const otherName = toCoach ? memberName : coachName;
+    if (recipient?.wantsUpdates)
+      await sendEmail(
+        recipient.email,
+        introEmail({ ...base, change: "cancelled", otherName }),
+      );
+    await sendPush([recipientId], {
+      title: `Intro cancelled: ${otherName}`,
+      body: base.when,
+      url: toCoach ? "/calendar/intros" : "/calendar",
+      tag: `intro-${bookingId}`,
+    });
   });
 }

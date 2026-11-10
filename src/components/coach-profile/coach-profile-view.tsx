@@ -23,6 +23,7 @@ import {
   SummaryCard,
   VerificationBadge,
 } from "./profile-parts";
+import { LocalDateTime, SaveCoachButton } from "./profile-client";
 
 const SECTIONS = [
   { id: "about", label: "About" },
@@ -74,18 +75,29 @@ function ActionButtons({
             : "flex flex-col gap-2 sm:flex-row"
         }
       >
-        <button
-          type="button"
-          aria-disabled={profile.sample || undefined}
-          aria-describedby={note ? noteId : undefined}
-          className={`btn-primary ${layout === "bar" ? "flex-1 px-3" : ""}`}
-        >
-          Book intro session
-        </button>
-        {layout !== "bar" && (
+        {profile.sample ? (
           <button
             type="button"
-            aria-disabled={profile.sample || undefined}
+            aria-disabled
+            aria-describedby={note ? noteId : undefined}
+            className={`btn-primary ${layout === "bar" ? "flex-1 px-3" : ""}`}
+          >
+            Book intro session
+          </button>
+        ) : (
+          profile.intro && (
+            <Link
+              href={`/coaches/${profile.id}/intro`}
+              className={`btn-primary ${layout === "bar" ? "flex-1 px-3" : ""}`}
+            >
+              Book intro session
+            </Link>
+          )
+        )}
+        {layout !== "bar" && profile.sample && (
+          <button
+            type="button"
+            aria-disabled
             aria-describedby={note ? noteId : undefined}
             className="btn-secondary"
           >
@@ -103,6 +115,9 @@ function ActionButtons({
             </svg>
             Save coach
           </button>
+        )}
+        {layout !== "bar" && !profile.sample && profile.saved !== undefined && (
+          <SaveCoachButton coachId={profile.id} initial={profile.saved} />
         )}
       </div>
       {note && layout !== "bar" && (
@@ -260,6 +275,14 @@ function BookingCard({ profile }: { profile: CoachProfileView }) {
           <dt className="text-muted">Format</dt>
           <dd>{intro.formats.join(" or ")}</dd>
         </div>
+        {intro.nextSlot && (
+          <div className="col-span-2">
+            <dt className="text-muted">Next opening</dt>
+            <dd className="font-semibold">
+              <LocalDateTime iso={intro.nextSlot} />
+            </dd>
+          </div>
+        )}
       </dl>
       <p className="text-xs text-muted">
         {intro.cancellation} Booking an intro never starts a membership.
@@ -869,16 +892,31 @@ export function CoachProfile({
               <div className="lg:hidden">
                 <BookingCard profile={profile} />
               </div>
-              <Card className="space-y-2">
-                <h3 className="font-semibold">
-                  Before your call, {profile.firstName} will ask
-                </h3>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
-                  {profile.intro!.questions.map((question) => (
-                    <li key={question}>{question}</li>
-                  ))}
-                </ul>
-              </Card>
+              {!profile.sample && (
+                <p className="hidden max-w-2xl text-muted lg:block">
+                  Meet {profile.firstName} before you commit: pick one of their
+                  open times for a free intro. It doesn&apos;t start a
+                  membership, and you can cancel any time before it starts.{" "}
+                  <Link
+                    href={`/coaches/${profile.id}/intro`}
+                    className="text-link"
+                  >
+                    See open times
+                  </Link>
+                </p>
+              )}
+              {profile.intro!.questions.length > 0 && (
+                <Card className="space-y-2">
+                  <h3 className="font-semibold">
+                    Before your call, {profile.firstName} will ask
+                  </h3>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+                    {profile.intro!.questions.map((question) => (
+                      <li key={question}>{question}</li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
             </Section>
           )}
         </div>

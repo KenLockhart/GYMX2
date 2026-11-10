@@ -154,6 +154,16 @@ export function CoachDiscovery({
   const [tab, setTab] = useState<Tab>("all");
   const [view, setView] = useState<"grid" | "stack">("grid");
   const [error, setError] = useState<string | null>(null);
+  // Up to three coaches to compare side by side.
+  const [compare, setCompare] = useState<string[]>([]);
+  const toggleCompare = (id: string) =>
+    setCompare((list) =>
+      list.includes(id)
+        ? list.filter((x) => x !== id)
+        : list.length >= 3
+          ? list
+          : [...list, id],
+    );
   const [, start] = useTransition();
 
   const shown = useMemo(() => {
@@ -307,6 +317,18 @@ export function CoachDiscovery({
               </Link>
               <div className="flex flex-1 flex-col gap-3 p-4">
                 <Facts card={card} />
+                <label
+                  className={`flex w-fit items-center gap-2 text-sm ${compare.length >= 3 && !compare.includes(card.id) ? "text-muted/60" : "text-muted"}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={compare.includes(card.id)}
+                    disabled={compare.length >= 3 && !compare.includes(card.id)}
+                    onChange={() => toggleCompare(card.id)}
+                    className="accent-[var(--accent)]"
+                  />
+                  Compare
+                </label>
                 <div className="mt-auto flex flex-wrap gap-2 pt-1">
                   <Link
                     href={`/coaches/${card.id}`}
@@ -356,6 +378,43 @@ export function CoachDiscovery({
             </li>
           ))}
         </ul>
+      )}
+
+      {compare.length > 0 && (
+        <div
+          role="region"
+          aria-label="Compare coaches"
+          className="sticky bottom-3 z-20 mx-auto flex max-w-xl flex-wrap items-center gap-3 rounded-2xl border border-accent/60 bg-background/95 px-4 py-3 shadow-xl backdrop-blur"
+        >
+          <p className="min-w-0 flex-1 truncate text-sm">
+            <span className="font-semibold">
+              Compare {compare.length} of 3:
+            </span>{" "}
+            <span className="text-muted">
+              {compare
+                .map((id) => cards.find((c) => c.id === id)?.name)
+                .filter(Boolean)
+                .join(", ")}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setCompare([])}
+            className="text-sm text-muted hover:text-foreground"
+          >
+            Clear
+          </button>
+          {compare.length >= 2 ? (
+            <Link
+              href={`/coaches/compare?ids=${compare.join(",")}`}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              Compare
+            </Link>
+          ) : (
+            <span className="text-xs text-muted">Pick one more</span>
+          )}
+        </div>
       )}
     </div>
   );

@@ -161,8 +161,9 @@ export type CoachProfileView = {
       reply: string | null;
     }[];
   };
-  // Not yet available for real coaches: the intro video and intro booking arrive in later PRs.
+  // Not yet available for real coaches: the intro video arrives in a later PR.
   video: { prompts: string[] } | null;
+  // Free intro sessions, shown when the coach has open times (always on the sample).
   intro: {
     title: string;
     priceCents: number;
@@ -170,7 +171,11 @@ export type CoachProfileView = {
     formats: string[];
     cancellation: string;
     questions: string[];
+    // The next open time, for "Next opening" on the booking card.
+    nextSlot?: string | null;
   } | null;
+  // Whether a member viewer has saved this coach. Left out for everyone else.
+  saved?: boolean;
 };
 
 // The lowest recurring monthly price, which is the only honest "starting price": intro calls

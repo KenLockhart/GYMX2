@@ -122,9 +122,14 @@ export default async function CalendarPage({
           </p>
         </div>
         {isCoach && (
-          <Link href="/calendar/new" className="btn-primary">
-            Schedule a session
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/calendar/intros" className="btn-secondary">
+              Intro times
+            </Link>
+            <Link href="/calendar/new" className="btn-primary">
+              Schedule a session
+            </Link>
+          </div>
         )}
       </div>
 
