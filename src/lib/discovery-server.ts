@@ -4,7 +4,11 @@ import { PHOTO_BUCKET } from "@/lib/coach-profile-server";
 import { startingMonthlyPrice } from "@/lib/coach-profile";
 import type { CoachCard } from "@/lib/discovery";
 import { computeMatch } from "@/lib/matching";
-import { loadMatchWeights, loadMyAnswers } from "@/lib/matching-server";
+import {
+  loadCoachIdentities,
+  loadMatchWeights,
+  loadMyAnswers,
+} from "@/lib/matching-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -104,6 +108,12 @@ export async function loadDiscoveryCards(viewer: {
     : { data: [] };
   const photoUrl = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]));
 
+  // Needed only to apply the member's coach-preference filter.
+  const identities =
+    answers && weights
+      ? await loadCoachIdentities([...profileByCoach.keys()])
+      : new Map<string, "woman" | "man" | "nonbinary">();
+
   return (coaches ?? []).map((coach) => {
     const id = coach.id as string;
     const row = profileByCoach.get(id);
@@ -112,7 +122,11 @@ export async function loadDiscoveryCards(viewer: {
     const match =
       draft && answers && weights
         ? (() => {
-            const result = computeMatch(answers, draft, weights);
+            const result = computeMatch(
+              answers,
+              { ...draft, identity: identities.get(id) ?? null },
+              weights,
+            );
             return {
               total: result.eligible ? result.total : null,
               eligible: result.eligible,

@@ -116,6 +116,56 @@ export default function TermsPage() {
         terms.
       </p>
 
+      <h3>Finding a coach</h3>
+      <p>
+        <strong>Profiles.</strong> Coaches must keep their profiles truthful and
+        up to date. Don&rsquo;t claim qualifications you don&rsquo;t hold,
+        promise particular results (such as a set amount of weight lost in a set
+        time), make medical claims or describe yourself with rankings members
+        can&rsquo;t check. GYMX2 admins review each profile before it goes live
+        and may ask for changes, label claims, or hide or remove a profile.
+      </p>
+      <p>
+        <strong>Verified credentials.</strong> &ldquo;Verified&rdquo; means a
+        GYMX2 admin checked the credential with the issuing organization or
+        against the document the coach supplied, on the date shown. It
+        isn&rsquo;t an endorsement or a guarantee of a coach&rsquo;s skill, and
+        an expired credential is never shown as verified. Coaches can&rsquo;t
+        mark their own credentials as verified.
+      </p>
+      <p>
+        <strong>Match scores.</strong> Match scores are worked out automatically
+        from your quiz answers and the coach&rsquo;s profile, using weights
+        GYMX2 sets. They help you compare coaches; they aren&rsquo;t a
+        recommendation, a guarantee or a judgment of anyone, and coaches
+        can&rsquo;t pay to change them. Where we don&rsquo;t have enough
+        information, we say so rather than guess.
+      </p>
+      <p>
+        <strong>Free intro sessions.</strong> Intros are free and don&rsquo;t
+        start a membership or any obligation to buy. Either of you can cancel
+        before the intro starts. Members can have one free intro per coach and
+        up to three upcoming intros at a time. Coaches must only offer times
+        they can keep.
+      </p>
+      <p>
+        <strong>Reviews.</strong> Only members who joined a coach can review
+        them, once each, about their own experience. Reviews must be honest and
+        follow these terms. Coaches must not write or buy reviews, offer
+        anything in exchange for a review, or pressure members to change or
+        remove one. Coaches can reply publicly but can&rsquo;t edit or remove
+        reviews. Anyone can report a review; admins hide reviews that are fake,
+        abusive, share private information or break these terms, but don&rsquo;t
+        hide a review just because it&rsquo;s negative.
+      </p>
+      <p>
+        <strong>Reporting and blocking.</strong> You can report a coach to GYMX2
+        admins at any time. Members can also block a coach they&rsquo;ve left:
+        the coach no longer appears in their search, and they can&rsquo;t be
+        joined or booked until the member unblocks them. The coach isn&rsquo;t
+        told.
+      </p>
+
       <h2>5. Coaches: keep members on GYMX2</h2>
       <p>
         Members find coaches through GYMX2. While you coach here, and for 12
