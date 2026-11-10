@@ -55,9 +55,9 @@ export function MatchSummary({ answers }: { answers: MatchAnswers }) {
       <section className="space-y-3 rounded-3xl border border-border bg-surface p-6">
         <h2 className="text-2xl">What you told us</h2>
         <p className="text-sm text-muted">
-          {core.done} of {core.total} main questions answered. Match scores on
-          coach profiles arrive with the next update, and the more you answer,
-          the more they can tell you.
+          {core.done} of {core.total} main questions answered. Your match score
+          shows on each coach&apos;s profile; the more you answer, the more it
+          can tell you.
         </p>
         <dl className="divide-y divide-border">
           {QUESTIONS.map((q) => {

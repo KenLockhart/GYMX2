@@ -135,10 +135,10 @@ export default async function CoachPage({
     return typeof url === "string" && url ? [{ label, url }] : [];
   });
 
-  const view = await loadPublishedView({
-    id: coach.id,
-    display_name: coach.display_name,
-  });
+  const view = await loadPublishedView(
+    { id: coach.id, display_name: coach.display_name },
+    { id: profile.id, role: profile.role },
+  );
   if (view) {
     const actions =
       profile.id === coach.id ? (

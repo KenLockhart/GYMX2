@@ -193,8 +193,12 @@ function Hero({
           sample={profile.sample}
         />
         <SummaryCard
-          value={profile.match ? `${profile.match.total}%` : "—"}
-          label={profile.match ? "Match score" : "Match score soon"}
+          value={
+            profile.match?.total != null && !profile.match.blockers?.length
+              ? `${profile.match.total}%`
+              : "—"
+          }
+          label="Match score"
           sample={profile.sample}
         />
       </div>
@@ -291,7 +295,7 @@ export function CoachProfile({
       profile.about.intro.length > 0 ||
       profile.about.prompts.length > 0 ||
       !!profile.idealClient,
-    match: s || profile.match !== null,
+    match: s || profile.match !== null || !!profile.matchPrompt,
     style:
       profile.style.attributes.length > 0 ||
       profile.style.traits.length > 0 ||
@@ -397,15 +401,45 @@ export function CoachProfile({
 
           {has.match && (
             <Section id="match" title="Our compatibility" sample={s}>
-              {profile.match ? (
+              {profile.match?.blockers?.length ? (
+                <Card className="space-y-3">
+                  <p className="font-semibold">
+                    {profile.firstName} isn&apos;t a match for you right now
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+                    {profile.match.blockers.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-muted">
+                    Based on your answers.{" "}
+                    <Link href="/coaches/match?edit=1" className="text-link">
+                      Change them
+                    </Link>{" "}
+                    if something&apos;s changed.
+                  </p>
+                </Card>
+              ) : profile.match ? (
                 <Card className="space-y-5">
                   <div className="flex flex-wrap items-end justify-between gap-2">
-                    <p>
-                      <span className="font-display text-5xl font-bold text-accent">
-                        {profile.match.total}%
-                      </span>{" "}
-                      <span className="text-muted">match</span>
-                    </p>
+                    {profile.match.total !== null ? (
+                      <p>
+                        <span className="font-display text-5xl font-bold text-accent">
+                          {profile.match.total}%
+                        </span>{" "}
+                        <span className="text-muted">match</span>
+                      </p>
+                    ) : (
+                      <p className="max-w-sm">
+                        <span className="font-semibold">
+                          Not enough information yet.
+                        </span>{" "}
+                        <span className="text-sm text-muted">
+                          Answer more questions, or check back when{" "}
+                          {profile.firstName} fills in more of their profile.
+                        </span>
+                      </p>
+                    )}
                     <p className="text-xs text-muted">
                       A guide from your answers and {profile.firstName}&apos;s
                       profile, not a prediction of results.
@@ -420,35 +454,45 @@ export function CoachProfile({
                       />
                     ))}
                   </div>
-                  <div className="grid gap-5 border-t border-border pt-5 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <h3 className="font-semibold">
-                        Why {profile.firstName} may be a great match for you
-                      </h3>
-                      <ul className="list-disc space-y-1.5 pl-5 text-sm">
-                        {profile.match.reasons.map((reason) => (
-                          <li key={reason}>{reason}</li>
-                        ))}
-                      </ul>
+                  {(profile.match.reasons.length > 0 ||
+                    profile.match.discuss.length > 0) && (
+                    <div className="grid gap-5 border-t border-border pt-5 sm:grid-cols-2">
+                      {profile.match.reasons.length > 0 && (
+                        <div className="space-y-2">
+                          <h3 className="font-semibold">
+                            Why {profile.firstName} may be a great match for you
+                          </h3>
+                          <ul className="list-disc space-y-1.5 pl-5 text-sm">
+                            {profile.match.reasons.map((reason) => (
+                              <li key={reason}>{reason}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {profile.match.discuss.length > 0 && (
+                        <div className="space-y-2">
+                          <h3 className="font-semibold">
+                            Things to discuss before committing
+                          </h3>
+                          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted">
+                            {profile.match.discuss.map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-2">
-                      <h3 className="font-semibold">
-                        Things to discuss before committing
-                      </h3>
-                      <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted">
-                        {profile.match.discuss.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
+                  )}
                 </Card>
               ) : (
-                <Card>
+                <Card className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-muted">
                     Answer a few questions about how you like to train to see
                     how well you and {profile.firstName} fit.
                   </p>
+                  <Link href="/coaches/match" className="btn-primary">
+                    Find your match
+                  </Link>
                 </Card>
               )}
             </Section>

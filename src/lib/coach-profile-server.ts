@@ -12,6 +12,11 @@ import {
   overallVerification,
 } from "@/lib/credentials";
 import { reviewerName } from "@/lib/public-pages";
+import {
+  loadMatchWeights,
+  loadMyAnswers,
+  toMatchSummary,
+} from "@/lib/matching-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -145,13 +150,18 @@ export async function buildView(
   coach: { id: string; display_name: string },
   draft: CoachDraft,
   photoPath: string | null,
+  // A member viewing the profile gets their match, computed fresh from their own answers.
+  viewer?: { id: string; role: string },
 ) {
-  const [photoUrl, reviews, creds] = await Promise.all([
+  const isMember = viewer?.role === "member" && viewer.id !== coach.id;
+  const [photoUrl, reviews, creds, answers, weights] = await Promise.all([
     signedCoachPhoto(photoPath),
     loadCoachReviews(coach.id),
     loadPublicCredentials(coach.id),
+    isMember ? loadMyAnswers(viewer!.id) : Promise.resolve(null),
+    isMember ? loadMatchWeights() : Promise.resolve(null),
   ]);
-  return toCoachView(draft, {
+  const view = toCoachView(draft, {
     id: coach.id,
     name: coach.display_name,
     photoUrl,
@@ -160,13 +170,19 @@ export async function buildView(
     credentials: creds.credentials,
     verification: creds.verification,
   });
+  if (isMember) {
+    if (answers && weights)
+      view.match = toMatchSummary(answers, draft, weights);
+    else view.matchPrompt = true;
+  }
+  return view;
 }
 
 // The approved profile members see, or null when the coach has none published.
-export async function loadPublishedView(coach: {
-  id: string;
-  display_name: string;
-}) {
+export async function loadPublishedView(
+  coach: { id: string; display_name: string },
+  viewer?: { id: string; role: string },
+) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("coach_profiles_public")
@@ -178,5 +194,6 @@ export async function loadPublishedView(coach: {
     coach,
     readDraft(data.data),
     (data.photo_path as string | null) ?? null,
+    viewer,
   );
 }

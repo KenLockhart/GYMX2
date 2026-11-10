@@ -50,10 +50,13 @@ export const MATCH_CATEGORIES = [
 export type MatchCategory = (typeof MATCH_CATEGORIES)[number]["key"];
 
 export type MatchSummary = {
-  total: number;
-  categories: Record<MatchCategory, number>;
+  // Null when there isn't enough information on either side to score fairly.
+  total: number | null;
+  categories: Record<MatchCategory, number | null>;
   reasons: string[];
   discuss: string[];
+  // Hard rules the coach doesn't meet: no score is shown.
+  blockers?: string[];
 };
 
 // The total as a weighted average of the category scores, rounded to a whole percent.
@@ -66,7 +69,8 @@ export function weightedTotal(categories: Record<MatchCategory, number>) {
   return Math.round(sum / weights);
 }
 
-export type CredentialStatus = "verified" | "pending" | "unverified" | "expired";
+export type CredentialStatus =
+  "verified" | "pending" | "unverified" | "expired";
 
 export type CoachPackage = {
   name: string;
@@ -95,6 +99,8 @@ export type CoachProfileView = {
   rating: { average: number; count: number } | null;
   experienceYears: number;
   match: MatchSummary | null;
+  // Shown instead of a score when the viewer hasn't answered the questionnaire.
+  matchPrompt?: boolean;
   about: {
     intro: string[];
     threeWords: string[];

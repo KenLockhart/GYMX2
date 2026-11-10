@@ -50,6 +50,8 @@ export const coachDraftSchema = z.object({
   experienceYears: z.number().int().min(0).max(60).nullable().default(null),
   specialties: list(z.string().trim().min(1).max(30), 3),
   acceptingClients: z.boolean().default(true),
+  // Optional and never displayed: used only when a member asks for a coach who is a woman or a man.
+  identity: z.enum(["woman", "man", "nonbinary"]).nullable().default(null),
   about: z
     .object({
       intro: text(2000),
