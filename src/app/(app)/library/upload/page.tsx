@@ -18,7 +18,10 @@ export default async function UploadPage() {
       {isStreamConfigured() ? (
         <UploadForm />
       ) : (
-        <p role="status" className="rounded-lg border border-border bg-surface p-4 text-muted">
+        <p
+          role="status"
+          className="rounded-lg border border-border bg-surface p-4 text-muted"
+        >
           Video uploads aren&apos;t connected yet.
         </p>
       )}

@@ -1,3 +1,4 @@
+import { VIDEO_CATEGORIES } from "./video-library";
 import { z } from "zod";
 
 const email = z
@@ -84,6 +85,8 @@ export const videoSchema = z.object({
     .string()
     .trim()
     .max(2000, "Use 2,000 characters or fewer for the description."),
+  category: z.enum(VIDEO_CATEGORIES).catch("Other"),
+  visibility: z.enum(["members", "private"]).catch("members"),
 });
 
 export const taskSchema = z.object({
