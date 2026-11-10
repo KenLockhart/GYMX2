@@ -6,6 +6,11 @@ import {
   toCoachView,
 } from "@/lib/coach-draft";
 import type { CoachProfileView } from "@/lib/coach-profile";
+import {
+  type DisplayStatus,
+  kindLabel,
+  overallVerification,
+} from "@/lib/credentials";
 import { reviewerName } from "@/lib/public-pages";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -89,14 +94,62 @@ export async function loadCoachReviews(coachId: string) {
   return { rating, items };
 }
 
+function monthYear(value: string) {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+// The credentials members may see, through the database function that leaves out ID numbers,
+// documents and notes and never shows an expired credential as verified.
+export async function loadPublicCredentials(coachId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("public_coach_credentials", {
+    target_coach_id: coachId,
+  });
+  const rows = (data ?? []) as {
+    kind: string;
+    organization: string;
+    title: string;
+    display_status: DisplayStatus;
+    expires_on: string | null;
+    verified_at: string | null;
+  }[];
+  const credentials: CoachProfileView["credentials"] = rows.map((row) => ({
+    title: row.title,
+    organization: row.organization,
+    status: row.display_status,
+    detail: [
+      kindLabel(row.kind),
+      row.display_status === "verified" && row.verified_at
+        ? `checked by GYMX2 in ${monthYear(row.verified_at)}`
+        : null,
+      row.expires_on
+        ? `${row.display_status === "expired" ? "expired" : "valid until"} ${monthYear(row.expires_on)}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  }));
+  return {
+    credentials,
+    verification: overallVerification(
+      rows.map((row) => ({ kind: row.kind, status: row.display_status })),
+    ),
+  };
+}
+
 export async function buildView(
   coach: { id: string; display_name: string },
   draft: CoachDraft,
   photoPath: string | null,
 ) {
-  const [photoUrl, reviews] = await Promise.all([
+  const [photoUrl, reviews, creds] = await Promise.all([
     signedCoachPhoto(photoPath),
     loadCoachReviews(coach.id),
+    loadPublicCredentials(coach.id),
   ]);
   return toCoachView(draft, {
     id: coach.id,
@@ -104,6 +157,8 @@ export async function buildView(
     photoUrl,
     rating: reviews.rating,
     reviews: reviews.items,
+    credentials: creds.credentials,
+    verification: creds.verification,
   });
 }
 
