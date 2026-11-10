@@ -1,9 +1,23 @@
-import Link from "next/link";
-import { signOut } from "@/app/(auth)/actions";
-import { BrandLink } from "@/components/brand-link";
-import { NotificationBell } from "@/components/notification-bell";
+import { AppHeader } from "@/components/app-header";
+import { MainContainer } from "@/components/main-container";
+import { loadAdminCounts, sidebarBadges } from "@/lib/admin-console-server";
 import { requireAccount } from "@/lib/auth";
+import {
+  allDestinations,
+  initials,
+  menuGroups,
+  messagesHref,
+  primaryNav,
+  type Role,
+} from "@/lib/nav";
 import { createClient } from "@/lib/supabase/server";
+
+const ROLE_LABEL: Record<Role, string> = {
+  member: "Member",
+  coach: "Coach",
+  moderator: "Moderator",
+  admin: "Admin",
+};
 
 export default async function AppLayout({
   children,
@@ -40,131 +54,26 @@ export default async function AppLayout({
     unread = count ?? 0;
   }
 
+  const role = profile.role as Role;
+  const adminBadges =
+    role === "admin" ? sidebarBadges(await loadAdminCounts()) : undefined;
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-border">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 sm:px-6">
-          <BrandLink href="/dashboard" />
-          <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-medium">
-            <Link href="/dashboard" className="hover:text-accent">
-              Dashboard
-            </Link>
-            <Link href="/tasks" className="hover:text-accent">
-              Tasks
-            </Link>
-            <Link href="/calendar" className="hover:text-accent">
-              Calendar
-            </Link>
-            <Link href="/library" className="hover:text-accent">
-              Library
-            </Link>
-            <Link href="/armory" className="hover:text-accent">
-              Armory
-            </Link>
-            {profile.role === "member" && (
-              <Link href="/coaches" className="hover:text-accent">
-                Coaches
-              </Link>
-            )}
-            {profile.role === "coach" && (
-              <>
-                <Link href="/members" className="hover:text-accent">
-                  Members
-                </Link>
-                <Link href="/plans" className="hover:text-accent">
-                  Memberships
-                </Link>
-                <Link href="/insights" className="hover:text-accent">
-                  Insights
-                </Link>
-              </>
-            )}
-            {profile.role === "admin" ? (
-              <Link href="/admin/messages" className="hover:text-accent">
-                Messages
-              </Link>
-            ) : (
-              <Link
-                href="/messages"
-                className="inline-flex items-center gap-1.5 hover:text-accent"
-              >
-                Messages
-                {unread > 0 && (
-                  <span className="rounded-full bg-accent px-1.5 text-xs font-bold text-accent-foreground">
-                    {unread}
-                    <span className="sr-only"> unread</span>
-                  </span>
-                )}
-              </Link>
-            )}
-            <Link href="/community" className="hover:text-accent">
-              Community
-            </Link>
-            <Link href="/groups" className="hover:text-accent">
-              {profile.role === "coach" ? "My community" : "Coach communities"}
-            </Link>
-            <Link href="/programs" className="hover:text-accent">
-              Programs
-            </Link>
-            <Link href="/memos" className="hover:text-accent">
-              Memos
-            </Link>
-            {profile.role !== "admin" && (
-              <>
-                <Link
-                  href={profile.role === "coach" ? "/checkins" : "/checkin"}
-                  className="hover:text-accent"
-                >
-                  {profile.role === "coach" ? "Check-ins" : "Check-in"}
-                </Link>
-                <Link href="/track" className="hover:text-accent">
-                  Track
-                </Link>
-                <Link href="/progress" className="hover:text-accent">
-                  Progress
-                </Link>
-              </>
-            )}
-            <NotificationBell
-              me={profile.id}
-              initialCount={unreadNotifications ?? 0}
-            />
-            <Link href="/profile" className="hover:text-accent">
-              Profile
-            </Link>
-            {["moderator", "coach", "admin"].includes(profile.role) && (
-              <Link
-                href="/moderation"
-                className="inline-flex items-center gap-1.5 hover:text-accent"
-              >
-                Reports
-                {openReports > 0 && (
-                  <span className="rounded-full bg-danger px-1.5 text-xs font-bold text-background">
-                    {openReports}
-                    <span className="sr-only"> open</span>
-                  </span>
-                )}
-              </Link>
-            )}
-            {profile.role === "admin" && (
-              <Link href="/admin" className="hover:text-accent">
-                Admin
-              </Link>
-            )}
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="cursor-pointer text-muted hover:text-foreground"
-              >
-                Log out
-              </button>
-            </form>
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
-        {children}
-      </main>
+      <AppHeader
+        me={profile.id}
+        name={profile.display_name}
+        initials={initials(profile.display_name)}
+        roleLabel={ROLE_LABEL[role] ?? "Member"}
+        primary={primaryNav(role)}
+        groups={menuGroups(role)}
+        destinations={allDestinations(role)}
+        messagesHref={messagesHref(role)}
+        messagesLabel={role === "admin" ? "Review conversations" : "Messages"}
+        unreadMessages={unread}
+        unreadNotifications={unreadNotifications ?? 0}
+        badges={openReports > 0 ? { "/moderation": openReports } : {}}
+      />
+      <MainContainer adminBadges={adminBadges}>{children}</MainContainer>
     </div>
   );
 }

@@ -49,18 +49,21 @@ export function NotificationBell({
     };
   }, [me]);
 
+  const active = pathname === "/notifications";
   return (
     <Link
       href="/notifications"
-      aria-current={pathname === "/notifications" ? "page" : undefined}
-      className="inline-flex items-center gap-1.5 hover:text-accent"
+      aria-current={active ? "page" : undefined}
+      className={`relative grid size-10 place-items-center rounded-full hover:bg-surface-raised ${
+        active ? "text-accent" : "text-foreground/85 hover:text-foreground"
+      }`}
     >
       <svg
         aria-hidden
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
         className="size-5"
@@ -68,11 +71,15 @@ export function NotificationBell({
         <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
         <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
       </svg>
-      <span className="sr-only">Notifications</span>
+      <span className="sr-only">
+        Notifications{count > 0 && `, ${count} unread`}
+      </span>
       {count > 0 && (
-        <span className="rounded-full bg-accent px-1.5 text-xs font-bold text-accent-foreground">
+        <span
+          aria-hidden
+          className="absolute right-0.5 top-0.5 min-w-5 rounded-full bg-accent px-1.5 text-center text-xs font-bold leading-5 text-accent-foreground"
+        >
           {count > 99 ? "99+" : count}
-          <span className="sr-only"> unread</span>
         </span>
       )}
     </Link>
