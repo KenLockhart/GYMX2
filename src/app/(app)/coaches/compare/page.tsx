@@ -21,7 +21,9 @@ export default async function ComparePage({
     ids.length >= 2
       ? await loadDiscoveryCards({ id: profile.id, role: profile.role })
       : [];
-  const cards = ids.flatMap((id) => all.filter((card) => card.id === id));
+  const cards = ids.flatMap((id) =>
+    all.filter((card) => card.id === id && !card.blocked),
+  );
   const nextIntro = await Promise.all(
     cards.map((card) =>
       card.hasProfile ? loadOpenSlots(card.id).then((s) => s[0] ?? null) : null,

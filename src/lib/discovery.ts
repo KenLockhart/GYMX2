@@ -25,6 +25,8 @@ export type CoachCard = {
   joined: boolean;
   saved: boolean;
   passed: boolean;
+  // Coaches the member blocked: left out of every list except Blocked.
+  blocked: boolean;
 };
 
 export type DiscoveryFilters = {

@@ -98,6 +98,33 @@ describe("coach draft", () => {
     expect(warnings.some((w) => w.includes("medical"))).toBe(true);
   });
 
+  it("flags rankings, timed results and unchecked certifications", () => {
+    const d = complete();
+    d.headline = "Atlanta's #1 trainer: lose 20 lbs in 30 days";
+    const warnings = profileWarnings(d);
+    expect(warnings.some((w) => w.includes("rankings"))).toBe(true);
+    expect(warnings.some((w) => w.includes("set time"))).toBe(true);
+
+    d.headline = "NASM certified strength coach";
+    expect(
+      profileWarnings(d, []).some((w) => w.includes("Qualifications")),
+    ).toBe(true);
+    expect(
+      profileWarnings(d, [{ status: "rejected" }]).some((w) =>
+        w.includes("Qualifications"),
+      ),
+    ).toBe(true);
+    expect(
+      profileWarnings(d, [{ status: "pending" }]).some((w) =>
+        w.includes("Qualifications"),
+      ),
+    ).toBe(false);
+    // Without credentials to check against, no certification warning.
+    expect(profileWarnings(d).some((w) => w.includes("Qualifications"))).toBe(
+      false,
+    );
+  });
+
   it("turns a draft into the member view", () => {
     const d = complete();
     d.about.intro = "First paragraph.\n\nSecond paragraph.";

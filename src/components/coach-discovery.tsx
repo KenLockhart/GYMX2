@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { setPassed, setSaved } from "@/app/(app)/coaches/discovery-actions";
+import { unblockCoach } from "@/app/(app)/coaches/safety-actions";
 import { COACH_STYLE, POPULATIONS } from "@/lib/coach-options";
 import { formatPrice } from "@/lib/coach-profile";
 import {
@@ -15,7 +16,7 @@ import {
   sortCoaches,
 } from "@/lib/discovery";
 
-type Tab = "all" | "saved" | "passed";
+type Tab = "all" | "saved" | "passed" | "blocked";
 
 function Portrait({
   card,
@@ -168,7 +169,15 @@ export function CoachDiscovery({
 
   const shown = useMemo(() => {
     const inTab = cards.filter((c) =>
-      tab === "saved" ? c.saved : tab === "passed" ? c.passed : !c.passed,
+      tab === "blocked"
+        ? c.blocked
+        : c.blocked
+          ? false
+          : tab === "saved"
+            ? c.saved
+            : tab === "passed"
+              ? c.passed
+              : !c.passed,
     );
     return sortCoaches(filterCoaches(inTab, filters), sort);
   }, [cards, filters, sort, tab]);
@@ -204,11 +213,25 @@ export function CoachDiscovery({
   }
 
   const count = activeFilterCount(filters);
+  const visible = cards.filter((c) => !c.blocked);
   const counts = {
-    all: cards.filter((c) => !c.passed).length,
-    saved: cards.filter((c) => c.saved).length,
-    passed: cards.filter((c) => c.passed).length,
+    all: visible.filter((c) => !c.passed).length,
+    saved: visible.filter((c) => c.saved).length,
+    passed: visible.filter((c) => c.passed).length,
+    blocked: cards.filter((c) => c.blocked).length,
   };
+
+  function unblock(id: string) {
+    setError(null);
+    start(async () => {
+      const result = await unblockCoach(id);
+      if (result.error) setError(result.error);
+      else
+        setCards((current) =>
+          current.map((c) => (c.id === id ? { ...c, blocked: false } : c)),
+        );
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -218,8 +241,12 @@ export function CoachDiscovery({
           aria-label="Which coaches"
           className="flex gap-1 rounded-full border border-border p-1"
         >
-          {(["all", "saved", "passed"] as const)
-            .filter((t) => canSave || t === "all")
+          {(["all", "saved", "passed", "blocked"] as const)
+            .filter(
+              (t) =>
+                (canSave || t === "all") &&
+                (t !== "blocked" || counts.blocked > 0 || tab === "blocked"),
+            )
             .map((t) => (
               <button
                 key={t}
@@ -228,8 +255,14 @@ export function CoachDiscovery({
                 onClick={() => setTab(t)}
                 className={`rounded-full px-3 py-1.5 text-sm ${tab === t ? "bg-accent font-semibold text-accent-foreground" : "text-muted hover:text-foreground"}`}
               >
-                {t === "all" ? "Coaches" : t === "saved" ? "Saved" : "Passed"} (
-                {counts[t]})
+                {t === "all"
+                  ? "Coaches"
+                  : t === "saved"
+                    ? "Saved"
+                    : t === "passed"
+                      ? "Passed"
+                      : "Blocked"}{" "}
+                ({counts[t]})
               </button>
             ))}
         </div>
@@ -297,13 +330,15 @@ export function CoachDiscovery({
         <p className="rounded-2xl border border-border bg-surface p-6 text-center text-muted">
           {tab === "saved"
             ? "Save coaches you like to compare them later."
-            : tab === "passed"
-              ? "Coaches you pass on show here, so you can change your mind."
-              : count > 0
-                ? "No coaches match those filters. Try removing one."
-                : "No coaches yet."}
+            : tab === "blocked"
+              ? "You haven't blocked anyone."
+              : tab === "passed"
+                ? "Coaches you pass on show here, so you can change your mind."
+                : count > 0
+                  ? "No coaches match those filters. Try removing one."
+                  : "No coaches yet."}
         </p>
-      ) : view === "stack" ? (
+      ) : view === "stack" && tab !== "blocked" ? (
         <Stack cards={shown} canSave={canSave} onFlag={flag} />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -344,7 +379,16 @@ export function CoachDiscovery({
                       Message
                     </Link>
                   )}
-                  {canSave && (
+                  {card.blocked && (
+                    <button
+                      type="button"
+                      onClick={() => unblock(card.id)}
+                      className="btn-secondary px-3 py-2 text-sm"
+                    >
+                      Unblock
+                    </button>
+                  )}
+                  {canSave && !card.blocked && (
                     <>
                       <button
                         type="button"

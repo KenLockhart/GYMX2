@@ -87,6 +87,13 @@ export async function startMembershipCheckout(
   if (!plan?.stripe_price_id)
     return { error: "That plan isn't available right now." };
   if (plan.coach_id === member.id) return { error: "This is your own plan." };
+  const { data: block } = await db
+    .from("coach_blocks")
+    .select("coach_id")
+    .eq("member_id", member.id)
+    .eq("coach_id", plan.coach_id)
+    .maybeSingle();
+  if (block) return { error: "You blocked this coach. Unblock them to join." };
 
   const { data: existing } = await db
     .from("subscriptions")
