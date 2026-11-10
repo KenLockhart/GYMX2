@@ -57,6 +57,44 @@ export default function PrivacyPage() {
           you&rsquo;ve joined.
         </li>
         <li>
+          <strong>Coach profiles:</strong> what coaches add to their profile
+          (photo, headline, specialties, experience, coaching style, packages,
+          policies and availability). Signed-in users see a profile once a GYMX2
+          admin approves it. Coaches can also say whether they are a woman, a
+          man or nonbinary; this is optional, never shown on the profile, and
+          used only when a member asks for a coach who is a woman or a man.
+        </li>
+        <li>
+          <strong>Coach credentials:</strong> certifications, licenses and other
+          qualifications a coach submits, with the issuing organization, number,
+          dates and any document they upload. GYMX2 admins use them to check the
+          credential. Members see only the title, the organization and whether
+          GYMX2 has verified it, never numbers or documents.
+        </li>
+        <li>
+          <strong>Your coach match answers:</strong> if you take the coach match
+          quiz, your answers about your goals, schedule, training preferences,
+          Coaching Love Language and, if you choose, the kind of coach you
+          prefer. Only you can see your answers. We use them only to work out
+          match scores for you, which only you see. Coaches and admins
+          don&rsquo;t see your answers or your scores, and you can change or
+          delete them at any time.
+        </li>
+        <li>
+          <strong>Finding a coach:</strong> coaches you save, pass on or block.
+          These lists are private to you. Coaches aren&rsquo;t told and
+          can&rsquo;t see them.
+        </li>
+        <li>
+          <strong>Intro sessions:</strong> the intro times coaches offer, the
+          time you book, the message you send with it and any cancellation.
+        </li>
+        <li>
+          <strong>Reviews and reports:</strong> reviews you write (your overall
+          rating, optional category ratings and comments), coaches&rsquo;
+          replies, and reports you send about reviews or coaches.
+        </li>
+        <li>
           <strong>What you upload:</strong> videos, files and images, such as
           training videos and Armory items.
         </li>
@@ -152,6 +190,25 @@ export default function PrivacyPage() {
           only the coach is on camera and nothing is recorded. Members invited
           to the session see your name and live chat messages, and your coach
           sees that you watched.
+        </li>
+        <li>
+          <strong>Intro sessions:</strong> when you book a free intro, the coach
+          sees your name, the time and your message, and the intro appears on
+          both of your calendars. The coach&rsquo;s meeting place or video link
+          is shared with you only once you book.
+        </li>
+        <li>
+          <strong>Reviews:</strong> your review appears on the coach&rsquo;s
+          profile and public page with your first name and last initial, along
+          with any reply from the coach. Category scores are shown only as an
+          average once at least three members have rated that category. Admins
+          can hide reviews that break our <Link href="/terms">Terms</Link>; you
+          still see your own.
+        </li>
+        <li>
+          <strong>Reports about reviews and coaches</strong> go to GYMX2 admins,
+          who see who sent them. The coach or reviewer isn&rsquo;t told who
+          reported them.
         </li>
         <li>
           <strong>Sellers</strong> see what you bought from them and, for gear,

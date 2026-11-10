@@ -8,11 +8,12 @@ export default function AccountDeletedPage() {
     <article>
       <h1>Your account is deleted</h1>
       <p>
-        Your GYMX2 account and everything in it is gone. We sent a confirmation to your email. Thanks for training
-        with us.
+        Your GYMX2 account and everything in it is gone. We sent a confirmation
+        to your email. Thanks for training with us.
       </p>
       <p>
-        Changed your mind? You&apos;re always welcome back: <Link href="/signup">create a new account</Link>.
+        Changed your mind? You&apos;re always welcome back:{" "}
+        <Link href="/signup">create a new account</Link>.
       </p>
     </article>
   );

@@ -14,6 +14,7 @@ import {
 import { reviewerName } from "@/lib/public-pages";
 import { categoryAverages, type ReviewCategoryColumn } from "@/lib/reviews";
 import {
+  loadCoachIdentities,
   loadMatchWeights,
   loadMyAnswers,
   toMatchSummary,
@@ -226,9 +227,14 @@ export async function loadPublishedView(
     .eq("coach_id", coach.id)
     .maybeSingle();
   if (!data) return null;
+  // The identity answer isn't in the published copy; the server adds it back only for matching.
+  const draft = readDraft(data.data);
+  if (viewer?.role === "member")
+    draft.identity =
+      (await loadCoachIdentities([coach.id])).get(coach.id) ?? null;
   return buildView(
     coach,
-    readDraft(data.data),
+    draft,
     (data.photo_path as string | null) ?? null,
     viewer,
   );

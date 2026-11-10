@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { BrandLink } from "@/components/brand-link";
 
-export default function LegalLayout({ children }: { children: React.ReactNode }) {
+export default function LegalLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 sm:px-6">
       <header className="flex items-center justify-between py-5">

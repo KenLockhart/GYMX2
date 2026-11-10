@@ -8,6 +8,7 @@ import {
   type MatchWeights,
   validWeights,
 } from "@/lib/matching";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function loadMatchWeights(): Promise<MatchWeights> {
@@ -62,4 +63,21 @@ export function toMatchSummary(
     reasons: result.reasons,
     discuss: result.discuss,
   };
+}
+
+// Coaches' optional identity answers, kept out of the published profile so members can't read them.
+// Only the server reads them, only to apply a member's coach-preference filter.
+export async function loadCoachIdentities(coachIds: string[]) {
+  if (!coachIds.length) return new Map<string, "woman" | "man" | "nonbinary">();
+  const { data } = await createAdminClient()
+    .from("coach_profiles_public")
+    .select("coach_id, identity")
+    .in("coach_id", coachIds)
+    .not("identity", "is", null);
+  return new Map(
+    (data ?? []).map((row) => [
+      row.coach_id as string,
+      row.identity as "woman" | "man" | "nonbinary",
+    ]),
+  );
 }

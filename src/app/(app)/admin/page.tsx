@@ -26,6 +26,8 @@ export default async function AdminPage() {
     { data: salesData },
     { data: messageData },
     { data: subscriptionData },
+    { count: openReviewReports },
+    { count: openCoachReports },
   ] = await Promise.all([
     supabase.rpc("admin_list_users"),
     supabase
@@ -41,7 +43,16 @@ export default async function AdminPage() {
       .gte("created_at", weekAgo)
       .limit(2000),
     supabase.from("subscriptions").select("status, price_cents").limit(10000),
+    supabase
+      .from("review_reports")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "open"),
+    supabase
+      .from("coach_reports")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "open"),
   ]);
+  const openReports = (openReviewReports ?? 0) + (openCoachReports ?? 0);
   // Coach requests first, then newest sign-ups.
   const users = ((data ?? []) as AdminUser[]).toSorted(
     (a, b) =>
@@ -141,6 +152,11 @@ export default async function AdminPage() {
           </Link>
           <Link href="/admin/reports" className="btn-secondary">
             Review and coach reports
+            {openReports > 0 && (
+              <span className="ml-2 rounded-full bg-accent px-2 text-xs font-bold text-accent-foreground">
+                {openReports} open
+              </span>
+            )}
           </Link>
           <Link href="/admin/emails" className="btn-secondary">
             Emails
