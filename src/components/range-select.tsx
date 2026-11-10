@@ -1,13 +1,23 @@
 "use client";
 
 import { CalendarDays } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
-import { RANGES, type RangeDays } from "@/lib/admin-console";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { RANGES } from "@/lib/admin-console";
 
-// The overview's time range, kept in the address so it can be shared and survives a refresh.
-export function RangeSelect({ value }: { value: RangeDays }) {
+type Option = { value: string | number; label: string };
+
+// A time range kept in the address (so it can be shared and survives a refresh). Other settings in
+// the address, such as the open tab, stay as they are.
+export function RangeSelect({
+  value,
+  options = RANGES.map((r) => ({ value: r.days, label: r.label })),
+}: {
+  value: string | number;
+  options?: readonly Option[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
+  const params = useSearchParams();
   return (
     <label className="relative flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm">
       <CalendarDays
@@ -17,12 +27,16 @@ export function RangeSelect({ value }: { value: RangeDays }) {
       />
       <span className="sr-only">Time range</span>
       <select
-        value={value}
-        onChange={(e) => router.push(`${pathname}?range=${e.target.value}`)}
+        value={String(value)}
+        onChange={(e) => {
+          const next = new URLSearchParams(params.toString());
+          next.set("range", e.target.value);
+          router.push(`${pathname}?${next.toString()}`);
+        }}
         className="cursor-pointer appearance-none bg-transparent pr-5 font-semibold outline-none"
       >
-        {RANGES.map((r) => (
-          <option key={r.days} value={r.days} className="bg-surface">
+        {options.map((r) => (
+          <option key={r.value} value={String(r.value)} className="bg-surface">
             {r.label}
           </option>
         ))}

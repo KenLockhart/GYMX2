@@ -1,7 +1,12 @@
 // Admin leaderboards, worked out from activity counts. Only who-did-what-when is used,
 // never the content of messages or memos.
 
-export type Person = { id: string; display_name: string; role: string };
+export type Person = {
+  id: string;
+  display_name: string;
+  role: string;
+  created_at?: string;
+};
 
 export type ActivityRows = {
   people: Person[];
@@ -23,12 +28,25 @@ export type ActivityRows = {
     fee_cents: number;
     refunded_at: string | null;
     kind?: string;
+    created_at?: string;
   }[];
 };
 
 // How much each action counts toward an activity score. Shown on the page so the ranking is clear.
-export const MEMBER_POINTS = { tasks: 3, sessions: 2, messages: 1, memos: 1, habits: 1 } as const;
-export const COACH_POINTS = { videos: 3, newMembers: 3, sessions: 2, tasks: 1, messages: 1 } as const;
+export const MEMBER_POINTS = {
+  tasks: 3,
+  sessions: 2,
+  messages: 1,
+  memos: 1,
+  habits: 1,
+} as const;
+export const COACH_POINTS = {
+  videos: 3,
+  newMembers: 3,
+  sessions: 2,
+  tasks: 1,
+  messages: 1,
+} as const;
 
 function tally<T>(rows: T[], key: (row: T) => string | null) {
   const counts = new Map<string, number>();
@@ -40,8 +58,11 @@ function tally<T>(rows: T[], key: (row: T) => string | null) {
 }
 
 export function buildLeaderboards(rows: ActivityRows, limit = 10) {
-  const byRole = (role: string) => rows.people.filter((person) => person.role === role);
-  const name = new Map(rows.people.map((person) => [person.id, person.display_name]));
+  const byRole = (role: string) =>
+    rows.people.filter((person) => person.role === role);
+  const name = new Map(
+    rows.people.map((person) => [person.id, person.display_name]),
+  );
 
   const completed = tally(rows.completions, (row) => row.member_id);
   const going = tally(rows.going, (row) => row.member_id);
@@ -107,15 +128,23 @@ export function buildLeaderboards(rows: ActivityRows, limit = 10) {
     buyerTotals.set(sale.member_id, row);
   }
   const buyers = [...buyerTotals]
-    .map(([id, totals]) => ({ id, name: name.get(id) ?? "Former member", ...totals }))
+    .map(([id, totals]) => ({
+      id,
+      name: name.get(id) ?? "Former member",
+      ...totals,
+    }))
     .sort((a, b) => b.cents - a.cents || b.orders - a.orders)
     .slice(0, limit);
 
   // GYMX2's own items (sold by an admin) are grouped as GYMX2.
   const admins = new Set(byRole("admin").map((person) => person.id));
-  const sellerTotals = new Map<string, { sales: number; cents: number; earned: number }>();
+  const sellerTotals = new Map<
+    string,
+    { sales: number; cents: number; earned: number }
+  >();
   for (const sale of paid) {
-    const key = !sale.seller_id || admins.has(sale.seller_id) ? "gymx2" : sale.seller_id;
+    const key =
+      !sale.seller_id || admins.has(sale.seller_id) ? "gymx2" : sale.seller_id;
     const row = sellerTotals.get(key) ?? { sales: 0, cents: 0, earned: 0 };
     row.sales += 1;
     row.cents += sale.amount_cents;
@@ -123,18 +152,36 @@ export function buildLeaderboards(rows: ActivityRows, limit = 10) {
     sellerTotals.set(key, row);
   }
   const sellers = [...sellerTotals]
-    .map(([id, totals]) => ({ id, name: id === "gymx2" ? "GYMX2" : (name.get(id) ?? "Former coach"), ...totals }))
+    .map(([id, totals]) => ({
+      id,
+      name: id === "gymx2" ? "GYMX2" : (name.get(id) ?? "Former coach"),
+      ...totals,
+    }))
     .sort((a, b) => b.cents - a.cents || b.sales - a.sales)
     .slice(0, limit);
 
   const itemTotals = new Map<
     string,
-    { id: string | null; title: string; sold: number; cents: number; membership: boolean }
+    {
+      id: string | null;
+      title: string;
+      sold: number;
+      cents: number;
+      membership: boolean;
+    }
   >();
   for (const sale of paid) {
     const membership = sale.kind === "membership";
-    const key = sale.item_id ?? `${membership ? "membership" : "removed"}:${sale.item_title}`;
-    const row = itemTotals.get(key) ?? { id: sale.item_id, title: sale.item_title, sold: 0, cents: 0, membership };
+    const key =
+      sale.item_id ??
+      `${membership ? "membership" : "removed"}:${sale.item_title}`;
+    const row = itemTotals.get(key) ?? {
+      id: sale.item_id,
+      title: sale.item_title,
+      sold: 0,
+      cents: 0,
+      membership,
+    };
     row.sold += 1;
     row.cents += sale.amount_cents;
     itemTotals.set(key, row);
@@ -153,9 +200,94 @@ export const LEADERBOARD_RANGES = [
 ] as const;
 
 export function rangeStart(value: string | undefined, now = new Date()) {
-  const range = LEADERBOARD_RANGES.find((option) => option.value === value) ?? LEADERBOARD_RANGES[1];
+  const range =
+    LEADERBOARD_RANGES.find((option) => option.value === value) ??
+    LEADERBOARD_RANGES[1];
   return {
     range,
-    since: range.days === null ? null : new Date(now.getTime() - range.days * 24 * 60 * 60 * 1000).toISOString(),
+    since:
+      range.days === null
+        ? null
+        : new Date(
+            now.getTime() - range.days * 24 * 60 * 60 * 1000,
+          ).toISOString(),
   };
+}
+
+// Community engagement: shared posts, comments and likes. Posts kept to "only me" and removed
+// posts or comments don't count.
+export const ENGAGEMENT_POINTS = { posts: 3, comments: 2, likes: 1 } as const;
+
+export type EngagementRows = {
+  posts: { author_id: string }[];
+  comments: { author_id: string }[];
+  likes: { user_id: string }[];
+};
+
+export function buildEngagement(
+  people: Person[],
+  rows: EngagementRows,
+  limit = 10,
+) {
+  const posts = tally(rows.posts, (r) => r.author_id);
+  const comments = tally(rows.comments, (r) => r.author_id);
+  const likes = tally(rows.likes, (r) => r.user_id);
+  return people
+    .filter((person) => person.role !== "admin")
+    .map((person) => {
+      const stats = {
+        posts: posts.get(person.id) ?? 0,
+        comments: comments.get(person.id) ?? 0,
+        likes: likes.get(person.id) ?? 0,
+      };
+      const score =
+        stats.posts * ENGAGEMENT_POINTS.posts +
+        stats.comments * ENGAGEMENT_POINTS.comments +
+        stats.likes * ENGAGEMENT_POINTS.likes;
+      return {
+        id: person.id,
+        name: person.display_name,
+        role: person.role,
+        ...stats,
+        score,
+      };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    .slice(0, limit);
+}
+
+// Armory sales over a window and the one before it, with a running total per day.
+export function salesTrend(
+  sales: {
+    amount_cents: number;
+    created_at?: string;
+    refunded_at: string | null;
+  }[],
+  days: number,
+  now = new Date(),
+) {
+  const DAY = 24 * 60 * 60 * 1000;
+  const end = now.getTime();
+  const start = end - days * DAY;
+  const paid = sales
+    .filter((s) => !s.refunded_at && s.created_at)
+    .map((s) => ({
+      t: new Date(s.created_at!).getTime(),
+      cents: s.amount_cents,
+    }));
+  const sum = (from: number, to: number) =>
+    paid
+      .filter((s) => s.t > from && s.t <= to)
+      .reduce((total, s) => total + s.cents, 0);
+  const cents = sum(start, end);
+  const prevCents = sum(start - days * DAY, start);
+  const changePct =
+    prevCents > 0
+      ? Math.round(((cents - prevCents) / prevCents) * 1000) / 10
+      : null;
+  const series = Array.from({ length: days + 1 }, (_, i) =>
+    sum(start, start + i * DAY),
+  );
+  return { cents, prevCents, changePct, series };
 }

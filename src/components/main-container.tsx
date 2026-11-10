@@ -30,7 +30,7 @@ export function MainContainer({
       </main>
     );
   return (
-    <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+    <main className="mx-auto w-full max-w-[96rem] flex-1 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         <AdminSidebar badges={adminBadges} />
         <div className="min-w-0 flex-1">{children}</div>
