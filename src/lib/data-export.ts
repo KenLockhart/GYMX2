@@ -189,6 +189,12 @@ const SECTIONS: {
     owner: "coach_id",
   },
   {
+    name: "coach_match_answers",
+    table: "member_match_preferences",
+    columns: "answers, completed_at, updated_at",
+    owner: "member_id",
+  },
+  {
     name: "programs_started",
     table: "program_enrollments",
     columns:

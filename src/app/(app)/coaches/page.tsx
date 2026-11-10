@@ -76,6 +76,23 @@ export default async function CoachesPage() {
           email.
         </p>
         <Link
+          href="/coaches/match"
+          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-accent bg-accent/10 px-4 py-4 hover:bg-accent/15"
+        >
+          <span>
+            <span className="block font-display text-2xl font-bold uppercase leading-tight">
+              Find your coach match
+            </span>
+            <span className="text-sm text-muted">
+              Two minutes of questions about how you like to train, including
+              your Coaching Love Language.
+            </span>
+          </span>
+          <span aria-hidden className="text-2xl text-accent">
+            →
+          </span>
+        </Link>
+        <Link
           href="/coaches/sample"
           className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-accent/60 bg-accent/5 px-4 py-3 text-sm hover:bg-accent/10"
         >

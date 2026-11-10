@@ -86,3 +86,14 @@ h2 {
     @apply mb-8 text-sm text-muted;
   }
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
