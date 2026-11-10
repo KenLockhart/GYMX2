@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { RangeSelect } from "@/components/range-select";
+import { TrophyArt } from "@/components/trophy-art";
 import { sparklinePoints } from "@/lib/admin-console";
 import { formatMoney } from "@/lib/armory";
 import type { buildEngagement, buildLeaderboards } from "@/lib/leaderboard";
@@ -600,17 +601,8 @@ export function LeaderboardView({
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-6 -top-10 hidden h-48 w-72 sm:block"
-        >
-          <div className="absolute inset-0 rounded-full bg-[radial-gradient(closest-side,rgba(200,241,53,0.35),transparent)]" />
-          <Trophy
-            className="absolute right-16 top-10 size-28 text-accent drop-shadow-[0_0_24px_rgba(200,241,53,0.55)]"
-            strokeWidth={1.2}
-          />
-        </div>
+      <div className="relative overflow-hidden xl:min-h-36 2xl:min-h-44">
+        <TrophyArt className="absolute top-0 right-0 hidden xl:block xl:h-36 xl:w-[15rem] 2xl:h-44 2xl:w-[18.25rem]" />
         <p className="text-xs font-bold uppercase tracking-widest text-accent">
           Admin / Insights
         </p>
