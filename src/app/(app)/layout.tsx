@@ -21,9 +21,10 @@ export default async function AppLayout({
     .select("id", { count: "exact", head: true })
     .eq("recipient_id", profile.id)
     .is("read_at", null);
-  // Open reports for moderators and admins (row security limits moderators to the shared feed).
+  // Open reports for reviewers. Row security limits moderators to the shared feed and coaches to
+  // their own community, and hides reports about the viewer's own posts.
   let openReports = 0;
-  if (profile.role === "moderator" || profile.role === "admin") {
+  if (["moderator", "coach", "admin"].includes(profile.role)) {
     const { count } = await supabase
       .from("content_reports")
       .select("id", { count: "exact", head: true })
@@ -131,7 +132,7 @@ export default async function AppLayout({
             <Link href="/profile" className="hover:text-accent">
               Profile
             </Link>
-            {(profile.role === "moderator" || profile.role === "admin") && (
+            {["moderator", "coach", "admin"].includes(profile.role) && (
               <Link
                 href="/moderation"
                 className="inline-flex items-center gap-1.5 hover:text-accent"
