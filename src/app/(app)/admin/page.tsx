@@ -41,6 +41,9 @@ export const metadata: Metadata = { title: "Admin" };
 
 type Named = { display_name: string } | null;
 
+// Recent activity scrolls inside its panel, so it can hold more than fits on screen.
+const ACTIVITY_LIMIT = 25;
+
 export default async function AdminPage({
   searchParams,
 }: {
@@ -90,7 +93,7 @@ export default async function AdminPage({
       .select("reviewed_at, coach:profiles!coach_id(display_name)")
       .eq("status", "approved")
       .order("reviewed_at", { ascending: false })
-      .limit(5),
+      .limit(ACTIVITY_LIMIT),
     loadAdminCounts(),
   ]);
 
@@ -245,49 +248,52 @@ export default async function AdminPage({
     ...tasks.filter((t) => t.count === 0),
   ];
 
-  const activity = mergeActivity([
-    users
-      .slice()
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-      .slice(0, 5)
-      .map((u): Activity => ({
-        kind: "signup",
-        title: `New ${u.role === "coach" ? "coach" : "member"} signed up`,
-        detail: u.display_name,
-        at: u.created_at,
-        href: "/admin/users",
+  const activity = mergeActivity(
+    [
+      users
+        .slice()
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, ACTIVITY_LIMIT)
+        .map((u): Activity => ({
+          kind: "signup",
+          title: `New ${u.role === "coach" ? "coach" : "member"} signed up`,
+          detail: u.display_name,
+          at: u.created_at,
+          href: "/admin/users",
+        })),
+      approved.map((a): Activity => ({
+        kind: "profile",
+        title: "Coach profile approved",
+        detail: a.coach?.display_name ?? "A coach",
+        at: a.reviewed_at ?? "",
+        href: "/admin/coach-profiles",
       })),
-    approved.map((a): Activity => ({
-      kind: "profile",
-      title: "Coach profile approved",
-      detail: a.coach?.display_name ?? "A coach",
-      at: a.reviewed_at ?? "",
-      href: "/admin/coach-profiles",
-    })),
-    reviews.slice(0, 5).map((r): Activity => ({
-      kind: "review",
-      title: `New ${r.rating}-star review`,
-      detail: `${r.member?.display_name ?? "A member"} for ${r.coach?.display_name ?? "a coach"}`,
-      at: r.created_at,
-      href: "/admin/reviews",
-    })),
-    sales.slice(0, 5).map((s): Activity => ({
-      kind: "sale",
-      title: s.refunded_at ? "Armory sale refunded" : "Armory sale",
-      detail: `${s.item_title} · ${formatMoney(s.amount_cents)}`,
-      at: s.created_at,
-      href: "/armory/sales",
-    })),
-    affiliates
-      .filter((a) => a.status === "approved" && a.decided_at)
-      .map((a): Activity => ({
-        kind: "affiliate",
-        title: "New affiliate approved",
-        detail: a.user?.display_name ?? "An affiliate",
-        at: a.decided_at!,
-        href: "/admin/affiliates",
+      reviews.slice(0, ACTIVITY_LIMIT).map((r): Activity => ({
+        kind: "review",
+        title: `New ${r.rating}-star review`,
+        detail: `${r.member?.display_name ?? "A member"} for ${r.coach?.display_name ?? "a coach"}`,
+        at: r.created_at,
+        href: "/admin/reviews",
       })),
-  ]);
+      sales.slice(0, ACTIVITY_LIMIT).map((s): Activity => ({
+        kind: "sale",
+        title: s.refunded_at ? "Armory sale refunded" : "Armory sale",
+        detail: `${s.item_title} · ${formatMoney(s.amount_cents)}`,
+        at: s.created_at,
+        href: "/armory/sales",
+      })),
+      affiliates
+        .filter((a) => a.status === "approved" && a.decided_at)
+        .map((a): Activity => ({
+          kind: "affiliate",
+          title: "New affiliate approved",
+          detail: a.user?.display_name ?? "An affiliate",
+          at: a.decided_at!,
+          href: "/admin/affiliates",
+        })),
+    ],
+    ACTIVITY_LIMIT,
+  );
 
   return (
     <AdminOverview

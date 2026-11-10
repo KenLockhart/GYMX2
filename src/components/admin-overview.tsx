@@ -210,9 +210,9 @@ export function AdminOverview({
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <section
           aria-labelledby="tasks-title"
-          className="rounded-2xl border border-border bg-surface"
+          className="flex flex-col rounded-2xl border border-border bg-surface xl:h-[max(15rem,calc(100dvh-38.25rem))]"
         >
-          <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+          <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
             <h2 id="tasks-title" className="text-2xl normal-case">
               Requests and tasks
             </h2>
@@ -223,7 +223,7 @@ export function AdminOverview({
               </span>
             )}
           </div>
-          <ul className="divide-y divide-border">
+          <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain rounded-b-2xl [scrollbar-color:var(--color-border)_transparent] [scrollbar-width:thin]">
             {sortedTasks.map((task) => (
               <li key={task.label}>
                 <Link
@@ -264,9 +264,9 @@ export function AdminOverview({
 
         <section
           aria-labelledby="activity-title"
-          className="rounded-2xl border border-border bg-surface"
+          className="flex flex-col rounded-2xl border border-border bg-surface xl:h-[max(15rem,calc(100dvh-38.25rem))]"
         >
-          <div className="border-b border-border px-5 py-4">
+          <div className="shrink-0 border-b border-border px-5 py-4">
             <h2 id="activity-title" className="text-2xl normal-case">
               Recent activity
             </h2>
@@ -277,45 +277,47 @@ export function AdminOverview({
               here.
             </p>
           ) : (
-            <ol className="relative px-5 py-2">
-              <span
-                aria-hidden
-                className="absolute bottom-6 left-[2.45rem] top-6 w-px bg-border"
-              />
-              {activity.map((event, i) => {
-                const style = activityStyle[event.kind];
-                return (
-                  <li key={`${event.kind}-${event.at}-${i}`}>
-                    <Link
-                      href={event.href}
-                      className="relative flex items-center gap-4 rounded-xl py-2.5 hover:bg-surface-raised/60"
-                    >
-                      <span
-                        className={`relative grid size-9 shrink-0 place-items-center rounded-full ${style.tone}`}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-b-2xl [scrollbar-color:var(--color-border)_transparent] [scrollbar-width:thin]">
+              <ol className="relative px-5 py-2">
+                <span
+                  aria-hidden
+                  className="absolute bottom-6 left-[2.45rem] top-6 w-px bg-border"
+                />
+                {activity.map((event, i) => {
+                  const style = activityStyle[event.kind];
+                  return (
+                    <li key={`${event.kind}-${event.at}-${i}`}>
+                      <Link
+                        href={event.href}
+                        className="relative flex items-center gap-4 rounded-xl py-2.5 hover:bg-surface-raised/60"
                       >
-                        <style.icon
+                        <span
+                          className={`relative grid size-9 shrink-0 place-items-center rounded-full ${style.tone}`}
+                        >
+                          <style.icon
+                            aria-hidden
+                            className="size-[18px]"
+                            strokeWidth={2}
+                          />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">
+                            {event.title}
+                          </span>
+                          <span className="block truncate text-xs text-muted">
+                            {event.detail} · {timeAgo(event.at)}
+                          </span>
+                        </span>
+                        <ArrowRight
                           aria-hidden
-                          className="size-[18px]"
-                          strokeWidth={2}
+                          className="size-4 shrink-0 text-muted"
                         />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold">
-                          {event.title}
-                        </span>
-                        <span className="block truncate text-xs text-muted">
-                          {event.detail} · {timeAgo(event.at)}
-                        </span>
-                      </span>
-                      <ArrowRight
-                        aria-hidden
-                        className="size-4 shrink-0 text-muted"
-                      />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ol>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
           )}
         </section>
       </div>
