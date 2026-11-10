@@ -31,6 +31,9 @@ import {
 } from "@/lib/coach-options";
 import { formatPrice, LOVE_LANGUAGES } from "@/lib/coach-profile";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import { kindLabel, overallVerification } from "@/lib/credentials";
+import type { OwnCredential } from "@/lib/credentials-server";
+import { CredentialsStep } from "./credentials-step";
 import {
   CheckboxGroup,
   ChipInput,
@@ -75,6 +78,7 @@ export function CoachProfileEditor({
   initialStatus,
   reviewNote,
   published,
+  initialCredentials,
 }: {
   coachId: string;
   coachName: string;
@@ -83,7 +87,9 @@ export function CoachProfileEditor({
   initialStatus: Status;
   reviewNote: string;
   published: boolean;
+  initialCredentials: OwnCredential[];
 }) {
+  const [credentials, setCredentials] = useState(initialCredentials);
   const [draft, setDraft] = useState(initial);
   const [step, setStep] = useState<StepKey>("basics");
   const [status, setStatus] = useState<Status>(initialStatus);
@@ -415,17 +421,10 @@ export function CoachProfileEditor({
           )}
 
           {step === "credentials" && (
-            <>
-              <Note>
-                Certificate upload and GYMX2 verification arrive in the next
-                update. Your profile will show each certificate as Verified,
-                Pending or Unverified, and only GYMX2 can mark one Verified.
-              </Note>
-              <p className="text-sm text-muted">
-                Until then, please don&apos;t describe certifications as
-                verified in your bio.
-              </p>
-            </>
+            <CredentialsStep
+              credentials={credentials}
+              onChange={setCredentials}
+            />
           )}
 
           {step === "clients" && (
@@ -955,6 +954,7 @@ export function CoachProfileEditor({
                     photoUrl,
                     rating: null,
                     reviews: [],
+                    ...previewCredentials(credentials),
                   })}
                 />
               </div>
@@ -1295,4 +1295,22 @@ function PricingStep({
       </div>
     </div>
   );
+}
+
+// The editor preview shows credentials the way members will see them.
+function previewCredentials(list: OwnCredential[]) {
+  const shown = list.flatMap((c) =>
+    c.shown ? [{ ...c, shown: c.shown }] : [],
+  );
+  return {
+    credentials: shown.map((c) => ({
+      title: c.title,
+      organization: c.organization,
+      status: c.shown,
+      detail: kindLabel(c.kind),
+    })),
+    verification: overallVerification(
+      shown.map((c) => ({ kind: c.kind, status: c.shown })),
+    ),
+  };
 }

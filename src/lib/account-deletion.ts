@@ -65,6 +65,7 @@ async function removeStoredFiles(userId: string) {
     "armory-images",
     "progress-photos",
     "coach-photos",
+    "credential-docs",
   ]) {
     const { data } = await storage.from(bucket).list(userId, { limit: 1000 });
     const paths = (data ?? []).map((file) => `${userId}/${file.name}`);

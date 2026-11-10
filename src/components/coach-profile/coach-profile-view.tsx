@@ -44,11 +44,13 @@ const STATUS_STYLE = {
   verified: "border-success/40 text-success",
   pending: "border-border text-muted",
   unverified: "border-border text-muted",
+  expired: "border-border text-muted",
 } as const;
 const STATUS_LABEL = {
   verified: "Verified",
   pending: "Pending verification",
   unverified: "Unverified",
+  expired: "Expired",
 } as const;
 
 // On the sample profile, booking and saving are shown but switched off.

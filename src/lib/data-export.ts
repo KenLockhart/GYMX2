@@ -182,6 +182,13 @@ const SECTIONS: {
     owner: "coach_id",
   },
   {
+    name: "coach_credentials",
+    table: "coach_credentials",
+    columns:
+      "kind, organization, title, credential_number, issued_on, expires_on, status, verification_source, verified_at, created_at",
+    owner: "coach_id",
+  },
+  {
     name: "programs_started",
     table: "program_enrollments",
     columns:

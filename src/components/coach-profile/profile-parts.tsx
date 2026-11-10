@@ -28,6 +28,11 @@ const STATUS = {
     tone: "text-muted",
     icon: <path d="M12 8v5M12 16.5v.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />,
   },
+  expired: {
+    label: "Credentials expired",
+    tone: "text-muted",
+    icon: <path d="M12 8v5M12 16.5v.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />,
+  },
 } satisfies Record<
   CredentialStatus,
   { label: string; tone: string; icon: ReactNode }

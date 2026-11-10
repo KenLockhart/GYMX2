@@ -66,7 +66,7 @@ export function weightedTotal(categories: Record<MatchCategory, number>) {
   return Math.round(sum / weights);
 }
 
-export type CredentialStatus = "verified" | "pending" | "unverified";
+export type CredentialStatus = "verified" | "pending" | "unverified" | "expired";
 
 export type CoachPackage = {
   name: string;
