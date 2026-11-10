@@ -58,6 +58,7 @@ const settingsSchema = z
       type: z.enum(settingTypes),
       inApp: z.boolean(),
       push: z.boolean(),
+      email: z.boolean(),
     }),
   )
   .max(settingTypes.length);
@@ -76,6 +77,7 @@ export async function saveNotificationSettings(
       // Direct messages don't appear in the notification center.
       in_app: setting.type === "message" ? true : setting.inApp,
       push: setting.push,
+      email: setting.email,
     })),
     { onConflict: "user_id,type" },
   );

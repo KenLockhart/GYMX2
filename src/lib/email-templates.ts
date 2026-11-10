@@ -839,3 +839,93 @@ export function membershipChangeEmail(input: {
     },
   );
 }
+
+export type CommunityEmailType =
+  "like" | "comment" | "reply" | "progress_reply" | "announcement" | "removed";
+
+const COMMUNITY_FOOTER =
+  "Choose which Community emails you get in Profile, Notifications on GYMX2.";
+
+// One email per new Community notification. Repeats (more likes on the same post while the first
+// is unread) don't send again; see community-notify.ts.
+export function communityEmail(input: {
+  siteUrl: string;
+  type: CommunityEmailType;
+  actorName: string;
+  // The comment, the announcement or the removal reason, when there is one.
+  snippet: string;
+  link: string;
+}): Email {
+  const actor = input.actorName;
+  const short = oneLine(actor, 60);
+  const snippet =
+    input.snippet.length > 500
+      ? `${input.snippet.slice(0, 499)}…`
+      : input.snippet;
+  const quote: Block[] = snippet ? [{ kind: "quote", text: snippet }] : [];
+  const url = `${input.siteUrl}${input.link}`;
+  const vars = { name: actor };
+  switch (input.type) {
+    case "like":
+      return build("community.like", vars, {
+        subject: `${short} liked your post`,
+        heading: `${actor} liked your post`,
+        blocks: [
+          {
+            kind: "p",
+            text: "Your post is getting some love in the GYMX2 Community.",
+          },
+        ],
+        button: { label: "See your post", url },
+        footer: `We send one email per post until you've seen it. ${COMMUNITY_FOOTER}`,
+      });
+    case "comment":
+      return build("community.comment", vars, {
+        subject: `${short} commented on your post`,
+        heading: `${actor} commented on your post`,
+        blocks: quote,
+        button: { label: "Reply on GYMX2", url },
+        footer: COMMUNITY_FOOTER,
+      });
+    case "progress_reply":
+      return build("community.progress_reply", vars, {
+        subject: `${short} commented on your progress`,
+        heading: `${actor} commented on your progress post`,
+        blocks: quote,
+        button: { label: "See the comment", url },
+        footer: COMMUNITY_FOOTER,
+      });
+    case "reply":
+      return build("community.reply", vars, {
+        subject: `${short} replied to your comment`,
+        heading: `${actor} replied to your comment`,
+        blocks: quote,
+        button: { label: "Reply on GYMX2", url },
+        footer: COMMUNITY_FOOTER,
+      });
+    case "announcement":
+      return build("community.announcement", vars, {
+        subject: `New announcement from ${short}`,
+        heading: `${actor} posted an announcement`,
+        blocks: quote,
+        button: { label: "Read it on GYMX2", url },
+        footer: `You're getting this because you're in ${actor}'s community. ${COMMUNITY_FOOTER}`,
+      });
+    case "removed":
+      return build("community.removed", vars, {
+        subject: "Something you posted was removed",
+        heading: "Something you posted was removed from Community",
+        blocks: [
+          {
+            kind: "p",
+            text: "It was removed because it broke the GYMX2 community guidelines.",
+          },
+          ...(snippet
+            ? [{ kind: "lines", lines: [`Reason: ${snippet}`] } as Block]
+            : []),
+        ],
+        button: { label: "Read the Terms", url: `${input.siteUrl}/terms` },
+        footer: "Reply to support@gymx2.com if you think this was a mistake.",
+      });
+  }
+}

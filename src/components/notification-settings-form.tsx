@@ -11,6 +11,7 @@ export type SettingValue = {
   type: NotificationType;
   inApp: boolean;
   push: boolean;
+  email: boolean;
 };
 
 export function NotificationSettingsForm({
@@ -25,7 +26,7 @@ export function NotificationSettingsForm({
 
   function change(
     type: NotificationType,
-    field: "inApp" | "push",
+    field: "inApp" | "push" | "email",
     value: boolean,
   ) {
     setMessage(null);
@@ -52,6 +53,7 @@ export function NotificationSettingsForm({
             <th className="py-2 font-medium">Notify me about</th>
             <th className="w-20 py-2 text-center font-medium">In app</th>
             <th className="w-20 py-2 text-center font-medium">Phone</th>
+            <th className="w-20 py-2 text-center font-medium">Email</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -93,6 +95,16 @@ export function NotificationSettingsForm({
                     checked={value.push}
                     onChange={(event) =>
                       change(meta.type, "push", event.target.checked)
+                    }
+                  />
+                </td>
+                <td className="py-2 text-center">
+                  <input
+                    type="checkbox"
+                    aria-label={`${meta.label}: email`}
+                    checked={value.email}
+                    onChange={(event) =>
+                      change(meta.type, "email", event.target.checked)
                     }
                   />
                 </td>

@@ -242,6 +242,7 @@ export async function createPost(
         groupKey: `announcement:${created.id}`,
         title: `${profile.display_name} posted an announcement`,
         body: post.body.slice(0, 120) || "Tap to read it.",
+        snippet: post.body,
       });
     });
   }
@@ -499,6 +500,7 @@ export async function addComment(
         groupKey: `comment:${postId}`,
         title: `${profile.display_name} commented on your post`,
         body: preview,
+        snippet: body,
       });
     if (parentAuthor)
       await notifyCommunity({
@@ -512,6 +514,7 @@ export async function addComment(
         groupKey: `reply:${parentId}`,
         title: `${profile.display_name} replied to you`,
         body: preview,
+        snippet: body,
       });
   });
 
@@ -625,6 +628,7 @@ export async function removePost(
       body: why.data
         ? `Reason: ${why.data}`
         : "It broke the community guidelines.",
+      snippet: why.data,
     }),
   );
   revalidatePath("/community");
@@ -730,6 +734,7 @@ export async function removeComment(
       body: why.data
         ? `Reason: ${why.data}`
         : "It broke the community guidelines.",
+      snippet: why.data,
     }),
   );
   revalidatePath("/moderation");
