@@ -21,7 +21,7 @@ export default async function ProfilePage() {
   const supabase = await createClient();
   const { data: savedSettings } = await supabase
     .from("notification_settings")
-    .select("type, in_app, push")
+    .select("type, in_app, push, email")
     .eq("user_id", profile.id);
   const notificationSettings = NOTIFICATION_SETTINGS.map((meta) => {
     const saved = (savedSettings ?? []).find((row) => row.type === meta.type);
@@ -29,6 +29,7 @@ export default async function ProfilePage() {
       type: meta.type,
       inApp: (saved?.in_app as boolean | undefined) ?? true,
       push: (saved?.push as boolean | undefined) ?? meta.defaultPush,
+      email: (saved?.email as boolean | undefined) ?? meta.defaultEmail,
     };
   });
 
@@ -136,9 +137,10 @@ export default async function ProfilePage() {
         />
         <h3 className="pt-4 text-xl">Community notifications</h3>
         <p className="max-w-xl text-sm text-muted">
-          Choose what shows in your notifications (the bell in the menu) and
-          what sends to your phone. Phone notifications also need to be turned
-          on above.
+          Choose what shows in your notifications (the bell in the menu), what
+          sends to your phone and what we email you. Phone notifications also
+          need to be turned on above, and emails need &ldquo;Email me about
+          messages, sessions and reminders&rdquo; on in your profile.
         </p>
         <NotificationSettingsForm initial={notificationSettings} />
       </section>

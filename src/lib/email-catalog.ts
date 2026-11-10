@@ -5,6 +5,7 @@ import {
   affiliateDecisionEmail,
   affiliatePayoutEmail,
   checkinReminderEmail,
+  communityEmail,
   flaggedMessageEmail,
   liveNowEmail,
   membershipChangeEmail,
@@ -23,6 +24,7 @@ import {
 export type EmailGroup =
   | "Orders"
   | "Messages"
+  | "Community"
   | "Sessions"
   | "Reminders"
   | "Memberships"
@@ -153,6 +155,103 @@ export const EMAIL_CATALOG: CatalogEntry[] = [
         senderName: "Coach Ken",
         body: "Great work this week! Ready for Saturday?",
         conversationPath: "/messages",
+      }),
+  },
+  {
+    key: "community.comment",
+    name: "Comment on your post",
+    group: "Community",
+    to: "The post's author, if they chose email",
+    when: "Someone comments on their post (off by default)",
+    optional: true,
+    sample: (siteUrl) =>
+      communityEmail({
+        siteUrl,
+        type: "comment",
+        actorName: "Jordan Smith",
+        snippet: "This is awesome, great form on that last set!",
+        link: "/community/post/sample",
+      }),
+  },
+  {
+    key: "community.reply",
+    name: "Reply to your comment",
+    group: "Community",
+    to: "The comment's author, if they chose email",
+    when: "Someone replies to their comment (off by default)",
+    optional: true,
+    sample: (siteUrl) =>
+      communityEmail({
+        siteUrl,
+        type: "reply",
+        actorName: "Jordan Smith",
+        snippet: "Same here, let's go!",
+        link: "/community/post/sample",
+      }),
+  },
+  {
+    key: "community.progress_reply",
+    name: "Comment on your progress",
+    group: "Community",
+    to: "The progress post's author, if they chose email",
+    when: "Someone comments on their progress post (off by default)",
+    optional: true,
+    sample: (siteUrl) =>
+      communityEmail({
+        siteUrl,
+        type: "progress_reply",
+        actorName: "Coach Ken",
+        snippet: "Huge difference since September. Proud of you.",
+        link: "/community/post/sample",
+      }),
+  },
+  {
+    key: "community.like",
+    name: "Likes on your post",
+    group: "Community",
+    to: "The post's author, if they chose email",
+    when: "The first new like on a post since they last checked (off by default)",
+    optional: true,
+    sample: (siteUrl) =>
+      communityEmail({
+        siteUrl,
+        type: "like",
+        actorName: "Jordan Smith",
+        snippet: "",
+        link: "/community/post/sample",
+      }),
+  },
+  {
+    key: "community.announcement",
+    name: "Coach announcement",
+    group: "Community",
+    to: "Members of the coach's community",
+    when: "Their coach posts an announcement (on by default)",
+    optional: true,
+    sample: (siteUrl) =>
+      communityEmail({
+        siteUrl,
+        type: "announcement",
+        actorName: "Coach Ken",
+        snippet:
+          "New 6-week strength challenge starts Monday. Check-ins every Friday.",
+        link: "/community/post/sample",
+      }),
+  },
+  {
+    key: "community.removed",
+    name: "Post or comment removed",
+    group: "Community",
+    to: "The author",
+    when: "A moderator, coach or admin removes their post or comment (on by default)",
+    optional: true,
+    sample: (siteUrl) =>
+      communityEmail({
+        siteUrl,
+        type: "removed",
+        actorName: "GYMX2",
+        snippet: "Sharing a payment link",
+        link: "/community",
       }),
   },
   {
@@ -395,6 +494,7 @@ export const EMAIL_CATALOG: CatalogEntry[] = [
 export const EMAIL_GROUPS: EmailGroup[] = [
   "Orders",
   "Messages",
+  "Community",
   "Sessions",
   "Reminders",
   "Memberships",

@@ -28,6 +28,7 @@ export const NOTIFICATION_SETTINGS: {
   inApp: boolean;
   push: boolean;
   defaultPush: boolean;
+  defaultEmail: boolean;
 }[] = [
   {
     type: "comment",
@@ -36,6 +37,7 @@ export const NOTIFICATION_SETTINGS: {
     inApp: true,
     push: true,
     defaultPush: true,
+    defaultEmail: false,
   },
   {
     type: "reply",
@@ -44,6 +46,7 @@ export const NOTIFICATION_SETTINGS: {
     inApp: true,
     push: true,
     defaultPush: true,
+    defaultEmail: false,
   },
   {
     type: "progress_reply",
@@ -52,6 +55,7 @@ export const NOTIFICATION_SETTINGS: {
     inApp: true,
     push: true,
     defaultPush: true,
+    defaultEmail: false,
   },
   {
     type: "announcement",
@@ -60,30 +64,34 @@ export const NOTIFICATION_SETTINGS: {
     inApp: true,
     push: true,
     defaultPush: true,
+    defaultEmail: true,
   },
   {
     type: "like",
     label: "Likes on your posts",
-    hint: "Grouped, so a popular post sends one.",
+    hint: "Grouped, so a popular post sends one until you've seen it.",
     inApp: true,
     push: true,
     defaultPush: false,
+    defaultEmail: false,
   },
   {
     type: "removed",
-    label: "A post of yours was removed",
+    label: "Something you posted was removed",
     hint: "With the reason, when one was given.",
     inApp: true,
     push: true,
     defaultPush: false,
+    defaultEmail: true,
   },
   {
     type: "message",
     label: "Direct messages",
-    hint: "Unread messages also show on Messages in the menu.",
+    hint: "Emails only about the first unread message in a conversation.",
     inApp: false,
     push: true,
     defaultPush: true,
+    defaultEmail: true,
   },
 ];
 

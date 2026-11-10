@@ -1,5 +1,9 @@
 import "server-only";
+import { loadRecipient, sendEmail } from "@/lib/email";
+import { communityEmail } from "@/lib/email-templates";
+import { NOTIFICATION_SETTINGS } from "@/lib/notifications";
 import { sendPush } from "@/lib/push";
+import { getSiteUrl } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type NotificationType =
@@ -27,7 +31,13 @@ type Event = {
   groupKey: string;
   title: string;
   body: string;
+  // The comment, announcement or removal reason, for the email.
+  snippet?: string;
 };
+
+const DEFAULT_EMAIL = Object.fromEntries(
+  NOTIFICATION_SETTINGS.map((setting) => [setting.type, setting.defaultEmail]),
+) as Record<string, boolean>;
 
 // Writes in-app notifications and sends push where each person allows it. Never notifies the
 // person who acted. Never throws: a failed notification must not undo a like or comment.
@@ -40,7 +50,7 @@ export async function notifyCommunity(event: Event) {
   try {
     const { data: settings } = await db
       .from("notification_settings")
-      .select("user_id, in_app, push")
+      .select("user_id, in_app, push, email")
       .eq("type", event.type)
       .in("user_id", recipients);
     const chosen = new Map(
@@ -51,13 +61,25 @@ export async function notifyCommunity(event: Event) {
       (id) => chosen.get(id)?.push ?? DEFAULT_PUSH[event.type],
     );
 
+    const email = recipients.filter(
+      (id) => chosen.get(id)?.email ?? DEFAULT_EMAIL[event.type] ?? false,
+    );
+
+    // Unread notifications with this key, for collapsing repeats and for not emailing them again.
+    const { data: unread } =
+      inApp.length || email.length
+        ? await db
+            .from("notifications")
+            .select("id, recipient_id, count")
+            .eq("group_key", event.groupKey)
+            .is("read_at", null)
+            .in("recipient_id", [...new Set([...inApp, ...email])])
+        : { data: [] };
+    const alreadyUnread = new Set(
+      (unread ?? []).map((row) => row.recipient_id as string),
+    );
+
     if (inApp.length) {
-      const { data: unread } = await db
-        .from("notifications")
-        .select("id, recipient_id, count")
-        .eq("group_key", event.groupKey)
-        .is("read_at", null)
-        .in("recipient_id", inApp);
       const existing = new Map(
         (unread ?? []).map((row) => [row.recipient_id as string, row]),
       );
@@ -86,6 +108,29 @@ export async function notifyCommunity(event: Event) {
         }),
       );
     }
+    // Email once per group: a fifth like on a post nobody has looked at yet doesn't email again.
+    const emailNow = email.filter((id) => !alreadyUnread.has(id));
+    if (emailNow.length) {
+      const siteUrl = getSiteUrl();
+      await Promise.all(
+        emailNow.map(async (id) => {
+          const recipient = await loadRecipient(id);
+          // The account-wide "Email me" switch in Profile still wins.
+          if (!recipient?.wantsUpdates) return;
+          await sendEmail(
+            recipient.email,
+            communityEmail({
+              siteUrl,
+              type: event.type === "removed" ? "removed" : event.type,
+              actorName: event.actorName,
+              snippet: event.snippet ?? "",
+              link: event.link,
+            }),
+          );
+        }),
+      );
+    }
+
     if (push.length) {
       await sendPush(push, {
         title: event.title,

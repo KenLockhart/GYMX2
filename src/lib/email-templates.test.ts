@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  customizeEmail,
+  communityEmail,
   accountDeletedEmail,
   escapeHtml,
   flaggedMessageEmail,
@@ -364,5 +366,67 @@ describe("email catalog", () => {
     for (const entry of EMAIL_CATALOG) {
       expect(entry.sample("https://gymx2.com").key).toBe(entry.key);
     }
+  });
+});
+
+describe("communityEmail", () => {
+  const base = {
+    siteUrl: "https://gymx2.com",
+    actorName: "Jordan <b>",
+    link: "/community/post/abc",
+  };
+
+  it("words each type and links to the post", () => {
+    const comment = communityEmail({
+      ...base,
+      type: "comment",
+      snippet: "Nice work",
+    });
+    expect(comment.key).toBe("community.comment");
+    expect(comment.subject).toBe("Jordan <b> commented on your post");
+    expect(comment.html).toContain("https://gymx2.com/community/post/abc");
+    expect(comment.text).toContain("> Nice work");
+    expect(
+      communityEmail({ ...base, type: "reply", snippet: "" }).subject,
+    ).toContain("replied to your comment");
+    expect(
+      communityEmail({ ...base, type: "announcement", snippet: "Hi" }).subject,
+    ).toBe("New announcement from Jordan <b>");
+    expect(communityEmail({ ...base, type: "like", snippet: "" }).key).toBe(
+      "community.like",
+    );
+  });
+
+  it("escapes names and text in the HTML", () => {
+    const email = communityEmail({
+      ...base,
+      type: "comment",
+      snippet: "<script>x</script>",
+    });
+    expect(email.html).not.toContain("<script>");
+    expect(email.html).not.toContain("Jordan <b>");
+    expect(email.html).toContain("Jordan &lt;b&gt;");
+  });
+
+  it("shows a removal reason and never names who removed it", () => {
+    const email = communityEmail({
+      ...base,
+      actorName: "Mod Mia",
+      type: "removed",
+      snippet: "Spam link",
+    });
+    expect(email.text).toContain("Reason: Spam link");
+    expect(email.text).not.toContain("Mod Mia");
+    expect(email.html).toContain("https://gymx2.com/terms");
+  });
+
+  it("can be reworded by admins with the actor's name", () => {
+    const email = customizeEmail(
+      communityEmail({ ...base, type: "comment", snippet: "Hey" }),
+      {
+        subject: "{name} said something",
+      },
+    );
+    expect(email.subject).toBe("Jordan <b> said something");
   });
 });

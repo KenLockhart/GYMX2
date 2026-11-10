@@ -188,6 +188,14 @@ function notifyRecipient(message: MessageRow) {
       loadRecipient(message.sender_id),
     ]);
     if (!recipient?.wantsUpdates) return;
+    // Direct-message emails can be turned off in Profile, Notifications.
+    const { data: setting } = await admin
+      .from("notification_settings")
+      .select("email")
+      .eq("user_id", recipientId)
+      .eq("type", "message")
+      .maybeSingle();
+    if (setting && !setting.email) return;
 
     await sendEmail(
       recipient.email,

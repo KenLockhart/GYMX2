@@ -88,5 +88,9 @@ describe("notification settings", () => {
     expect(
       NOTIFICATION_SETTINGS.find((s) => s.type === "like")?.defaultPush,
     ).toBe(false);
+    // Email is opt-in except announcements, removals and direct messages (as before).
+    expect(
+      NOTIFICATION_SETTINGS.filter((s) => s.defaultEmail).map((s) => s.type),
+    ).toEqual(["announcement", "removed", "message"]);
   });
 });
