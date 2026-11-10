@@ -1,230 +1,70 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
-import { formatMoney } from "@/lib/armory";
+import { CoachDiscovery } from "@/components/coach-discovery";
 import { requireAccount } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import type { Profile } from "@/lib/types";
-import { matchCoaches } from "@/lib/onboarding";
-import { joinCoach, leaveCoach } from "./actions";
-import { BadgeRow } from "@/components/game-parts";
-import { loadBadges } from "@/lib/achievements-data";
-import { readDraft } from "@/lib/coach-draft";
-import { computeMatch } from "@/lib/matching";
-import { loadMatchWeights, loadMyAnswers } from "@/lib/matching-server";
+import { loadDiscoveryCards } from "@/lib/discovery-server";
+import { loadMyAnswers } from "@/lib/matching-server";
 
 export const metadata: Metadata = { title: "Coaches" };
 
+// Coach discovery, open to everyone signed in. Saving, passing and match scores are for members.
 export default async function CoachesPage() {
   const { profile } = await requireAccount();
-  if (profile.role !== "member") redirect("/dashboard");
-
-  const supabase = await createClient();
-  const [coachResult, joinedResult] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, display_name, bio, join_mode, specialties")
-      .eq("role", "coach")
-      .order("display_name"),
-    supabase
-      .from("coach_members")
-      .select("coach_id")
-      .eq("member_id", profile.id),
+  const isMember = profile.role === "member";
+  const [cards, answers] = await Promise.all([
+    loadDiscoveryCards({ id: profile.id, role: profile.role }).catch(
+      () => null,
+    ),
+    isMember ? loadMyAnswers(profile.id) : Promise.resolve(null),
   ]);
-  const coaches = (coachResult.data ?? []) as Pick<
-    Profile,
-    "id" | "display_name" | "bio" | "join_mode" | "specialties"
-  >[];
-  const matched = new Map(
-    matchCoaches(
-      { goals: profile.goals, focus: profile.focus },
-      coaches.map((coach) => ({
-        id: coach.id,
-        specialties: coach.specialties ?? [],
-        programs: 0,
-      })),
-      coaches.length,
-    ).map((match) => [match.id, match]),
-  );
-  // Compatibility for coaches with an approved profile, from the member's own answers.
-  const [answers, weights, { data: published }] = await Promise.all([
-    loadMyAnswers(profile.id),
-    loadMatchWeights(),
-    supabase.from("coach_profiles_public").select("coach_id, data"),
-  ]);
-  const compatibility = new Map<
-    string,
-    { total: number | null; eligible: boolean }
-  >();
-  if (answers)
-    for (const row of published ?? []) {
-      const result = computeMatch(answers, readDraft(row.data), weights);
-      compatibility.set(row.coach_id as string, {
-        total: result.eligible ? result.total : null,
-        eligible: result.eligible,
-      });
-    }
-  // Scored matches first (highest first), then goal matches, then everyone else alphabetically.
-  coaches.sort(
-    (a, b) =>
-      (compatibility.get(b.id)?.total ?? -1) -
-        (compatibility.get(a.id)?.total ?? -1) ||
-      (matched.get(b.id)?.score ?? 0) - (matched.get(a.id)?.score ?? 0),
-  );
-  // The cheapest open plan per coach, for "Plans from $X/month".
-  const { data: planData } = await supabase
-    .from("coach_plans")
-    .select("coach_id, price_cents")
-    .eq("active", true)
-    .not("stripe_price_id", "is", null);
-  const lowestPlan = new Map<string, number>();
-  for (const plan of planData ?? []) {
-    const current = lowestPlan.get(plan.coach_id as string);
-    if (current === undefined || (plan.price_cents as number) < current) {
-      lowestPlan.set(plan.coach_id as string, plan.price_cents as number);
-    }
-  }
-  const joined = new Set(
-    (joinedResult.data ?? []).map((row) => row.coach_id as string),
-  );
-  const badges = await loadBadges(coaches.map((coach) => coach.id));
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-5xl">Coaches</h1>
+        <h1 className="text-5xl">Find your coach</h1>
         <p className="mt-2 max-w-xl text-muted">
-          Join a coach to watch their videos, get Tasks and sessions from them,
-          and message them. They&apos;ll see your name and bio, but never your
-          email.
+          {isMember
+            ? "Browse coaches, save the ones you like and open a profile to join. Coaches see your name and bio when you join, but never your email, and never who saved or passed on them."
+            : "Browse the coaches on GYMX2 the way members see them."}
         </p>
-        <Link
-          href="/coaches/match"
-          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-accent bg-accent/10 px-4 py-4 hover:bg-accent/15"
-        >
-          <span>
-            <span className="block font-display text-2xl font-bold uppercase leading-tight">
-              Find your coach match
+        {isMember && (
+          <Link
+            href="/coaches/match"
+            className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-accent bg-accent/10 px-4 py-4 hover:bg-accent/15"
+          >
+            <span>
+              <span className="block font-display text-2xl font-bold uppercase leading-tight">
+                {answers ? "Update your coach match" : "Find your coach match"}
+              </span>
+              <span className="text-sm text-muted">
+                {answers
+                  ? "Change your answers any time. Your match scores update straight away."
+                  : "Two minutes of questions about how you like to train, including your Coaching Love Language."}
+              </span>
             </span>
-            <span className="text-sm text-muted">
-              Two minutes of questions about how you like to train, including
-              your Coaching Love Language.
+            <span aria-hidden className="text-2xl text-accent">
+              →
             </span>
-          </span>
-          <span aria-hidden className="text-2xl text-accent">
-            →
-          </span>
-        </Link>
+          </Link>
+        )}
         <Link
           href="/coaches/sample"
-          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-accent/60 bg-accent/5 px-4 py-3 text-sm hover:bg-accent/10"
+          className="mt-3 inline-block text-sm text-muted hover:text-accent"
         >
-          <span>
-            <span className="font-semibold text-accent">
-              New coach profiles are coming.
-            </span>{" "}
-            <span className="text-muted">
-              Preview the design with Coach Jasmine, a sample profile.
-            </span>
-          </span>
-          <span aria-hidden className="text-accent">
-            →
-          </span>
+          See a sample profile (Coach Jasmine) →
         </Link>
       </div>
 
-      {coachResult.error || joinedResult.error ? (
+      {cards === null ? (
         <p role="alert" className="text-danger">
           We couldn&apos;t load the coaches. Please refresh and try again.
         </p>
-      ) : coaches.length === 0 ? (
+      ) : cards.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface p-4 text-muted">
           No coaches have joined GYMX2 yet.
         </p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
-          {coaches.map((coach) => {
-            const isJoined = joined.has(coach.id);
-            return (
-              <li
-                key={coach.id}
-                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      href={`/coaches/${coach.id}`}
-                      className="text-link font-semibold"
-                    >
-                      {coach.display_name}
-                    </Link>
-                    <BadgeRow badges={badges.get(coach.id) ?? []} max={5} />
-                    {compatibility.get(coach.id)?.total != null ? (
-                      <span className="rounded bg-accent px-1.5 py-0.5 text-xs font-bold uppercase text-accent-foreground">
-                        {compatibility.get(coach.id)!.total}% match
-                      </span>
-                    ) : compatibility.get(coach.id)?.eligible === false ? (
-                      <span className="rounded border border-border px-1.5 py-0.5 text-xs text-muted">
-                        Not a match right now
-                      </span>
-                    ) : (
-                      (matched.get(coach.id)?.shared.length ?? 0) > 0 && (
-                        <span className="rounded bg-accent px-1.5 py-0.5 text-xs font-bold uppercase text-accent-foreground">
-                          Good match
-                        </span>
-                      )
-                    )}
-                  </div>
-                  {coach.bio && (
-                    <p className="mt-1 text-sm text-muted">{coach.bio}</p>
-                  )}
-                  {coach.join_mode !== "free" && lowestPlan.has(coach.id) && (
-                    <p className="mt-1 text-sm font-semibold text-accent">
-                      {coach.join_mode === "paid" ? "Subscribers only · " : ""}
-                      Plans from{" "}
-                      {formatMoney(lowestPlan.get(coach.id) as number)}/month
-                    </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 flex-wrap items-start gap-2">
-                  {isJoined && (
-                    <Link
-                      href={`/messages/${coach.id}`}
-                      className="btn-secondary"
-                    >
-                      Message
-                    </Link>
-                  )}
-                  {!isJoined && coach.join_mode === "paid" ? (
-                    <Link href={`/coaches/${coach.id}`} className="btn-primary">
-                      See plans
-                    </Link>
-                  ) : (
-                    <ActionForm
-                      action={isJoined ? leaveCoach : joinCoach}
-                      confirmMessage={
-                        isJoined
-                          ? `Leave ${coach.display_name}? Your unfinished Tasks and upcoming sessions with them will be removed.`
-                          : undefined
-                      }
-                      className="space-y-2"
-                    >
-                      <input type="hidden" name="coach_id" value={coach.id} />
-                      <SubmitButton
-                        pendingText={isJoined ? "Leaving..." : "Joining..."}
-                        className={isJoined ? "btn-secondary" : "btn-primary"}
-                      >
-                        {isJoined ? "Leave" : "Join"}
-                      </SubmitButton>
-                      <FormStatus />
-                    </ActionForm>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <CoachDiscovery cards={cards} canSave={isMember} />
       )}
     </div>
   );

@@ -195,6 +195,18 @@ const SECTIONS: {
     owner: "member_id",
   },
   {
+    name: "coaches_saved",
+    table: "coach_favorites",
+    columns: "coach:profiles!coach_id(display_name), created_at",
+    owner: "member_id",
+  },
+  {
+    name: "coaches_passed",
+    table: "coach_passes",
+    columns: "coach:profiles!coach_id(display_name), created_at",
+    owner: "member_id",
+  },
+  {
     name: "programs_started",
     table: "program_enrollments",
     columns:
