@@ -1,86 +1,45 @@
+import { ShoppingCart, Star, UserRound, Users } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { formatMoney } from "@/lib/armory";
+import {
+  type LeaderboardKpi,
+  type LeaderboardTab,
+  LeaderboardView,
+} from "@/components/leaderboard-view";
+import { averageRating, growth } from "@/lib/admin-console";
+import { publicImageUrl } from "@/lib/armory";
 import { requireAdmin } from "@/lib/auth";
 import {
+  buildEngagement,
+  buildLeaderboards,
   COACH_POINTS,
+  ENGAGEMENT_POINTS,
   LEADERBOARD_RANGES,
   MEMBER_POINTS,
-  buildLeaderboards,
   rangeStart,
+  salesTrend,
 } from "@/lib/leaderboard";
-import { loadActivity } from "./load";
+import { getSupabaseEnv } from "@/lib/supabase/env";
+import {
+  loadActivity,
+  loadEngagement,
+  loadLeaderboardExtras,
+  loadSalesSince,
+} from "./load";
 
 export const metadata: Metadata = { title: "Leaderboard" };
 
-function Board({
-  title,
-  note,
-  columns,
-  rows,
-  empty,
-}: {
-  title: string;
-  note?: string;
-  columns: string[];
-  rows: { key: string; name: React.ReactNode; cells: React.ReactNode[] }[];
-  empty: string;
-}) {
-  return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-2xl">{title}</h2>
-        {note && <p className="text-xs text-muted">{note}</p>}
-      </div>
-      {rows.length === 0 ? (
-        <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-          {empty}
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[28rem] text-left text-sm">
-            <thead className="bg-surface text-muted">
-              <tr>
-                <th className="w-10 p-3 font-medium">#</th>
-                <th className="p-3 font-medium">Name</th>
-                {columns.map((column, index) => (
-                  <th
-                    key={column}
-                    className={`p-3 text-right font-medium ${index === columns.length - 1 ? "text-foreground" : ""}`}
-                  >
-                    {column}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((row, rank) => (
-                <tr
-                  key={row.key}
-                  className={rank === 0 ? "bg-surface-raised" : undefined}
-                >
-                  <td
-                    className={`p-3 font-semibold ${rank < 3 ? "text-accent" : "text-muted"}`}
-                  >
-                    {rank + 1}
-                  </td>
-                  <td className="p-3 font-medium">{row.name}</td>
-                  {row.cells.map((cell, index) => (
-                    <td
-                      key={index}
-                      className={`p-3 text-right tabular-nums ${index === row.cells.length - 1 ? "font-semibold" : "text-muted"}`}
-                    >
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
+const TABS: LeaderboardTab[] = [
+  "overview",
+  "members",
+  "coaches",
+  "sales",
+  "engagement",
+];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// The card has room for whole dollars only; the tables below show cents.
+function wholeDollars(cents: number) {
+  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
 }
 
 export default async function LeaderboardPage({
@@ -89,146 +48,111 @@ export default async function LeaderboardPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   await requireAdmin();
-  const requested = (await searchParams).range;
+  const params = await searchParams;
+  const tabParam = typeof params.tab === "string" ? params.tab : "";
+  const tab: LeaderboardTab = TABS.includes(tabParam as LeaderboardTab)
+    ? (tabParam as LeaderboardTab)
+    : "overview";
   const { range, since } = rangeStart(
-    typeof requested === "string" ? requested : undefined,
+    typeof params.range === "string" ? params.range : undefined,
   );
-  const boards = buildLeaderboards(await loadActivity(since));
-  const empty =
-    range.days === null
-      ? "Nothing yet."
-      : `Nothing in the ${range.label.toLowerCase()}.`;
+  // The cards compare with the window before, so they need twice the range (90 days for all time).
+  const trendDays = range.days ?? 90;
+  const now = new Date();
+  const trendSince = new Date(
+    now.getTime() - 2 * trendDays * DAY_MS,
+  ).toISOString();
+
+  const [activity, engagementRows, recentSales] = await Promise.all([
+    loadActivity(since),
+    tab === "engagement" ? loadEngagement(since) : Promise.resolve(null),
+    loadSalesSince(trendSince),
+  ]);
+  const boards = buildLeaderboards(activity);
+  const extras = await loadLeaderboardExtras(
+    boards.items.flatMap((item) => (item.id ? [item.id] : [])),
+  );
+  const engagement = engagementRows
+    ? buildEngagement(activity.people, engagementRows)
+    : [];
+
+  const created = (role: string) =>
+    activity.people
+      .filter((p) => p.role === role && p.created_at)
+      .map((p) => p.created_at!);
+  const members = growth(created("member"), trendDays, now);
+  const coaches = growth(created("coach"), trendDays, now);
+  const sales = salesTrend(recentSales, trendDays, now);
+  const rating = averageRating(extras.ratings);
+  // All time shows totals; the trend lines then cover the last 90 days.
+  const allTime = range.days === null;
+  const kpis: LeaderboardKpi[] = [
+    {
+      label: "Total members",
+      value: members.total.toLocaleString("en-US"),
+      icon: Users,
+      changePct: allTime ? null : members.changePct,
+      series: members.series,
+    },
+    {
+      label: "Coaches",
+      value: coaches.total.toLocaleString("en-US"),
+      icon: UserRound,
+      changePct: allTime ? null : coaches.changePct,
+      series: coaches.series,
+    },
+    {
+      label: allTime
+        ? "Armory sales (all time)"
+        : `Armory sales (${range.days}d)`,
+      value: wholeDollars(
+        allTime
+          ? activity.sales
+              .filter((s) => !s.refunded_at)
+              .reduce((sum, s) => sum + s.amount_cents, 0)
+          : sales.cents,
+      ),
+      icon: ShoppingCart,
+      changePct: allTime ? null : sales.changePct,
+      series: sales.series,
+    },
+    {
+      label: `Average review rating (${extras.ratings.length})`,
+      value: rating === null ? "—" : String(rating),
+      icon: Star,
+      changePct: null,
+      series: null,
+      stars: rating,
+    },
+  ];
+
+  const supabaseUrl = getSupabaseEnv().url;
+  const itemImages = new Map(
+    [...extras.items].map(([id, item]) => [
+      id,
+      {
+        url: publicImageUrl(supabaseUrl, item.imagePath),
+        membership: item.kind === "membership",
+      },
+    ]),
+  );
 
   return (
-    <div className="space-y-8">
-      <Link href="/admin" className="text-link text-sm">
-        Back to admin
-      </Link>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-5xl">Leaderboard</h1>
-          <p className="mt-2 max-w-2xl text-muted">
-            Who&apos;s most active and who&apos;s selling. Scores count what
-            people do, never what they write.
-          </p>
-        </div>
-        <nav aria-label="Time range" className="flex gap-2">
-          {LEADERBOARD_RANGES.map((option) => (
-            <Link
-              key={option.value}
-              href={`/admin/leaderboard?range=${option.value}`}
-              aria-current={option.value === range.value ? "page" : undefined}
-              className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
-                option.value === range.value
-                  ? "bg-accent text-accent-foreground"
-                  : "border border-border hover:bg-surface-raised"
-              }`}
-            >
-              {option.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      <div className="grid gap-8 xl:grid-cols-2">
-        <Board
-          title="Most active members"
-          note={`Points: task done ${MEMBER_POINTS.tasks} · session RSVP ${MEMBER_POINTS.sessions} · message ${MEMBER_POINTS.messages} · memo ${MEMBER_POINTS.memos} · habit ${MEMBER_POINTS.habits}`}
-          columns={[
-            "Tasks done",
-            "Sessions",
-            "Messages",
-            "Memos",
-            "Habits",
-            "Score",
-          ]}
-          rows={boards.members.map((row) => ({
-            key: row.id,
-            name: row.name,
-            cells: [
-              row.tasks,
-              row.sessions,
-              row.messages,
-              row.memos,
-              row.habits,
-              row.score,
-            ],
-          }))}
-          empty={empty}
-        />
-        <Board
-          title="Most active coaches"
-          note={`Points: video ${COACH_POINTS.videos} · new member ${COACH_POINTS.newMembers} · session ${COACH_POINTS.sessions} · task given ${COACH_POINTS.tasks} · message ${COACH_POINTS.messages}`}
-          columns={[
-            "Videos",
-            "New members",
-            "Sessions",
-            "Tasks given",
-            "Messages",
-            "Score",
-          ]}
-          rows={boards.coaches.map((row) => ({
-            key: row.id,
-            name: row.name,
-            cells: [
-              row.videos,
-              row.newMembers,
-              row.sessions,
-              row.tasks,
-              row.messages,
-              row.score,
-            ],
-          }))}
-          empty={empty}
-        />
-        <Board
-          title="Top buyers"
-          note="Refunded orders are left out."
-          columns={["Orders", "Spent"]}
-          rows={boards.buyers.map((row) => ({
-            key: row.id,
-            name: row.name,
-            cells: [row.orders, formatMoney(row.cents)],
-          }))}
-          empty={empty}
-        />
-        <Board
-          title="Top sellers"
-          note="GYMX2's own items are grouped as GYMX2. Coach earnings are before Stripe's card fees."
-          columns={["Sales", "Coach earned", "Total sold"]}
-          rows={boards.sellers.map((row) => ({
-            key: row.id,
-            name: row.name,
-            cells: [
-              row.sales,
-              row.id === "gymx2" ? "—" : formatMoney(row.earned),
-              formatMoney(row.cents),
-            ],
-          }))}
-          empty={empty}
-        />
-        <Board
-          title="Best-selling items and memberships"
-          columns={["Revenue", "Sold"]}
-          rows={boards.items.map((row) => ({
-            key: row.id ?? row.title,
-            name: row.id ? (
-              <Link href={`/armory/${row.id}`} className="hover:text-accent">
-                {row.title}
-              </Link>
-            ) : (
-              <span>
-                {row.title}{" "}
-                <span className="text-xs text-muted">
-                  {row.membership ? "(monthly payments)" : "(removed)"}
-                </span>
-              </span>
-            ),
-            cells: [formatMoney(row.cents), row.sold],
-          }))}
-          empty={empty}
-        />
-      </div>
-    </div>
+    <LeaderboardView
+      tab={tab}
+      range={range.value}
+      rangeOptions={LEADERBOARD_RANGES}
+      rangeLabel={range.label}
+      kpis={kpis}
+      boards={boards}
+      engagement={engagement}
+      coachPhotos={extras.coachPhotos}
+      itemImages={itemImages}
+      points={{
+        members: `Points: task or program day done ${MEMBER_POINTS.tasks} · session attended or RSVP ${MEMBER_POINTS.sessions} · message ${MEMBER_POINTS.messages} · memo ${MEMBER_POINTS.memos} · habit ${MEMBER_POINTS.habits}`,
+        coaches: `Points: video ${COACH_POINTS.videos} · new member ${COACH_POINTS.newMembers} · session ${COACH_POINTS.sessions} · task given ${COACH_POINTS.tasks} · message ${COACH_POINTS.messages}`,
+        engagement: `Shared posts, comments and likes. Points: post ${ENGAGEMENT_POINTS.posts} · comment ${ENGAGEMENT_POINTS.comments} · like ${ENGAGEMENT_POINTS.likes}. Private and removed posts don't count.`,
+      }}
+    />
   );
 }

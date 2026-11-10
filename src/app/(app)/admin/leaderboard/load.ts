@@ -1,5 +1,6 @@
 import "server-only";
-import type { ActivityRows } from "@/lib/leaderboard";
+import type { ActivityRows, EngagementRows } from "@/lib/leaderboard";
+import { PHOTO_BUCKET } from "@/lib/coach-profile-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type Query = {
@@ -53,7 +54,10 @@ export async function loadActivity(
     attended,
   ] = await Promise.all([
     readAll<ActivityRows["people"][number]>(() =>
-      db.from("profiles").select("id, display_name, role").order("id"),
+      db
+        .from("profiles")
+        .select("id, display_name, role, created_at")
+        .order("id"),
     ),
     readAll<ActivityRows["completions"][number]>(() =>
       after(
@@ -105,7 +109,7 @@ export async function loadActivity(
         db
           .from("purchases")
           .select(
-            "member_id, seller_id, item_id, item_title, amount_cents, fee_cents, refunded_at, kind",
+            "member_id, seller_id, item_id, item_title, amount_cents, fee_cents, refunded_at, kind, created_at",
           ),
         "created_at",
       ).order("id"),
@@ -146,5 +150,110 @@ export async function loadActivity(
     joins,
     sales,
     habits,
+  };
+}
+
+// Shared Community activity since a date: posts not kept to "only me", comments and likes, leaving
+// out anything moderators removed. Only who and when are read, never what was written.
+export async function loadEngagement(
+  since: string | null,
+): Promise<EngagementRows> {
+  const db = createAdminClient();
+  const after = <Q>(query: Q): Q =>
+    since
+      ? (query as unknown as { gte: (column: string, value: string) => Q }).gte(
+          "created_at",
+          since,
+        )
+      : query;
+  const [posts, comments, likes] = await Promise.all([
+    readAll<EngagementRows["posts"][number]>(() =>
+      after(
+        db
+          .from("posts")
+          .select("author_id")
+          .neq("audience", "private")
+          .is("removed_at", null),
+      ).order("id"),
+    ),
+    readAll<EngagementRows["comments"][number]>(() =>
+      after(
+        db.from("post_comments").select("author_id").is("removed_at", null),
+      ).order("id"),
+    ),
+    readAll<EngagementRows["likes"][number]>(() =>
+      after(db.from("post_likes").select("user_id"))
+        .order("post_id")
+        .order("user_id"),
+    ),
+  ]);
+  return { posts, comments, likes };
+}
+
+// Paid Armory sales since a date, for the sales card's trend.
+export async function loadSalesSince(since: string) {
+  const db = createAdminClient();
+  return readAll<{
+    amount_cents: number;
+    created_at: string;
+    refunded_at: string | null;
+  }>(() =>
+    db
+      .from("purchases")
+      .select("amount_cents, created_at, refunded_at")
+      .gte("created_at", since)
+      .order("id"),
+  );
+}
+
+// Ratings for the average, coach photos for avatars, and item photos for the best sellers.
+export async function loadLeaderboardExtras(itemIds: string[]) {
+  const db = createAdminClient();
+  const [{ data: ratings }, { data: profiles }, { data: items }] =
+    await Promise.all([
+      db
+        .from("coach_reviews")
+        .select("rating")
+        .eq("hidden", false)
+        .limit(10000),
+      db
+        .from("coach_profiles_public")
+        .select("coach_id, photo_path")
+        .not("photo_path", "is", null),
+      itemIds.length
+        ? db
+            .from("armory_items")
+            .select("id, image_path, kind")
+            .in("id", itemIds)
+        : Promise.resolve({
+            data: [] as {
+              id: string;
+              image_path: string | null;
+              kind: string;
+            }[],
+          }),
+    ]);
+  const paths = (profiles ?? []).map((p) => p.photo_path as string);
+  const { data: signed } = paths.length
+    ? await db.storage.from(PHOTO_BUCKET).createSignedUrls(paths, 60 * 60)
+    : { data: [] };
+  const byPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]));
+  return {
+    ratings: (ratings ?? []).map((r) => r.rating as number),
+    coachPhotos: new Map(
+      (profiles ?? []).flatMap((p) => {
+        const url = byPath.get(p.photo_path as string);
+        return url ? [[p.coach_id as string, url] as const] : [];
+      }),
+    ),
+    items: new Map(
+      (items ?? []).map((i) => [
+        i.id as string,
+        {
+          imagePath: (i.image_path as string | null) ?? null,
+          kind: i.kind as string,
+        },
+      ]),
+    ),
   };
 }
