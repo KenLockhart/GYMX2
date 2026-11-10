@@ -84,6 +84,7 @@ export function PostCard({
   viewerRole,
   onDeleted,
   onMuted,
+  onDismissChange,
   linkToPost = true,
 }: {
   post: PostDTO;
@@ -91,6 +92,8 @@ export function PostCard({
   onDeleted?: (id: string) => void;
   // Lets the feed drop the muted person's other posts.
   onMuted?: (authorId: string, postId: string) => void;
+  // Hidden or muted (true), or brought back with Undo (false).
+  onDismissChange?: (postId: string, dismissed: boolean) => void;
   linkToPost?: boolean;
 }) {
   const router = useRouter();
@@ -151,6 +154,7 @@ export function PostCard({
           : await setMute(post.author.id, !undo);
       if (result.error) return setError(result.error);
       setDismissed(undo ? null : how);
+      onDismissChange?.(post.id, !undo);
       if (how === "muted" && !undo) onMuted?.(post.author.id, post.id);
       // Bring back the person's other posts.
       if (how === "muted" && undo) router.refresh();

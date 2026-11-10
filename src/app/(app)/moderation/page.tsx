@@ -16,7 +16,6 @@ type PostRow = {
   coach_id: string | null;
   created_at: string;
   removed_at: string | null;
-  flag_reasons: string;
 };
 type CommentRow = {
   id: string;
@@ -36,18 +35,14 @@ type ReportRow = {
   created_at: string;
 };
 
-function daysAgo(days: number) {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-}
-
 // Everything here is read with the moderator's own permissions: moderators see reports on the
 // shared feed, admins see reports anywhere except "Only me" posts. Private messages are never here.
 export default async function ModerationPage() {
   const { profile } = await requireModerator();
   const isAdmin = profile.role === "admin";
+  const isCoach = profile.role === "coach";
   const supabase = await createClient();
 
-  const since = daysAgo(14);
   const [{ data: reportData }, { data: flaggedData }] = await Promise.all([
     supabase
       .from("content_reports")
@@ -57,20 +52,14 @@ export default async function ModerationPage() {
       .eq("status", "open")
       .order("created_at", { ascending: true })
       .limit(500),
-    supabase
-      .from("posts")
-      .select(
-        "id, author_id, body, audience, coach_id, created_at, removed_at, flag_reasons",
-      )
-      .neq("flag_reasons", "")
-      .neq("audience", "only_me")
-      .is("removed_at", null)
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
-      .limit(50),
+    // Flag reasons are only readable through this function, for posts you may moderate.
+    supabase.rpc("flagged_posts", { max_age_days: 14 }),
   ]);
   const reports = (reportData ?? []) as ReportRow[];
-  const flagged = (flaggedData ?? []) as PostRow[];
+  const flaggedRows = (flaggedData ?? []) as {
+    post_id: string;
+    flag_reasons: string;
+  }[];
 
   const commentIds = [
     ...new Set(reports.flatMap((r) => (r.comment_id ? [r.comment_id] : []))),
@@ -89,7 +78,7 @@ export default async function ModerationPage() {
     ...new Set([
       ...reports.flatMap((r) => (r.post_id ? [r.post_id] : [])),
       ...[...comments.values()].map((c) => c.post_id),
-      ...flagged.map((p) => p.id),
+      ...flaggedRows.map((row) => row.post_id),
     ]),
   ];
   const [{ data: postData }, { data: mediaData }] = postIds.length
@@ -97,7 +86,7 @@ export default async function ModerationPage() {
         supabase
           .from("posts")
           .select(
-            "id, author_id, body, audience, coach_id, created_at, removed_at, flag_reasons",
+            "id, author_id, body, audience, coach_id, created_at, removed_at",
           )
           .in("id", postIds),
         supabase
@@ -108,6 +97,18 @@ export default async function ModerationPage() {
       ])
     : [{ data: [] }, { data: [] }];
   const posts = new Map(((postData ?? []) as PostRow[]).map((p) => [p.id, p]));
+
+  // Automatic flags on reported posts, again only through the moderator-only function.
+  const reportedPostIds = [...posts.keys()];
+  const { data: flagData } = reportedPostIds.length
+    ? await supabase.rpc("moderation_flags", { post_ids: reportedPostIds })
+    : { data: [] };
+  const flags = new Map(
+    [
+      ...((flagData ?? []) as { post_id: string; flag_reasons: string }[]),
+      ...flaggedRows,
+    ].map((row) => [row.post_id, row.flag_reasons]),
+  );
 
   const media = (mediaData ?? []) as { post_id: string; path: string }[];
   const { data: signed } = media.length
@@ -179,14 +180,18 @@ export default async function ModerationPage() {
           ? [isAdmin ? `${nameOf(r.reporter_id)}: ${r.details}` : r.details]
           : [],
       ),
-      autoFlag: post.flag_reasons || null,
+      autoFlag: flags.get(post.id) ?? null,
+      canClearFlag: false,
       reportIds: group.map((r) => r.id),
       reportedAt: group[0].created_at,
     });
   }
 
-  const flaggedItems: QueueItem[] = flagged
-    .filter((post) => !groups.has(`post:${post.id}`))
+  const flaggedItems: QueueItem[] = flaggedRows
+    .flatMap((row) => {
+      const post = posts.get(row.post_id);
+      return post && !groups.has(`post:${post.id}`) ? [post] : [];
+    })
     .map((post) => ({
       key: `flag:${post.id}`,
       kind: "post",
@@ -200,7 +205,8 @@ export default async function ModerationPage() {
       alreadyRemoved: false,
       summary: "Flagged automatically",
       details: [],
-      autoFlag: post.flag_reasons,
+      autoFlag: flags.get(post.id) ?? null,
+      canClearFlag: true,
       reportIds: [],
       reportedAt: post.created_at,
     }));
@@ -212,7 +218,9 @@ export default async function ModerationPage() {
         <p className="mt-2 text-muted">
           {isAdmin
             ? "Reported posts and comments from the shared feed and every coach community."
-            : "Reported posts and comments from the shared feed. Coach communities are moderated by their coaches and GYMX2 admins."}{" "}
+            : isCoach
+              ? "Reported posts and comments in your community. Reports about your own posts go to GYMX2 admins."
+              : "Reported posts and comments from the shared feed. Coach communities are moderated by their coaches and GYMX2 admins."}{" "}
           Removing something hides it from everyone and tells the author, with
           your reason if you give one. Direct messages are never shown here.
         </p>
@@ -225,7 +233,7 @@ export default async function ModerationPage() {
       <ModerationQueue
         title="Flagged automatically"
         empty="Nothing flagged in the last 14 days."
-        hint="Posts mentioning phone numbers, emails or payment apps. Nobody reported these; remove one only if it breaks the guidelines."
+        hint="Posts mentioning phone numbers, emails or payment apps. Nobody reported these: choose Looks fine to clear the flag, or remove the post if it breaks the guidelines."
         items={flaggedItems}
       />
     </div>

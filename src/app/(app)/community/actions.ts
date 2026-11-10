@@ -761,3 +761,25 @@ export async function dismissReports(
   revalidatePath("/moderation");
   return {};
 }
+
+// "Looks fine" on an automatically flagged post. The database checks the right to review it.
+export async function clearPostFlag(
+  postId: string,
+): Promise<{ error?: string }> {
+  await requireAccount();
+  const id = idSchema.safeParse(postId);
+  if (!id.success) return { error: "That post wasn't found." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("clear_post_flag", {
+    target_post_id: id.data,
+  });
+  if (error)
+    return {
+      error:
+        error.code === "42501"
+          ? "You can't review this post."
+          : "That didn't work. Please try again.",
+    };
+  revalidatePath("/moderation");
+  return {};
+}

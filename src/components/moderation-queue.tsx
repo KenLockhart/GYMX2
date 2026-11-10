@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import {
+  clearPostFlag,
   dismissReports,
   removeComment,
   removePost,
@@ -23,6 +24,8 @@ export type QueueItem = {
   summary: string;
   details: string[];
   autoFlag: string | null;
+  // Flagged automatically and not reported: a reviewer can clear the flag.
+  canClearFlag: boolean;
   reportIds: string[];
   reportedAt: string;
 };
@@ -50,6 +53,15 @@ function Item({
           : await removeComment(item.targetId, reason);
       if (result.error) return setError(result.error);
       onDone(item.key, "Removed");
+    });
+  }
+
+  function clearFlag() {
+    setError(null);
+    start(async () => {
+      const result = await clearPostFlag(item.targetId);
+      if (result.error) return setError(result.error);
+      onDone(item.key, "Looks fine");
     });
   }
 
@@ -121,6 +133,16 @@ function Item({
             className="btn-primary px-3 py-1.5 text-sm"
           >
             Remove {item.kind}
+          </button>
+        )}
+        {item.canClearFlag && (
+          <button
+            type="button"
+            onClick={clearFlag}
+            disabled={pending}
+            className="btn-secondary px-3 py-1.5 text-sm"
+          >
+            Looks fine
           </button>
         )}
         {item.reportIds.length > 0 && (

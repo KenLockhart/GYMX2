@@ -20,6 +20,9 @@ export function FeedList({
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const [more, setMore] = useState(initialMore);
+  // Hidden or muted cards stay on screen (with Undo) but are gone from the server's feed, so
+  // they don't count when asking for the next page; otherwise a post would be skipped.
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -29,13 +32,17 @@ export function FeedList({
     setFirstPage(initialPosts);
     setPosts(initialPosts);
     setMore(initialMore);
+    setDismissed(new Set());
   }
 
   function loadMore() {
     setError(null);
     start(async () => {
       try {
-        const next = await loadMorePosts(posts.length, coachId);
+        const next = await loadMorePosts(
+          Math.max(0, posts.length - dismissed.size),
+          coachId,
+        );
         setPosts((current) => [
           ...current,
           ...next.posts.filter(
@@ -66,6 +73,14 @@ export function FeedList({
           viewerRole={viewerRole}
           onDeleted={(id) =>
             setPosts((current) => current.filter((item) => item.id !== id))
+          }
+          onDismissChange={(id, isDismissed) =>
+            setDismissed((current) => {
+              const next = new Set(current);
+              if (isDismissed) next.add(id);
+              else next.delete(id);
+              return next;
+            })
           }
           onMuted={(authorId, keepId) =>
             setPosts((current) =>
