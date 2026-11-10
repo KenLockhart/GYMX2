@@ -110,6 +110,18 @@ export async function getPlayerUrl(uid: string) {
   return `https://customer-${customerCode}.cloudflarestream.com/${result.token}/iframe`;
 }
 
+// A still from the video, through the same short-lived token as playback.
+export async function getThumbnailUrl(uid: string) {
+  const response = await streamRequest(`/${uid}/token`, { method: "POST" });
+  if (!response.ok)
+    throw new Error(
+      `Cloudflare couldn't make a thumbnail link (${response.status}).`,
+    );
+  const { result } = await response.json();
+  const { customerCode } = requireStreamEnv();
+  return `https://customer-${customerCode}.cloudflarestream.com/${result.token}/thumbnails/thumbnail.jpg?time=2s&height=360&fit=crop`;
+}
+
 export async function deleteVideo(uid: string) {
   const response = await streamRequest(`/${uid}`, { method: "DELETE" });
   if (!response.ok && response.status !== 404) {

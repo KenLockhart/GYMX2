@@ -28,7 +28,11 @@ async function loadPlayerUrl(videoId: string) {
   }
 }
 
-export default async function VideoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VideoPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   await requireAccount();
   const { id } = await params;
 
@@ -36,13 +40,16 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
   const supabase = await createClient();
   const { data } = await supabase
     .from("videos")
-    .select("id, title, description, status, coach:profiles!coach_id(display_name)")
+    .select(
+      "id, title, description, status, coach:profiles!coach_id(display_name)",
+    )
     .eq("id", id)
     .maybeSingle();
   const video = data as unknown as WatchVideo | null;
   if (!video) notFound();
 
-  const playerUrl = video.status === "ready" ? await loadPlayerUrl(video.id) : null;
+  const playerUrl =
+    video.status === "ready" ? await loadPlayerUrl(video.id) : null;
 
   return (
     <div className="space-y-6">
@@ -61,7 +68,10 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           />
         </div>
       ) : (
-        <p role="status" className="rounded-lg border border-border bg-surface p-4 text-muted">
+        <p
+          role="status"
+          className="rounded-lg border border-border bg-surface p-4 text-muted"
+        >
           {video.status === "ready"
             ? "This video can't play right now. Please refresh and try again."
             : "This video is still being prepared."}
@@ -70,9 +80,13 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
 
       <div>
         <h1 className="text-4xl">{video.title}</h1>
-        {video.coach && <p className="mt-1 text-sm text-muted">{video.coach.display_name}</p>}
+        {video.coach && (
+          <p className="mt-1 text-sm text-muted">{video.coach.display_name}</p>
+        )}
         {video.description && (
-          <p className="mt-4 max-w-2xl whitespace-pre-line">{video.description}</p>
+          <p className="mt-4 max-w-2xl whitespace-pre-line">
+            {video.description}
+          </p>
         )}
       </div>
     </div>

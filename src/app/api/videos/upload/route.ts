@@ -15,15 +15,23 @@ function failure(message: string, status: number) {
 export async function POST(request: NextRequest) {
   const account = await getCurrentAccount();
   if (!account) return failure("Log in to upload a video.", 401);
-  if (account.profile.role !== "coach") return failure("Only coaches can upload videos.", 403);
-  if (!isStreamConfigured()) return failure("Video uploads aren't connected yet.", 503);
+  if (account.profile.role !== "coach")
+    return failure("Only coaches can upload videos.", 403);
+  if (!isStreamConfigured())
+    return failure("Video uploads aren't connected yet.", 503);
 
   const length = request.headers.get("Upload-Length") ?? "";
-  if (!/^\d+$/.test(length) || Number(length) === 0 || Number(length) > MAX_FILE_BYTES) {
+  if (
+    !/^\d+$/.test(length) ||
+    Number(length) === 0 ||
+    Number(length) > MAX_FILE_BYTES
+  ) {
     return failure("Videos must be under 30 GB.", 400);
   }
 
-  const parsed = videoSchema.safeParse(parseUploadMetadata(request.headers.get("Upload-Metadata")));
+  const parsed = videoSchema.safeParse(
+    parseUploadMetadata(request.headers.get("Upload-Metadata")),
+  );
   if (!parsed.success) return failure(parsed.error.issues[0].message, 400);
 
   try {
@@ -38,6 +46,8 @@ export async function POST(request: NextRequest) {
       cloudflare_uid: uid,
       title: parsed.data.title,
       description: parsed.data.description,
+      category: parsed.data.category,
+      visibility: parsed.data.visibility,
     });
     if (error) {
       // Nothing points at this upload now, so don't leave it behind in Cloudflare.
