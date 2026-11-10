@@ -176,6 +176,12 @@ const SECTIONS: {
     owner: "user_id",
   },
   {
+    name: "coach_profile_draft",
+    table: "coach_profile_drafts",
+    columns: "data, status, review_note, submitted_at, reviewed_at, updated_at",
+    owner: "coach_id",
+  },
+  {
     name: "programs_started",
     table: "program_enrollments",
     columns:

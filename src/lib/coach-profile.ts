@@ -111,7 +111,10 @@ export type CoachProfileView = {
     attributes: { label: string; primary: string; secondary?: string }[];
     note: string;
   };
-  loveLanguages: { primary: LoveLanguage; secondary: LoveLanguage };
+  loveLanguages: {
+    primary: LoveLanguage | null;
+    secondary: LoveLanguage | null;
+  };
   coaching: {
     included: string[];
     details: { label: string; value: string }[];
@@ -152,7 +155,8 @@ export type CoachProfileView = {
       reply: string | null;
     }[];
   };
-  video: { prompts: string[] };
+  // Not yet available for real coaches: the intro video and intro booking arrive in later PRs.
+  video: { prompts: string[] } | null;
   intro: {
     title: string;
     priceCents: number;
@@ -160,7 +164,7 @@ export type CoachProfileView = {
     formats: string[];
     cancellation: string;
     questions: string[];
-  };
+  } | null;
 };
 
 // The lowest recurring monthly price, which is the only honest "starting price": intro calls

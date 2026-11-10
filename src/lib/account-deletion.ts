@@ -60,7 +60,12 @@ export async function passwordMatches(email: string, password: string) {
 
 async function removeStoredFiles(userId: string) {
   const storage = createAdminClient().storage;
-  for (const bucket of ["armory-files", "armory-images", "progress-photos"]) {
+  for (const bucket of [
+    "armory-files",
+    "armory-images",
+    "progress-photos",
+    "coach-photos",
+  ]) {
     const { data } = await storage.from(bucket).list(userId, { limit: 1000 });
     const paths = (data ?? []).map((file) => `${userId}/${file.name}`);
     if (paths.length) await storage.from(bucket).remove(paths);

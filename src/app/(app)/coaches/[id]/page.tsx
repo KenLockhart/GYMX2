@@ -15,6 +15,8 @@ import { formatMoney } from "@/lib/armory";
 import { confirmMembershipCheckout } from "@/lib/membership-server";
 import { hasAccess, membershipStatusLabel } from "@/lib/memberships";
 import { isStripeTestMode, stripePublishableKey } from "@/lib/stripe";
+import { CoachProfile as RichProfile } from "@/components/coach-profile/coach-profile-view";
+import { loadPublishedView } from "@/lib/coach-profile-server";
 
 export const metadata: Metadata = { title: "Coach" };
 
@@ -132,6 +134,208 @@ export default async function CoachPage({
     const url = coach[key];
     return typeof url === "string" && url ? [{ label, url }] : [];
   });
+
+  const view = await loadPublishedView({
+    id: coach.id,
+    display_name: coach.display_name,
+  });
+  if (view) {
+    const actions =
+      profile.id === coach.id ? (
+        <Link href="/profile/coach" className="btn-secondary">
+          Edit your profile
+        </Link>
+      ) : isMember ? (
+        <div className="flex flex-wrap items-start gap-2">
+          {isJoined && (
+            <Link href={`/messages/${coach.id}`} className="btn-primary">
+              Message
+            </Link>
+          )}
+          {!isJoined && !canJoinFree && (
+            <a href="#pricing" className="btn-primary">
+              See plans
+            </a>
+          )}
+          {(isJoined || canJoinFree) && (
+            <ActionForm
+              action={isJoined ? leaveCoach : joinCoach}
+              confirmMessage={
+                isJoined
+                  ? `Leave ${coach.display_name}? Your unfinished Tasks and upcoming sessions with them will be removed.`
+                  : undefined
+              }
+              className="space-y-2"
+            >
+              <input type="hidden" name="coach_id" value={coach.id} />
+              <SubmitButton
+                pendingText={isJoined ? "Leaving..." : "Joining..."}
+                className={isJoined ? "btn-secondary" : "btn-primary"}
+              >
+                {isJoined
+                  ? "Leave"
+                  : canJoinFree && showPlans
+                    ? "Join free"
+                    : "Join"}
+              </SubmitButton>
+              <FormStatus />
+            </ActionForm>
+          )}
+        </div>
+      ) : undefined;
+    return (
+      <div className="space-y-6">
+        {isMember && (
+          <Link href="/coaches" className="text-link text-sm">
+            Back to coaches
+          </Link>
+        )}
+        {returned && membership && (
+          <p
+            role="status"
+            className="rounded-lg border border-accent bg-surface p-4"
+          >
+            You&apos;re in! Welcome to {membership.plan_name}. Manage your
+            membership any time in{" "}
+            <Link href="/armory/purchases" className="text-link">
+              My purchases
+            </Link>
+            .
+          </p>
+        )}
+
+        <RichProfile
+          profile={view}
+          actions={actions}
+          pricingExtra={
+            showPlans && (plans.length > 0 || membership) ? (
+              <section className="space-y-3">
+                <h3 className="text-xl font-semibold">Join a membership</h3>
+                {membership ? (
+                  <p className="max-w-2xl rounded-lg border border-accent bg-surface p-4 text-sm">
+                    You&apos;re on{" "}
+                    <span className="font-semibold">
+                      {membership.plan_name}
+                    </span>{" "}
+                    · {membershipStatusLabel(membership)} ·{" "}
+                    <Link href="/armory/purchases" className="text-link">
+                      Manage
+                    </Link>
+                  </p>
+                ) : (
+                  <>
+                    {coach.join_mode === "paid" && (
+                      <p className="text-sm text-muted">
+                        {coach.display_name} coaches subscribers only. Pick a
+                        plan to join.
+                      </p>
+                    )}
+                    <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                      {plans.map((plan) => (
+                        <li
+                          key={plan.id}
+                          className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5"
+                        >
+                          <div>
+                            <p className="text-lg font-semibold">{plan.name}</p>
+                            <p className="mt-1 text-3xl font-bold">
+                              {formatMoney(plan.price_cents)}
+                              <span className="text-base font-normal text-muted">
+                                /month
+                              </span>
+                            </p>
+                            {plan.trial_days > 0 && (
+                              <p className="text-sm font-semibold text-accent">
+                                {plan.trial_days}-day free trial
+                              </p>
+                            )}
+                          </div>
+                          {plan.description && (
+                            <p className="flex-1 whitespace-pre-line text-sm text-muted">
+                              {plan.description}
+                            </p>
+                          )}
+                          {isMember ? (
+                            <SubscribePanel
+                              planId={plan.id}
+                              buttonLabel={
+                                plan.trial_days > 0
+                                  ? "Start free trial"
+                                  : "Subscribe"
+                              }
+                              publishableKey={stripePublishableKey()}
+                            />
+                          ) : (
+                            <p className="text-xs text-muted">
+                              Members can subscribe here.
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted">
+                      Billed monthly by Stripe. Cancel any time from My
+                      purchases; you keep access until the end of the month
+                      you&apos;ve paid for.
+                      {isStripeTestMode() &&
+                        " Test mode: use card 4242 4242 4242 4242."}
+                    </p>
+                  </>
+                )}
+              </section>
+            ) : undefined
+          }
+          reviewsExtra={
+            isMember && isJoined ? (
+              <div className="space-y-3 rounded-2xl border border-border bg-surface p-5">
+                <h3 className="font-semibold">
+                  Your review of {coach.display_name}
+                </h3>
+                <ReviewForm
+                  coachId={coach.id}
+                  coachName={coach.display_name}
+                  existing={myReview}
+                />
+              </div>
+            ) : undefined
+          }
+        />
+        <section className="space-y-3">
+          <h2 className="text-2xl">Find {coach.display_name} online</h2>
+          {links.length === 0 ? (
+            <p className="text-muted">
+              {profile.id === coach.id ? (
+                <>
+                  You haven&apos;t added any links yet.{" "}
+                  <Link href="/profile" className="text-link">
+                    Add them on your profile
+                  </Link>
+                  .
+                </>
+              ) : (
+                "No links added yet."
+              )}
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {links.map((link) => (
+                <li key={link.label}>
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="btn-secondary px-4 py-2 text-sm"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

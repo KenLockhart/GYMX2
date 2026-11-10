@@ -37,6 +37,25 @@ export default async function ProfilePage() {
     <div className="space-y-10">
       <div className="space-y-6">
         <h1 className="text-5xl">Your profile</h1>
+        {profile.role === "coach" && (
+          <Link
+            href="/profile/coach"
+            className="flex items-center justify-between gap-3 rounded-2xl border border-accent/60 bg-accent/5 px-4 py-3 text-sm hover:bg-accent/10"
+          >
+            <span>
+              <span className="font-semibold text-accent">
+                Your coach profile
+              </span>{" "}
+              <span className="text-muted">
+                Photo, story, coaching style, pricing and more: the page members
+                see when they find you.
+              </span>
+            </span>
+            <span aria-hidden className="text-accent">
+              →
+            </span>
+          </Link>
+        )}
         <ProfileForm profile={profile} email={email} />
       </div>
 
