@@ -3,13 +3,8 @@
 import { PILLARS } from "@/lib/achievements";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
 import { EXPERIENCE, GOALS } from "@/lib/onboarding";
+import { useT } from "@/i18n/client";
 import type { ActionState } from "@/lib/types";
-
-const pillarHint = {
-  mind: "Stress, sleep, focus and habits",
-  body: "Strength, fitness, weight and nutrition",
-  spirit: "Purpose, motivation and inner growth",
-} as const;
 
 function Choice({
   type,
@@ -52,13 +47,13 @@ export function GoalsForm({
   initial: { goals: string[]; experience: string | null; focus: string | null };
   submitLabel: string;
 }) {
+  const t = useT();
+  const o = t.options;
   return (
     <ActionForm action={action} className="max-w-3xl space-y-8">
       <fieldset className="space-y-3">
-        <legend className="text-xl font-semibold">
-          What do you want to work on?
-        </legend>
-        <p className="text-sm text-muted">Pick as many as you like.</p>
+        <legend className="text-xl font-semibold">{t.goalsForm.goals}</legend>
+        <p className="text-sm text-muted">{t.goalsForm.goalsHint}</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {GOALS.map((goal) => (
             <Choice
@@ -66,7 +61,7 @@ export function GoalsForm({
               type="checkbox"
               name="goals"
               value={goal.value}
-              label={goal.label}
+              label={o.goals[goal.value] ?? goal.label}
               checked={initial.goals.includes(goal.value)}
             />
           ))}
@@ -74,7 +69,7 @@ export function GoalsForm({
       </fieldset>
       <fieldset className="space-y-3">
         <legend className="text-xl font-semibold">
-          How much experience do you have?
+          {t.goalsForm.experience}
         </legend>
         <div className="grid gap-2 sm:grid-cols-3">
           {EXPERIENCE.map((item) => (
@@ -83,17 +78,15 @@ export function GoalsForm({
               type="radio"
               name="experience"
               value={item.value}
-              label={item.label}
-              hint={item.hint}
+              label={o.experience[item.value]?.label ?? item.label}
+              hint={o.experience[item.value]?.hint ?? item.hint}
               checked={initial.experience === item.value}
             />
           ))}
         </div>
       </fieldset>
       <fieldset className="space-y-3">
-        <legend className="text-xl font-semibold">
-          Where do you want to start?
-        </legend>
+        <legend className="text-xl font-semibold">{t.goalsForm.focus}</legend>
         <div className="grid gap-2 sm:grid-cols-3">
           {PILLARS.map((pillar) => (
             <Choice
@@ -101,15 +94,15 @@ export function GoalsForm({
               type="radio"
               name="focus"
               value={pillar.value}
-              label={pillar.label}
-              hint={pillarHint[pillar.value]}
+              label={o.pillars[pillar.value]}
+              hint={o.pillarHints[pillar.value]}
               checked={initial.focus === pillar.value}
             />
           ))}
         </div>
       </fieldset>
       <div className="flex items-center gap-3">
-        <SubmitButton pendingText="Saving..." className="btn-primary">
+        <SubmitButton pendingText={t.common.saving} className="btn-primary">
           {submitLabel}
         </SubmitButton>
         <FormStatus />
@@ -125,6 +118,7 @@ export function SpecialtiesForm({
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   initial: string[];
 }) {
+  const t = useT();
   return (
     <ActionForm action={action} className="max-w-3xl space-y-3">
       <div className="grid gap-2 sm:grid-cols-2">
@@ -134,14 +128,14 @@ export function SpecialtiesForm({
             type="checkbox"
             name="specialties"
             value={goal.value}
-            label={goal.label}
+            label={t.options.goals[goal.value] ?? goal.label}
             checked={initial.includes(goal.value)}
           />
         ))}
       </div>
       <div className="flex items-center gap-3">
-        <SubmitButton pendingText="Saving..." className="btn-secondary">
-          Save specialties
+        <SubmitButton pendingText={t.common.saving} className="btn-secondary">
+          {t.profile.specialties.save}
         </SubmitButton>
         <FormStatus />
       </div>

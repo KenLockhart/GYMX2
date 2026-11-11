@@ -14,7 +14,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { signOut } from "@/app/(auth)/actions";
 import { NavIcon } from "@/components/nav-icon";
+import { LanguageSwitch } from "@/components/language-switch";
 import { NotificationBell } from "@/components/notification-bell";
+import { useT } from "@/i18n/client";
 import { isActive, type NavGroup, type NavItem } from "@/lib/nav";
 
 type Props = {
@@ -78,6 +80,7 @@ function useDismiss(
 }
 
 export function AppHeader(props: Props) {
+  const t = useT();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -120,7 +123,7 @@ export function AppHeader(props: Props) {
         <span aria-hidden className="mx-2 hidden h-7 w-px bg-border lg:block" />
 
         <nav
-          aria-label="Main"
+          aria-label={t.nav.main}
           className="hidden min-w-0 flex-1 items-center gap-0.5 lg:flex xl:gap-1"
         >
           {props.primary.map((entry) => {
@@ -156,7 +159,7 @@ export function AppHeader(props: Props) {
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            aria-label="Search pages (Ctrl+K)"
+            aria-label={t.nav.searchPages}
             className="grid size-10 place-items-center rounded-full text-foreground/85 hover:bg-surface-raised hover:text-foreground"
           >
             <Search aria-hidden className="size-5" strokeWidth={1.8} />
@@ -175,7 +178,7 @@ export function AppHeader(props: Props) {
             <MessageCircle aria-hidden className="size-5" strokeWidth={1.8} />
             <span className="sr-only">
               {props.messagesLabel}
-              {props.unreadMessages > 0 && `, ${props.unreadMessages} unread`}
+              {props.unreadMessages > 0 && t.nav.unread(props.unreadMessages)}
             </span>
             {props.unreadMessages > 0 && (
               <span aria-hidden className="absolute right-0.5 top-0.5">
@@ -210,7 +213,8 @@ export function AppHeader(props: Props) {
                 className={`size-4 text-muted transition-transform ${menuOpen ? "rotate-180" : ""}`}
               />
               <span className="sr-only">
-                Your menu{menuBadge > 0 && `, ${menuBadge} open reports`}
+                {t.nav.yourMenu}
+                {menuBadge > 0 && t.nav.openReports(menuBadge)}
               </span>
             </button>
             {menuOpen && (
@@ -232,6 +236,12 @@ export function AppHeader(props: Props) {
                   badges={props.badges}
                   pathname={pathname}
                 />
+                <div className="flex items-center justify-between gap-3 border-t border-border px-2 py-2.5">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-muted">
+                    {t.common.language.label}
+                  </span>
+                  <LanguageSwitch />
+                </div>
                 <form action={signOut} className="border-t border-border pt-1">
                   <button
                     type="submit"
@@ -243,7 +253,7 @@ export function AppHeader(props: Props) {
                       className="size-[18px]"
                       strokeWidth={1.8}
                     />
-                    Log out
+                    {t.nav.logOut}
                   </button>
                 </form>
               </div>
@@ -253,7 +263,7 @@ export function AppHeader(props: Props) {
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            aria-label={`Open menu${menuBadge > 0 ? `, ${menuBadge} open reports` : ""}`}
+            aria-label={`${t.nav.openMenu}${menuBadge > 0 ? t.nav.openReports(menuBadge) : ""}`}
             aria-expanded={drawerOpen}
             className="relative grid size-10 place-items-center rounded-full hover:bg-surface-raised lg:hidden"
           >
@@ -333,6 +343,7 @@ function MenuGroups({
 
 // The phone and tablet menu: everything in one panel.
 function Drawer(props: Props & { pathname: string; onClose: () => void }) {
+  const t = useT();
   const panel = useRef<HTMLDivElement>(null);
   const onClose = useRef(props.onClose);
   useEffect(() => {
@@ -354,7 +365,7 @@ function Drawer(props: Props & { pathname: string; onClose: () => void }) {
     <div className="fixed inset-0 z-50 lg:hidden">
       <button
         type="button"
-        aria-label="Close menu"
+        aria-label={t.nav.closeMenu}
         onClick={props.onClose}
         className="absolute inset-0 bg-black/70"
       />
@@ -363,7 +374,7 @@ function Drawer(props: Props & { pathname: string; onClose: () => void }) {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="Menu"
+        aria-label={t.nav.menu}
         className="absolute inset-y-0 right-0 flex w-[min(20rem,88vw)] flex-col overflow-y-auto border-l border-border bg-surface outline-none"
       >
         <div className="flex items-center gap-3 border-b border-border p-4">
@@ -377,13 +388,13 @@ function Drawer(props: Props & { pathname: string; onClose: () => void }) {
           <button
             type="button"
             onClick={props.onClose}
-            aria-label="Close menu"
+            aria-label={t.nav.closeMenu}
             className="grid size-10 place-items-center rounded-full hover:bg-surface-raised"
           >
             <X aria-hidden className="size-5" />
           </button>
         </div>
-        <nav aria-label="Main" className="p-2">
+        <nav aria-label={t.nav.main} className="p-2">
           {props.primary.map((entry) => {
             const active = isActive(props.pathname, entry.href);
             return (
@@ -410,13 +421,19 @@ function Drawer(props: Props & { pathname: string; onClose: () => void }) {
             pathname={props.pathname}
           />
         </div>
+        <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-muted">
+            {t.common.language.label}
+          </span>
+          <LanguageSwitch />
+        </div>
         <form action={signOut} className="mt-auto border-t border-border p-2">
           <button
             type="submit"
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-muted hover:bg-surface-raised hover:text-foreground"
           >
             <LogOut aria-hidden className="size-5" strokeWidth={1.8} />
-            Log out
+            {t.nav.logOut}
           </button>
         </form>
       </div>
@@ -432,6 +449,7 @@ function SearchDialog({
   destinations: NavItem[];
   onClose: () => void;
 }) {
+  const t = useT();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
@@ -459,14 +477,14 @@ function SearchDialog({
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
       <button
         type="button"
-        aria-label="Close search"
+        aria-label={t.nav.closeSearch}
         onClick={onClose}
         className="absolute inset-0 bg-black/70"
       />
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search pages"
+        aria-label={t.nav.searchDialog}
         className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
       >
         <div className="flex items-center gap-3 border-b border-border px-4">
@@ -487,8 +505,8 @@ function SearchDialog({
                 setIndex((i) => Math.max(i - 1, 0));
               } else if (e.key === "Enter") go(results[index]);
             }}
-            placeholder="Jump to a page..."
-            aria-label="Page name"
+            placeholder={t.nav.searchPlaceholder}
+            aria-label={t.nav.searchLabel}
             aria-controls="search-results"
             aria-activedescendant={
               results[index] ? `search-${index}` : undefined
@@ -506,7 +524,7 @@ function SearchDialog({
         >
           {results.length === 0 && (
             <li className="px-3 py-6 text-center text-sm text-muted">
-              No page called &ldquo;{query}&rdquo;.
+              {t.nav.noPage(query)}
             </li>
           )}
           {results.map((entry, i) => (

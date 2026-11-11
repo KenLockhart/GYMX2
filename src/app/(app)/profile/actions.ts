@@ -53,7 +53,8 @@ export async function deleteMyAccount(
   const { profile, email } = await requireAccount();
   const confirmation = String(formData.get("confirm") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  if (confirmation !== "DELETE")
+  // DELETE, or ELIMINAR on the Spanish screen.
+  if (confirmation !== "DELETE" && confirmation !== "ELIMINAR")
     return { error: "Type DELETE in capital letters to confirm." };
   if (!password) return { error: "Enter your password." };
 

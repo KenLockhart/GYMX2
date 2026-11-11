@@ -23,6 +23,7 @@ export type Profile = {
   specialties: string[];
   public_slug: string | null;
   public_page: boolean;
+  locale: "en" | "es";
   created_at: string;
   updated_at: string;
 };

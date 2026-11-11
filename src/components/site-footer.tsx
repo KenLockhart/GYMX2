@@ -1,19 +1,23 @@
+"use client";
+
 import Link from "next/link";
+import { useT } from "@/i18n/client";
 
 export function SiteFooter() {
+  const f = useT().common.footer;
   return (
     <footer className="border-t border-border">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-5 text-sm text-muted sm:px-6">
         <p>© {new Date().getFullYear()} GYMX2</p>
-        <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2">
+        <nav aria-label={f.legal} className="flex flex-wrap gap-x-5 gap-y-2">
           <Link href="/terms" className="hover:text-foreground">
-            Terms
+            {f.terms}
           </Link>
           <Link href="/privacy" className="hover:text-foreground">
-            Privacy
+            {f.privacy}
           </Link>
           <Link href="/refunds" className="hover:text-foreground">
-            Refunds and returns
+            {f.refunds}
           </Link>
         </nav>
       </div>

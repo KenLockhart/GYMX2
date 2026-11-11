@@ -6,6 +6,7 @@ import {
   FormStatus,
   SubmitButton,
 } from "@/components/form-parts";
+import { useT } from "@/i18n/client";
 import { signIn } from "../actions";
 
 export function LoginForm({
@@ -15,6 +16,7 @@ export function LoginForm({
   next?: string;
   initialError?: string;
 }) {
+  const t = useT();
   return (
     <ActionForm
       action={signIn}
@@ -23,21 +25,23 @@ export function LoginForm({
     >
       {next && <input type="hidden" name="next" value={next} />}
       <Field
-        label="Email"
+        label={t.auth.email}
         name="email"
         type="email"
         autoComplete="email"
         required
       />
       <Field
-        label="Password"
+        label={t.auth.password}
         name="password"
         type="password"
         autoComplete="current-password"
         required
       />
       <FormStatus />
-      <SubmitButton pendingText="Logging in...">Log in</SubmitButton>
+      <SubmitButton pendingText={t.auth.login.pending}>
+        {t.auth.login.submit}
+      </SubmitButton>
     </ActionForm>
   );
 }

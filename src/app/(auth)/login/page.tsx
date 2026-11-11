@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getT } from "@/i18n/server";
 import { getCurrentAccount } from "@/lib/auth";
 import { LoginForm } from "./login-form";
 
-export const metadata: Metadata = { title: "Log in" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).auth.login.title };
+}
 
 export default async function LoginPage({
   searchParams,
@@ -16,28 +19,25 @@ export default async function LoginPage({
   if (await getCurrentAccount()) redirect("/dashboard");
 
   const { next, error } = await searchParams;
+  const t = await getT();
 
   return (
     <>
-      <h1 className="mb-6 text-4xl">Log in</h1>
+      <h1 className="mb-6 text-4xl">{t.auth.login.title}</h1>
       <LoginForm
         next={next}
-        initialError={
-          error === "link"
-            ? "That link has expired or was already used. If you were confirming your email, try logging in."
-            : undefined
-        }
+        initialError={error === "link" ? t.auth.login.linkExpired : undefined}
       />
       <div className="mt-6 space-y-2 text-sm text-muted">
         <p>
           <Link href="/forgot-password" className="text-link">
-            Forgot your password?
+            {t.auth.login.forgot}
           </Link>
         </p>
         <p>
-          New to GYMX2?{" "}
+          {t.auth.login.newHere}{" "}
           <Link href="/signup" className="text-link">
-            Create an account
+            {t.auth.login.createAccount}
           </Link>
         </p>
       </div>

@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { saveNotificationSettings } from "@/app/(app)/notifications/actions";
+import { useLocale, useT } from "@/i18n/client";
+import { translateServerText } from "@/i18n/server-text";
 import {
   NOTIFICATION_SETTINGS,
   type NotificationType,
@@ -19,6 +21,9 @@ export function NotificationSettingsForm({
 }: {
   initial: SettingValue[];
 }) {
+  const t = useT();
+  const locale = useLocale();
+  const c = t.profile.community;
   const [settings, setSettings] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +46,7 @@ export function NotificationSettingsForm({
     start(async () => {
       const result = await saveNotificationSettings(settings);
       if (result.error) return setError(result.error);
-      setMessage("Saved.");
+      setMessage(t.common.saved);
     });
   }
 
@@ -50,40 +55,39 @@ export function NotificationSettingsForm({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-muted">
-            <th className="py-2 font-medium">Notify me about</th>
-            <th className="w-20 py-2 text-center font-medium">In app</th>
-            <th className="w-20 py-2 text-center font-medium">Phone</th>
-            <th className="w-20 py-2 text-center font-medium">Email</th>
+            <th className="py-2 font-medium">{c.notifyMe}</th>
+            <th className="w-20 py-2 text-center font-medium">{c.inApp}</th>
+            <th className="w-20 py-2 text-center font-medium">{c.phone}</th>
+            <th className="w-20 py-2 text-center font-medium">{c.email}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {NOTIFICATION_SETTINGS.map((meta) => {
             const value = settings.find((s) => s.type === meta.type)!;
+            const label =
+              t.options.notificationTypes[meta.type]?.label ?? meta.label;
+            const hint =
+              t.options.notificationTypes[meta.type]?.hint ?? meta.hint;
             return (
               <tr key={meta.type}>
                 <td className="py-2 pr-3">
-                  {meta.label}
-                  {meta.hint && (
-                    <span className="block text-xs text-muted">
-                      {meta.hint}
-                    </span>
+                  {label}
+                  {hint && (
+                    <span className="block text-xs text-muted">{hint}</span>
                   )}
                 </td>
                 <td className="py-2 text-center">
                   {meta.inApp ? (
                     <input
                       type="checkbox"
-                      aria-label={`${meta.label}: in app`}
+                      aria-label={`${label}: ${c.inApp}`}
                       checked={value.inApp}
                       onChange={(event) =>
                         change(meta.type, "inApp", event.target.checked)
                       }
                     />
                   ) : (
-                    <span
-                      className="text-muted"
-                      aria-label="Not in the notification center"
-                    >
+                    <span className="text-muted" aria-label={c.notInCenter}>
                       —
                     </span>
                   )}
@@ -91,7 +95,7 @@ export function NotificationSettingsForm({
                 <td className="py-2 text-center">
                   <input
                     type="checkbox"
-                    aria-label={`${meta.label}: phone`}
+                    aria-label={`${label}: ${c.phone}`}
                     checked={value.push}
                     onChange={(event) =>
                       change(meta.type, "push", event.target.checked)
@@ -101,7 +105,7 @@ export function NotificationSettingsForm({
                 <td className="py-2 text-center">
                   <input
                     type="checkbox"
-                    aria-label={`${meta.label}: email`}
+                    aria-label={`${label}: ${c.email}`}
                     checked={value.email}
                     onChange={(event) =>
                       change(meta.type, "email", event.target.checked)
@@ -115,7 +119,7 @@ export function NotificationSettingsForm({
       </table>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className="btn-primary">
-          {pending ? "Saving..." : "Save notification settings"}
+          {pending ? t.common.saving : c.save}
         </button>
         {message && (
           <p role="status" className="text-sm text-accent">
@@ -125,7 +129,7 @@ export function NotificationSettingsForm({
       </div>
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {translateServerText(error, locale)}
         </p>
       )}
     </form>

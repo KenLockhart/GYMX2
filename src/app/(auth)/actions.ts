@@ -3,6 +3,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { attributeSignup } from "@/lib/affiliate-server";
+import { rememberLocale } from "@/i18n/actions";
+import { isLocale } from "@/i18n/config";
 import { REFERRAL_COOKIE } from "@/lib/affiliates";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -31,12 +33,24 @@ export async function signIn(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data: signedIn, error } = await supabase.auth.signInWithPassword(
+    parsed.data,
+  );
   if (error)
     return {
       error:
         "That email and password didn't match, or the email isn't confirmed yet.",
     };
+
+  // Use the language saved on the account on this browser too.
+  if (signedIn.user) {
+    const { data: saved } = await supabase
+      .from("profiles")
+      .select("locale")
+      .eq("id", signedIn.user.id)
+      .maybeSingle();
+    if (isLocale(saved?.locale)) await rememberLocale(saved.locale);
+  }
 
   redirect(safeRedirectPath(text(formData, "next")));
 }
@@ -54,12 +68,15 @@ export async function signUp(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const { display_name, email, password, coach_requested } = parsed.data;
+  const chosen = text(formData, "locale");
+  const locale = isLocale(chosen) ? chosen : "en";
+  await rememberLocale(locale);
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { display_name, coach_requested: String(coach_requested) },
+      data: { display_name, coach_requested: String(coach_requested), locale },
       emailRedirectTo: `${getSiteUrl()}/auth/confirm?next=${encodeURIComponent(safeRedirectPath(text(formData, "next")))}`,
     },
   });
