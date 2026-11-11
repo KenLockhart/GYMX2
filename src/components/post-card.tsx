@@ -25,6 +25,7 @@ import {
   type PostDTO,
 } from "@/lib/community";
 import { T, useTr } from "@/i18n/t";
+import { useLocale } from "@/i18n/client";
 
 function PhotoGrid({ photos }: { photos: PostDTO["photos"] }) {
   const tr = useTr();
@@ -102,6 +103,7 @@ export function PostCard({
   onDismissChange?: (postId: string, dismissed: boolean) => void;
   linkToPost?: boolean;
 }) {
+  const locale = useLocale();
   const tr = useTr();
   const router = useRouter();
   const [post, setPost] = useState(initial);
@@ -270,10 +272,14 @@ export function PostCard({
                 href={`/community/post/${post.id}`}
                 className="hover:underline"
               >
-                <time dateTime={post.createdAt}>{timeAgo(post.createdAt)}</time>
+                <time dateTime={post.createdAt}>
+                  {timeAgo(post.createdAt, undefined, locale)}
+                </time>
               </Link>
             ) : (
-              <time dateTime={post.createdAt}>{timeAgo(post.createdAt)}</time>
+              <time dateTime={post.createdAt}>
+                {timeAgo(post.createdAt, undefined, locale)}
+              </time>
             )}{" "}
             ·{" "}
             {post.audience === "coach_community" && post.coach ? (

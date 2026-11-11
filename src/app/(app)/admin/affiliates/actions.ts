@@ -8,6 +8,7 @@ import { loadProgramSettings } from "@/lib/affiliate-server";
 import { BASE_LABELS, effectiveRates, referralLink } from "@/lib/affiliates";
 import { formatMoney } from "@/lib/armory";
 import { requireAdmin } from "@/lib/auth";
+import { translate } from "@/i18n/phrases";
 import { loadRecipient, sendEmail } from "@/lib/email";
 import {
   affiliateDecisionEmail,
@@ -100,14 +101,31 @@ export async function decideApplication(
       await sendEmail(
         person.email,
         affiliateDecisionEmail({
+          locale: person.locale,
           siteUrl: getSiteUrl(),
           name: person.name,
           approved: approve,
           link: referralLink(getSiteUrl(), data.code as string),
           terms: [
-            `You earn ${rates.salePercent}% of ${BASE_LABELS[settings.sale_base]} on purchases by people you refer, for ${settings.attribution_months} months.`,
-            `Plus ${formatMoney(rates.signupBonusCents)} when someone you refer makes their first purchase.`,
-            `Commissions can be paid ${settings.hold_days} days after each sale.`,
+            translate(
+              "You earn {percent}% of {base} on purchases by people you refer, for {months} months.",
+              person.locale,
+              {
+                percent: rates.salePercent,
+                base: translate(BASE_LABELS[settings.sale_base], person.locale),
+                months: settings.attribution_months,
+              },
+            ),
+            translate(
+              "Plus {bonus} when someone you refer makes their first purchase.",
+              person.locale,
+              { bonus: formatMoney(rates.signupBonusCents) },
+            ),
+            translate(
+              "Commissions can be paid {days} days after each sale.",
+              person.locale,
+              { days: settings.hold_days },
+            ),
           ],
         }),
       );
@@ -271,6 +289,7 @@ export async function payAffiliate(
       await sendEmail(
         person.email,
         affiliatePayoutEmail({
+          locale: person.locale,
           siteUrl: getSiteUrl(),
           name: person.name,
           amountCents: total,

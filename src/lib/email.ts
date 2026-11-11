@@ -5,6 +5,7 @@ import {
   type Email,
   type EmailCopy,
 } from "@/lib/email-templates";
+import type { Locale } from "@/i18n/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const FROM = "GYMX2 <no-reply@gymx2.com>";
@@ -56,7 +57,8 @@ export async function sendEmail(to: string, original: Email) {
     const copy = (await loadEmailCopy().catch(() => null))?.get(original.key);
     if (copy && !copy.enabled && catalogEntry(original.key)?.optional)
       return false;
-    email = customizeEmail(original, copy);
+    // Admins write custom wording in English, so Spanish emails keep the translated default.
+    if (original.locale !== "es") email = customizeEmail(original, copy);
   }
   try {
     const response = await fetch("https://api.resend.com/emails", {
@@ -93,7 +95,7 @@ export async function loadRecipient(userId: string) {
     admin.auth.admin.getUserById(userId),
     admin
       .from("profiles")
-      .select("display_name, email_updates")
+      .select("display_name, email_updates, locale")
       .eq("id", userId)
       .maybeSingle(),
   ]);
@@ -103,5 +105,6 @@ export async function loadRecipient(userId: string) {
     email,
     name: profile.display_name as string,
     wantsUpdates: profile.email_updates !== false,
+    locale: (profile.locale === "es" ? "es" : "en") as Locale,
   };
 }

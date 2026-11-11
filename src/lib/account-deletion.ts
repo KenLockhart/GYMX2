@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import type { Locale } from "@/i18n/config";
 import { sendEmail } from "@/lib/email";
 import { accountDeletedEmail } from "@/lib/email-templates";
 import { cancelAllMemberships } from "@/lib/membership-server";
@@ -130,6 +131,7 @@ export async function deleteAccount(person: {
   id: string;
   email: string;
   name: string;
+  locale?: Locale;
 }) {
   for (const [label, step] of [
     ["files", () => removeStoredFiles(person.id)],
@@ -153,7 +155,11 @@ export async function deleteAccount(person: {
 
   await sendEmail(
     person.email,
-    accountDeletedEmail({ siteUrl: getSiteUrl(), name: person.name }),
+    accountDeletedEmail({
+      siteUrl: getSiteUrl(),
+      name: person.name,
+      locale: person.locale,
+    }),
   );
   return true;
 }

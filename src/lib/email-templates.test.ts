@@ -430,3 +430,29 @@ describe("communityEmail", () => {
     expect(email.subject).toBe("Jordan <b> said something");
   });
 });
+
+describe("emails in Spanish", () => {
+  it("writes the whole email in the recipient's language", () => {
+    const email = newMessageEmail({
+      locale: "es",
+      siteUrl: "https://gymx2.com",
+      senderName: "Ana",
+      body: "Hola",
+      conversationPath: "/messages/x",
+    });
+    expect(email.subject).toBe("Nuevo mensaje de Ana");
+    expect(email.text).toContain("Ana te envió un mensaje");
+    expect(email.text).toContain("Responder en GYMX2");
+    expect(email.locale).toBe("es");
+  });
+
+  it("stays in English by default", () => {
+    const email = newMessageEmail({
+      siteUrl: "https://gymx2.com",
+      senderName: "Ana",
+      body: "Hi",
+      conversationPath: "/messages/x",
+    });
+    expect(email.subject).toBe("New message from Ana");
+  });
+});

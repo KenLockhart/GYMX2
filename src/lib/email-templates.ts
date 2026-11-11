@@ -1,6 +1,15 @@
 // The emails GYMX2 sends. Each returns a subject plus HTML and plain-text bodies.
 // Kept free of server code so they can be tested on their own.
 
+import type { Locale } from "../i18n/config";
+import { translate } from "../i18n/phrases";
+
+// Each email is written in its recipient's language (English unless they chose Spanish).
+function trFor(locale: Locale | undefined) {
+  return (text: string, vars?: Record<string, string | number>) =>
+    translate(text, locale ?? "en", vars);
+}
+
 export type Email = {
   subject: string;
   html: string;
@@ -9,6 +18,7 @@ export type Email = {
   key?: string;
   vars?: Record<string, string>;
   parts?: EmailParts;
+  locale?: Locale;
 };
 
 type EmailParts = {
@@ -100,11 +110,12 @@ ${htmlBlocks}
 }
 
 function build(
+  locale: Locale | undefined,
   key: string,
   vars: Record<string, string>,
   parts: EmailParts,
 ): Email {
-  return { subject: parts.subject, ...render(parts), key, vars, parts };
+  return { subject: parts.subject, ...render(parts), key, vars, parts, locale };
 }
 
 // Swaps {placeholders} for this email's values; unknown ones are left as typed.
@@ -173,6 +184,7 @@ export function trackingUrl(tracking: string) {
 }
 
 export function newSaleEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   itemTitle: string;
   buyerName: string;
@@ -183,31 +195,49 @@ export function newSaleEmail(input: {
   addressLines: string[];
   needsShipping: boolean;
 }): Email {
+  const tr = trFor(input.locale);
   const blocks: Block[] = [
     {
       kind: "p",
-      text: `${input.buyerName} bought ${input.itemTitle}${input.size ? ` (size ${input.size})` : ""} for ${money(input.amountCents)}.`,
+      text: input.size
+        ? tr("{buyer} bought {item} (size {size}) for {amount}.", {
+            buyer: input.buyerName,
+            item: input.itemTitle,
+            size: input.size,
+            amount: money(input.amountCents),
+          })
+        : tr("{buyer} bought {item} for {amount}.", {
+            buyer: input.buyerName,
+            item: input.itemTitle,
+            amount: money(input.amountCents),
+          }),
     },
   ];
   if (input.feeCents > 0) {
     blocks.push({
       kind: "p",
-      text: `GYMX2's fee is ${money(input.feeCents)}. Stripe sends the rest, less its card fees, to your bank.`,
+      text: tr(
+        "GYMX2's fee is {p0}. Stripe sends the rest, less its card fees, to your bank.",
+        { p0: money(input.feeCents) },
+      ),
     });
   }
   if (input.needsShipping) {
-    blocks.push({ kind: "p", text: "Ship it to:" });
+    blocks.push({ kind: "p", text: tr("Ship it to:") });
     blocks.push({
       kind: "lines",
       lines: [input.shippingName ?? input.buyerName, ...input.addressLines],
     });
     blocks.push({
       kind: "p",
-      text: "When it's on its way, mark it shipped on your Sales page and add the tracking number. We'll email the buyer.",
+      text: tr(
+        "When it's on its way, mark it shipped on your Sales page and add the tracking number. We'll email the buyer.",
+      ),
     });
   }
 
   return build(
+    input.locale,
     input.needsShipping ? "sale.ship" : "sale.digital",
     {
       buyer: input.buyerName,
@@ -217,43 +247,62 @@ export function newSaleEmail(input: {
     },
     {
       subject: input.needsShipping
-        ? `New order to ship: ${oneLine(input.itemTitle)}`
-        : `You made a sale: ${oneLine(input.itemTitle)}`,
+        ? tr("New order to ship: {p0}", { p0: oneLine(input.itemTitle) })
+        : tr("You made a sale: {p0}", { p0: oneLine(input.itemTitle) }),
       heading: input.needsShipping
-        ? "You have an order to ship"
-        : "You made a sale",
+        ? tr("You have an order to ship")
+        : tr("You made a sale"),
       blocks,
       button: {
-        label: input.needsShipping ? "Open orders to ship" : "See your sales",
+        label: input.needsShipping
+          ? tr("Open orders to ship")
+          : tr("See your sales"),
         url: `${input.siteUrl}/armory/sales`,
       },
-      footer: ORDER_FOOTER,
+      footer: tr(ORDER_FOOTER),
     },
   );
 }
 
 export function orderShippedEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   itemTitle: string;
   sellerName: string;
   size: string | null;
   tracking: string | null;
 }): Email {
+  const tr = trFor(input.locale);
   const link = input.tracking ? trackingUrl(input.tracking) : null;
   const blocks: Block[] = [
     {
       kind: "p",
-      text: `${input.sellerName} shipped your ${input.itemTitle}${input.size ? ` (size ${input.size})` : ""}.`,
+      text: input.size
+        ? tr("{seller} shipped your {item} (size {size}).", {
+            seller: input.sellerName,
+            item: input.itemTitle,
+            size: input.size,
+          })
+        : tr("{seller} shipped your {item}.", {
+            seller: input.sellerName,
+            item: input.itemTitle,
+          }),
     },
     input.tracking
-      ? { kind: "p", text: `Tracking number: ${input.tracking}` }
+      ? {
+          kind: "p",
+          text: tr("Tracking number: {tracking}", { tracking: input.tracking }),
+        }
       : {
           kind: "p",
-          text: "No tracking number was added. Message your coach if you have questions.",
+          text: tr(
+            "No tracking number was added. Message your coach if you have questions.",
+          ),
         },
   ];
 
   return build(
+    input.locale,
     "order.shipped",
     {
       seller: input.sellerName,
@@ -261,37 +310,44 @@ export function orderShippedEmail(input: {
       tracking: input.tracking ?? "",
     },
     {
-      subject: `Your order shipped: ${oneLine(input.itemTitle)}`,
-      heading: "Your order is on its way",
+      subject: tr("Your order shipped: {p0}", { p0: oneLine(input.itemTitle) }),
+      heading: tr("Your order is on its way"),
       blocks,
       button: link
-        ? { label: "Track your package", url: link }
-        : { label: "Open the Armory", url: `${input.siteUrl}/armory` },
-      footer: ORDER_FOOTER,
+        ? { label: tr("Track your package"), url: link }
+        : { label: tr("Open the Armory"), url: `${input.siteUrl}/armory` },
+      footer: tr(ORDER_FOOTER),
     },
   );
 }
 
 export function newMessageEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   senderName: string;
   body: string;
   conversationPath: string;
 }): Email {
+  const tr = trFor(input.locale);
   const preview =
     input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
   return build(
+    input.locale,
     "message.new",
     { sender: input.senderName },
     {
-      subject: `New message from ${oneLine(input.senderName, 60)}`,
-      heading: `${input.senderName} sent you a message`,
+      subject: tr("New message from {p0}", {
+        p0: oneLine(input.senderName, 60),
+      }),
+      heading: tr("{senderName} sent you a message", {
+        senderName: input.senderName,
+      }),
       blocks: [{ kind: "quote", text: preview }],
       button: {
-        label: "Reply on GYMX2",
+        label: tr("Reply on GYMX2"),
         url: `${input.siteUrl}${input.conversationPath}`,
       },
-      footer: `We only email about the first unread message in a conversation. ${UPDATES_FOOTER}`,
+      footer: `${tr("We only email about the first unread message in a conversation.")} ${tr(UPDATES_FOOTER)}`,
     },
   );
 }
@@ -303,6 +359,7 @@ export type IntroChange = "booked_coach" | "booked_member" | "cancelled";
 // Free intro sessions: the coach hears about a booking (with the member's message), the member
 // gets a confirmation, and whoever didn't cancel hears about a cancellation.
 export function introEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   change: IntroChange;
   // The other person: the member for the coach's emails, the coach for the member's.
@@ -314,9 +371,17 @@ export function introEmail(input: {
   message: string;
   sessionId: string | null;
 }): Email {
-  const details = [`When: ${input.when}`, `How: ${input.format}`];
-  if (input.location) details.push(`Where: ${input.location}`);
-  if (input.meetingUrl) details.push(`Join online: ${input.meetingUrl}`);
+  const tr = trFor(input.locale);
+  const details = [
+    tr("When: {when}", { when: input.when }),
+    tr("How: {format}", { format: input.format }),
+  ];
+  if (input.location)
+    details.push(tr("Where: {location}", { location: input.location }));
+  if (input.meetingUrl)
+    details.push(
+      tr("Join online: {meetingUrl}", { meetingUrl: input.meetingUrl }),
+    );
   const name = input.otherName;
   const short = oneLine(name, 40);
   const message =
@@ -328,63 +393,80 @@ export function introEmail(input: {
     : `${input.siteUrl}/calendar`;
   const vars = { name, when: input.when };
   if (input.change === "booked_coach")
-    return build("intro.booked_coach", vars, {
-      subject: `New intro booked: ${short}`,
-      heading: `${name} booked a free intro`,
+    return build(input.locale, "intro.booked_coach", vars, {
+      subject: tr("New intro booked: {short}", { short }),
+      heading: tr("{name} booked a free intro", { name }),
       blocks: [
         {
           kind: "p",
-          text: `${name} found you on GYMX2 and booked a free intro session with you.`,
+          text: tr(
+            "{name} found you on GYMX2 and booked a free intro session with you.",
+            { name },
+          ),
         },
         { kind: "lines", lines: details },
         ...(message
           ? [
-              { kind: "p" as const, text: `Their message:` },
+              { kind: "p" as const, text: tr("Their message:") },
               { kind: "quote" as const, text: message },
             ]
           : []),
         {
           kind: "p",
-          text: "It's on your calendar. If you can't make it, cancel it there so they can pick another time.",
+          text: tr(
+            "It's on your calendar. If you can't make it, cancel it there so they can pick another time.",
+          ),
         },
       ],
       button: {
-        label: "See your intros",
+        label: tr("See your intros"),
         url: `${input.siteUrl}/calendar/intros`,
       },
-      footer: UPDATES_FOOTER,
+      footer: tr(UPDATES_FOOTER),
     });
   if (input.change === "booked_member")
-    return build("intro.booked_member", vars, {
-      subject: `Your intro with ${short} is booked`,
-      heading: "Your free intro is booked",
+    return build(input.locale, "intro.booked_member", vars, {
+      subject: tr("Your intro with {short} is booked", { short }),
+      heading: tr("Your free intro is booked"),
       blocks: [
         {
           kind: "p",
-          text: `You're booked in for a free intro with ${name}. It doesn't start a membership.`,
+          text: tr(
+            "You're booked in for a free intro with {name}. It doesn't start a membership.",
+            { name },
+          ),
         },
         { kind: "lines", lines: details },
         {
           kind: "p",
-          text: "Can't make it? Cancel from your calendar any time before it starts.",
+          text: tr(
+            "Can't make it? Cancel from your calendar any time before it starts.",
+          ),
         },
       ],
-      button: { label: "Open in your calendar", url: calendar },
-      footer: UPDATES_FOOTER,
+      button: { label: tr("Open in your calendar"), url: calendar },
+      footer: tr(UPDATES_FOOTER),
     });
-  return build("intro.cancelled", vars, {
-    subject: `Intro cancelled: ${short}`,
-    heading: "An intro was cancelled",
+  return build(input.locale, "intro.cancelled", vars, {
+    subject: tr("Intro cancelled: {short}", { short }),
+    heading: tr("An intro was cancelled"),
     blocks: [
-      { kind: "p", text: `${name} cancelled your free intro session.` },
+      {
+        kind: "p",
+        text: tr("{name} cancelled your free intro session.", { name }),
+      },
       { kind: "lines", lines: details.slice(0, 2) },
     ],
-    button: { label: "Open your calendar", url: `${input.siteUrl}/calendar` },
-    footer: UPDATES_FOOTER,
+    button: {
+      label: tr("Open your calendar"),
+      url: `${input.siteUrl}/calendar`,
+    },
+    footer: tr(UPDATES_FOOTER),
   });
 }
 
 export function sessionEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   change: SessionChange;
   coachName: string;
@@ -394,29 +476,44 @@ export function sessionEmail(input: {
   meetingUrl: string | null;
   sessionId: string;
 }): Email {
-  const details = [`When: ${input.when}`];
-  if (input.location) details.push(`Where: ${input.location}`);
-  if (input.meetingUrl) details.push(`Join online: ${input.meetingUrl}`);
+  const tr = trFor(input.locale);
+  const details = [tr("When: {when}", { when: input.when })];
+  if (input.location)
+    details.push(tr("Where: {location}", { location: input.location }));
+  if (input.meetingUrl)
+    details.push(
+      tr("Join online: {meetingUrl}", { meetingUrl: input.meetingUrl }),
+    );
 
   const copy = {
     invited: {
-      subject: `${oneLine(input.coachName, 40)} invited you: ${oneLine(input.title, 60)}`,
-      heading: "You're invited to a session",
-      intro: `${input.coachName} added you to ${input.title}.`,
+      subject: tr("{p0} invited you: {p1}", {
+        p0: oneLine(input.coachName, 40),
+        p1: oneLine(input.title, 60),
+      }),
+      heading: tr("You're invited to a session"),
+      intro: tr("{coachName} added you to {title}.", {
+        coachName: input.coachName,
+        title: input.title,
+      }),
     },
     updated: {
-      subject: `Session changed: ${oneLine(input.title)}`,
-      heading: "A session changed",
-      intro: `${input.coachName} changed the time or place of ${input.title}. Here are the new details.`,
+      subject: tr("Session changed: {p0}", { p0: oneLine(input.title) }),
+      heading: tr("A session changed"),
+      intro: tr(
+        "{coachName} changed the time or place of {title}. Here are the new details.",
+        { coachName: input.coachName, title: input.title },
+      ),
     },
     cancelled: {
-      subject: `Session cancelled: ${oneLine(input.title)}`,
-      heading: "A session was cancelled",
+      subject: tr("Session cancelled: {p0}", { p0: oneLine(input.title) }),
+      heading: tr("A session was cancelled"),
       intro: `${input.coachName} cancelled ${input.title}.`,
     },
   }[input.change];
 
   return build(
+    input.locale,
     `session.${input.change}`,
     { coach: input.coachName, title: input.title, when: input.when },
     {
@@ -430,23 +527,27 @@ export function sessionEmail(input: {
           : [
               {
                 kind: "p" as const,
-                text: "Let your coach know if you can make it.",
+                text: tr("Let your coach know if you can make it."),
               },
             ]),
       ],
       button:
         input.change === "cancelled"
-          ? { label: "Open your calendar", url: `${input.siteUrl}/calendar` }
+          ? {
+              label: tr("Open your calendar"),
+              url: `${input.siteUrl}/calendar`,
+            }
           : {
-              label: "Going or can't go?",
+              label: tr("Going or can't go?"),
               url: `${input.siteUrl}/calendar/${input.sessionId}`,
             },
-      footer: UPDATES_FOOTER,
+      footer: tr(UPDATES_FOOTER),
     },
   );
 }
 
 export function flaggedMessageEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   coachName: string;
   memberName: string;
@@ -455,12 +556,14 @@ export function flaggedMessageEmail(input: {
   body: string;
   reviewPath: string;
 }): Email {
+  const tr = trFor(input.locale);
   const sender = input.fromCoach
     ? `${input.coachName} (coach)`
     : `${input.memberName} (member)`;
   const preview =
     input.body.length > 500 ? `${input.body.slice(0, 499)}…` : input.body;
   return build(
+    input.locale,
     "message.flagged",
     {
       coach: input.coachName,
@@ -468,30 +571,40 @@ export function flaggedMessageEmail(input: {
       reasons: input.reasons,
     },
     {
-      subject: `Flagged message: ${oneLine(input.coachName, 40)} and ${oneLine(input.memberName, 40)}`,
-      heading: "A message was flagged",
+      subject: tr("Flagged message: {p0} and {p1}", {
+        p0: oneLine(input.coachName, 40),
+        p1: oneLine(input.memberName, 40),
+      }),
+      heading: tr("A message was flagged"),
       blocks: [
         {
           kind: "p",
-          text: `${sender} sent a message that mentions: ${input.reasons}.`,
+          text: tr("{sender} sent a message that mentions: {reasons}.", {
+            sender,
+            reasons: input.reasons,
+          }),
         },
         { kind: "quote", text: preview },
         {
           kind: "p",
-          text: "This is a reason to look, not proof. Open the conversation to see it in context.",
+          text: tr(
+            "This is a reason to look, not proof. Open the conversation to see it in context.",
+          ),
         },
       ],
       button: {
-        label: "Review the conversation",
+        label: tr("Review the conversation"),
         url: `${input.siteUrl}${input.reviewPath}`,
       },
-      footer:
+      footer: tr(
         "You get this because you're a GYMX2 admin. We send at most one per conversation each day.",
+      ),
     },
   );
 }
 
 export function refundEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   audience: "buyer" | "seller";
   itemTitle: string;
@@ -499,23 +612,29 @@ export function refundEmail(input: {
   buyerName: string;
   orderCancelled: boolean;
 }): Email {
+  const tr = trFor(input.locale);
   const amount = money(input.amountCents);
   const buyer = input.audience === "buyer";
   const blocks: Block[] = buyer
     ? [
         {
           kind: "p",
-          text: `We refunded ${amount} for ${input.itemTitle} to the card you paid with.`,
+          text: tr(
+            "We refunded {amount} for {itemTitle} to the card you paid with.",
+            { amount, itemTitle: input.itemTitle },
+          ),
         },
         {
           kind: "p",
-          text: "Your bank may take 5–10 business days to show it.",
+          text: tr("Your bank may take 5–10 business days to show it."),
         },
         ...(input.orderCancelled
           ? [
               {
                 kind: "p" as const,
-                text: "Your order was cancelled before it shipped, so nothing will arrive.",
+                text: tr(
+                  "Your order was cancelled before it shipped, so nothing will arrive.",
+                ),
               },
             ]
           : []),
@@ -523,145 +642,199 @@ export function refundEmail(input: {
     : [
         {
           kind: "p",
-          text: `${input.buyerName}'s order of ${input.itemTitle} (${amount}) was refunded.`,
+          text: tr(
+            "{buyerName}'s order of {itemTitle} ({amount}) was refunded.",
+            { buyerName: input.buyerName, itemTitle: input.itemTitle, amount },
+          ),
         },
         {
           kind: "p",
           text: input.orderCancelled
-            ? "It hadn't shipped, so it's been removed from your orders to ship. Please don't send it."
-            : "Your share of the sale is taken back from your Stripe balance.",
+            ? tr(
+                "It hadn't shipped, so it's been removed from your orders to ship. Please don't send it.",
+              )
+            : tr(
+                "Your share of the sale is taken back from your Stripe balance.",
+              ),
         },
       ];
 
   return build(
+    input.locale,
     buyer ? "refund.buyer" : "refund.seller",
     { item: input.itemTitle, amount, buyer: input.buyerName },
     {
       subject: buyer
-        ? `Refund for ${oneLine(input.itemTitle)}`
-        : `Order refunded: ${oneLine(input.itemTitle)}`,
-      heading: buyer ? "Your refund is on its way" : "An order was refunded",
+        ? tr("Refund for {p0}", { p0: oneLine(input.itemTitle) })
+        : tr("Order refunded: {p0}", { p0: oneLine(input.itemTitle) }),
+      heading: buyer
+        ? tr("Your refund is on its way")
+        : tr("An order was refunded"),
       blocks,
       button: buyer
         ? {
-            label: "See your purchases",
+            label: tr("See your purchases"),
             url: `${input.siteUrl}/armory/purchases`,
           }
-        : { label: "See your sales", url: `${input.siteUrl}/armory/sales` },
-      footer: ORDER_FOOTER,
+        : { label: tr("See your sales"), url: `${input.siteUrl}/armory/sales` },
+      footer: tr(ORDER_FOOTER),
     },
   );
 }
 
 export function accountDeletedEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
 }): Email {
+  const tr = trFor(input.locale);
   return build(
+    input.locale,
     "account.deleted",
     { name: input.name },
     {
-      subject: "Your GYMX2 account was deleted",
-      heading: "Your account is deleted",
+      subject: tr("Your GYMX2 account was deleted"),
+      heading: tr("Your account is deleted"),
       blocks: [
         {
           kind: "p",
-          text: `Hi ${input.name}, your GYMX2 account and everything in it has been deleted, as you asked.`,
+          text: tr(
+            "Hi {name}, your GYMX2 account and everything in it has been deleted, as you asked.",
+            { name: input.name },
+          ),
         },
         {
           kind: "p",
-          text: "We keep records of past purchases for tax and accounting, without your name attached. Backups clear within 30 days.",
+          text: tr(
+            "We keep records of past purchases for tax and accounting, without your name attached. Backups clear within 30 days.",
+          ),
         },
         {
           kind: "p",
-          text: "If you didn't do this, email support@gymx2.com right away.",
+          text: tr(
+            "If you didn't do this, email support@gymx2.com right away.",
+          ),
         },
       ],
-      button: { label: "Visit GYMX2", url: input.siteUrl },
-      footer: "This is the last email you'll get from GYMX2.",
+      button: { label: tr("Visit GYMX2"), url: input.siteUrl },
+      footer: tr("This is the last email you'll get from GYMX2."),
     },
   );
 }
 
 export function affiliateDecisionEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
   approved: boolean;
   link: string;
   terms: string[];
 }): Email {
+  const tr = trFor(input.locale);
   return build(
+    input.locale,
     input.approved ? "affiliate.approved" : "affiliate.declined",
     { name: input.name, link: input.link },
     {
       subject: input.approved
-        ? "You're a GYMX2 affiliate"
-        : "Your GYMX2 affiliate application",
+        ? tr("You're a GYMX2 affiliate")
+        : tr("Your GYMX2 affiliate application"),
       heading: input.approved
-        ? "Welcome to the affiliate program"
-        : "About your affiliate application",
+        ? tr("Welcome to the affiliate program")
+        : tr("About your affiliate application"),
       blocks: input.approved
         ? [
             {
               kind: "p",
-              text: `Hi ${input.name}, you're approved. Share your link and earn when people you refer join and buy.`,
+              text: tr(
+                "Hi {name}, you're approved. Share your link and earn when people you refer join and buy.",
+                { name: input.name },
+              ),
             },
             {
               kind: "lines",
-              lines: [`Your link: ${input.link}`, ...input.terms],
+              lines: [
+                tr("Your link: {link}", { link: input.link }),
+                ...input.terms,
+              ],
             },
             {
               kind: "p",
-              text: "Set up payouts on your Affiliate page so we can pay you.",
+              text: tr(
+                "Set up payouts on your Affiliate page so we can pay you.",
+              ),
             },
           ]
         : [
             {
               kind: "p",
-              text: `Hi ${input.name}, thanks for applying. We can't approve your application right now.`,
+              text: tr(
+                "Hi {name}, thanks for applying. We can't approve your application right now.",
+                { name: input.name },
+              ),
             },
-            { kind: "p", text: "Questions? Email support@gymx2.com." },
+            { kind: "p", text: tr("Questions? Email support@gymx2.com.") },
           ],
       button: {
-        label: input.approved ? "Open your Affiliate page" : "Visit GYMX2",
+        label: input.approved
+          ? tr("Open your Affiliate page")
+          : tr("Visit GYMX2"),
         url: `${input.siteUrl}/affiliate`,
       },
-      footer:
+      footer: tr(
         "You're getting this because you applied to the GYMX2 affiliate program.",
+      ),
     },
   );
 }
 
 export function affiliatePayoutEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
   amountCents: number;
   count: number;
 }): Email {
+  const tr = trFor(input.locale);
   const amount = money(input.amountCents);
   return build(
+    input.locale,
     "affiliate.payout",
     { name: input.name, amount, count: String(input.count) },
     {
-      subject: `You've been paid ${amount}`,
-      heading: "Your affiliate payout is on its way",
+      subject: tr("You've been paid {amount}", { amount }),
+      heading: tr("Your affiliate payout is on its way"),
       blocks: [
         {
           kind: "p",
-          text: `Hi ${input.name}, we sent ${amount} for ${input.count} ${input.count === 1 ? "commission" : "commissions"} to your Stripe account.`,
+          text: tr(
+            "Hi {name}, we sent {amount} for {count} {p3} to your Stripe account.",
+            {
+              name: input.name,
+              amount,
+              count: input.count,
+              p3: input.count === 1 ? tr("commission") : tr("commissions"),
+            },
+          ),
         },
         {
           kind: "p",
-          text: "Stripe moves it to your bank on your normal payout schedule, usually within a few business days.",
+          text: tr(
+            "Stripe moves it to your bank on your normal payout schedule, usually within a few business days.",
+          ),
         },
       ],
-      button: { label: "See your earnings", url: `${input.siteUrl}/affiliate` },
-      footer: "You're getting this because you're a GYMX2 affiliate.",
+      button: {
+        label: tr("See your earnings"),
+        url: `${input.siteUrl}/affiliate`,
+      },
+      footer: tr("You're getting this because you're a GYMX2 affiliate."),
     },
   );
 }
 
 export function sessionReminderEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
   sessions: {
@@ -672,8 +845,10 @@ export function sessionReminderEmail(input: {
     coachName: string;
   }[];
 }): Email {
+  const tr = trFor(input.locale);
   const one = input.sessions.length === 1 ? input.sessions[0] : null;
   return build(
+    input.locale,
     "reminder.session",
     {
       name: input.name,
@@ -682,11 +857,18 @@ export function sessionReminderEmail(input: {
     },
     {
       subject: one
-        ? `Tomorrow: ${oneLine(one.title)}`
-        : `You have ${input.sessions.length} sessions tomorrow`,
-      heading: one ? "Your session is tomorrow" : "Your sessions tomorrow",
+        ? tr("Tomorrow: {p0}", { p0: oneLine(one.title) })
+        : tr("You have {length} sessions tomorrow", {
+            length: input.sessions.length,
+          }),
+      heading: one
+        ? tr("Your session is tomorrow")
+        : tr("Your sessions tomorrow"),
       blocks: [
-        { kind: "p", text: `Hi ${input.name}, here's what's coming up.` },
+        {
+          kind: "p",
+          text: tr("Hi {name}, here's what's coming up.", { name: input.name }),
+        },
         ...input.sessions.map((session) => ({
           kind: "lines" as const,
           lines: [
@@ -695,54 +877,67 @@ export function sessionReminderEmail(input: {
             ...(session.where ? [session.where] : []),
           ],
         })),
-        { kind: "p", text: "Can't make it? Let your coach know on GYMX2." },
+        { kind: "p", text: tr("Can't make it? Let your coach know on GYMX2.") },
       ],
       button: one
         ? {
-            label: "Open the session",
+            label: tr("Open the session"),
             url: `${input.siteUrl}/calendar/${one.id}`,
           }
-        : { label: "Open your calendar", url: `${input.siteUrl}/calendar` },
-      footer: UPDATES_FOOTER,
+        : { label: tr("Open your calendar"), url: `${input.siteUrl}/calendar` },
+      footer: tr(UPDATES_FOOTER),
     },
   );
 }
 
 export function liveNowEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
   coachName: string;
   title: string;
   sessionId: string;
 }): Email {
+  const tr = trFor(input.locale);
   return build(
+    input.locale,
     "live.now",
     { name: input.name, coach: input.coachName, title: input.title },
     {
       subject: `${oneLine(input.coachName)} is live: ${oneLine(input.title)}`,
-      heading: "Your session is live",
+      heading: tr("Your session is live"),
       blocks: [
         {
           kind: "p",
-          text: `Hi ${input.name}, ${input.coachName} just went live for "${input.title}". Jump in and train together.`,
+          text: tr(
+            'Hi {name}, {coachName} just went live for "{title}". Jump in and train together.',
+            {
+              name: input.name,
+              coachName: input.coachName,
+              title: input.title,
+            },
+          ),
         },
       ],
       button: {
-        label: "Watch live",
+        label: tr("Watch live"),
         url: `${input.siteUrl}/calendar/${input.sessionId}/live`,
       },
-      footer: UPDATES_FOOTER,
+      footer: tr(UPDATES_FOOTER),
     },
   );
 }
 
 export function taskDueEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
   tasks: { title: string; coachName: string }[];
 }): Email {
+  const tr = trFor(input.locale);
   const one = input.tasks.length === 1 ? input.tasks[0] : null;
   return build(
+    input.locale,
     "reminder.task",
     {
       name: input.name,
@@ -751,82 +946,105 @@ export function taskDueEmail(input: {
     },
     {
       subject: one
-        ? `Due tomorrow: ${oneLine(one.title)}`
-        : `${input.tasks.length} Tasks are due tomorrow`,
-      heading: one ? "A Task is due tomorrow" : "Tasks due tomorrow",
+        ? tr("Due tomorrow: {p0}", { p0: oneLine(one.title) })
+        : tr("{length} Tasks are due tomorrow", { length: input.tasks.length }),
+      heading: one ? tr("A Task is due tomorrow") : tr("Tasks due tomorrow"),
       blocks: [
         {
           kind: "p",
-          text: `Hi ${input.name}, finish ${one ? "this" : "these"} to stay on track (+3 points each).`,
+          text: tr(
+            "Hi {name}, finish {p1} to stay on track (+3 points each).",
+            { name: input.name, p1: one ? tr("this") : tr("these") },
+          ),
         },
         {
           kind: "lines",
-          lines: input.tasks.map(
-            (task) => `${task.title} (from ${task.coachName})`,
+          lines: input.tasks.map((task) =>
+            tr("{title} (from {coach})", {
+              title: task.title,
+              coach: task.coachName,
+            }),
           ),
         },
       ],
-      button: { label: "Open your Tasks", url: `${input.siteUrl}/tasks` },
-      footer: UPDATES_FOOTER,
+      button: { label: tr("Open your Tasks"), url: `${input.siteUrl}/tasks` },
+      footer: tr(UPDATES_FOOTER),
     },
   );
 }
 
 export function checkinReminderEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
 }): Email {
+  const tr = trFor(input.locale);
   return build(
+    input.locale,
     "reminder.checkin",
     { name: input.name },
     {
-      subject: "How did your week go?",
-      heading: "Time for your weekly check-in",
+      subject: tr("How did your week go?"),
+      heading: tr("Time for your weekly check-in"),
       blocks: [
         {
           kind: "p",
-          text: `Hi ${input.name}, take a minute to rate your energy, sleep, stress and motivation and share a win. Your coach reads every one.`,
+          text: tr(
+            "Hi {name}, take a minute to rate your energy, sleep, stress and motivation and share a win. Your coach reads every one.",
+            { name: input.name },
+          ),
         },
       ],
-      button: { label: "Check in", url: `${input.siteUrl}/checkin` },
-      footer: UPDATES_FOOTER,
+      button: { label: tr("Check in"), url: `${input.siteUrl}/checkin` },
+      footer: tr(UPDATES_FOOTER),
     },
   );
 }
 
 export function streakReminderEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
   days: number;
   coach: boolean;
 }): Email {
+  const tr = trFor(input.locale);
   return build(
+    input.locale,
     "reminder.streak",
     { name: input.name, days: String(input.days) },
     {
-      subject: `🔥 Keep your ${input.days}-day streak alive`,
-      heading: `Your ${input.days}-day streak ends tonight`,
+      subject: tr("🔥 Keep your {days}-day streak alive", { days: input.days }),
+      heading: tr("Your {days}-day streak ends tonight", { days: input.days }),
       blocks: [
         {
           kind: "p",
-          text: `Hi ${input.name}, you haven't been active today yet. One thing before midnight keeps it going.`,
+          text: tr(
+            "Hi {name}, you haven't been active today yet. One thing before midnight keeps it going.",
+            { name: input.name },
+          ),
         },
         {
           kind: "p",
           text: input.coach
-            ? "Publish a video, give a Task, schedule a session or message a member."
-            : "Finish a Task, write a Memo, RSVP to a session or message your coach.",
+            ? tr(
+                "Publish a video, give a Task, schedule a session or message a member.",
+              )
+            : tr(
+                "Finish a Task, write a Memo, RSVP to a session or message your coach.",
+              ),
         },
       ],
       button: input.coach
-        ? { label: "Open GYMX2", url: `${input.siteUrl}/dashboard` }
-        : { label: "Open your Tasks", url: `${input.siteUrl}/tasks` },
-      footer: UPDATES_FOOTER,
+        ? { label: tr("Open GYMX2"), url: `${input.siteUrl}/dashboard` }
+        : { label: tr("Open your Tasks"), url: `${input.siteUrl}/tasks` },
+      footer: tr(UPDATES_FOOTER),
     },
   );
 }
 
 export function weeklyDigestEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   name: string;
   level: string;
@@ -840,32 +1058,49 @@ export function weeklyDigestEmail(input: {
   challenges: string[];
   upcoming: string[];
 }): Email {
+  const tr = trFor(input.locale);
   const blocks: Block[] = [
     {
       kind: "p",
-      text: `Hi ${input.name}, last week you finished ${input.lastWeekDone} of ${input.challengeCount} challenges.${
+      text: `${tr("Hi {name}, last week you finished {done} of {count} challenges.", { name: input.name, done: input.lastWeekDone, count: input.challengeCount })}${
         input.newBadges.length
-          ? ` New badges: ${input.newBadges.join(", ")}.`
+          ? tr(" New badges: {badges}.", {
+              badges: input.newBadges.map((b) => tr(b)).join(", "),
+            })
           : ""
       }`,
     },
     {
       kind: "lines",
       lines: [
-        `Level: ${input.level} (${input.points} points${input.nextLevel ? `, ${input.toNext} to ${input.nextLevel}` : ""})`,
-        `Streak: ${input.streak} ${input.streak === 1 ? "day" : "days"}`,
+        input.nextLevel
+          ? tr("Level: {level} ({points} points, {toNext} to {next})", {
+              level: tr(input.level),
+              points: input.points,
+              toNext: input.toNext,
+              next: tr(input.nextLevel),
+            })
+          : tr("Level: {level} ({points} points)", {
+              level: tr(input.level),
+              points: input.points,
+            }),
+        tr("Streak: {streak} {p1}", {
+          streak: input.streak,
+          p1: input.streak === 1 ? tr("day") : tr("days"),
+        }),
       ],
     },
-    { kind: "p", text: "This week's challenges:" },
+    { kind: "p", text: tr("This week's challenges:") },
     { kind: "lines", lines: input.challenges },
   ];
   if (input.upcoming.length) {
     blocks.push(
-      { kind: "p", text: "Coming up:" },
+      { kind: "p", text: tr("Coming up:") },
       { kind: "lines", lines: input.upcoming },
     );
   }
   return build(
+    input.locale,
     "digest.weekly",
     {
       name: input.name,
@@ -874,16 +1109,20 @@ export function weeklyDigestEmail(input: {
       streak: String(input.streak),
     },
     {
-      subject: "Your GYMX2 week",
-      heading: "A new week starts now",
+      subject: tr("Your GYMX2 week"),
+      heading: tr("A new week starts now"),
       blocks,
-      button: { label: "See your progress", url: `${input.siteUrl}/progress` },
-      footer: UPDATES_FOOTER,
+      button: {
+        label: tr("See your progress"),
+        url: `${input.siteUrl}/progress`,
+      },
+      footer: tr(UPDATES_FOOTER),
     },
   );
 }
 
 export function membershipChangeEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   change: "started" | "ended";
   memberName: string;
@@ -891,8 +1130,10 @@ export function membershipChangeEmail(input: {
   priceCents: number;
   trial: boolean;
 }): Email {
+  const tr = trFor(input.locale);
   const started = input.change === "started";
   return build(
+    input.locale,
     started ? "membership.started" : "membership.ended",
     {
       member: input.memberName,
@@ -901,27 +1142,47 @@ export function membershipChangeEmail(input: {
     },
     {
       subject: started
-        ? `New ${input.trial ? "trial" : "member"}: ${oneLine(input.memberName, 40)} joined ${oneLine(input.planName, 40)}`
-        : `Membership ended: ${oneLine(input.memberName, 40)}`,
-      heading: started ? "You have a new subscriber" : "A membership ended",
+        ? tr("New {p0}: {p1} joined {p2}", {
+            p0: input.trial ? tr("trial") : tr("member"),
+            p1: oneLine(input.memberName, 40),
+            p2: oneLine(input.planName, 40),
+          })
+        : tr("Membership ended: {p0}", { p0: oneLine(input.memberName, 40) }),
+      heading: started
+        ? tr("You have a new subscriber")
+        : tr("A membership ended"),
       blocks: started
         ? [
             {
               kind: "p",
-              text: `${input.memberName} subscribed to ${input.planName} (${money(input.priceCents)}/month)${
-                input.trial ? ", starting with a 7-day free trial" : ""
-              }.`,
+              text: tr(
+                "{memberName} subscribed to {planName} ({p2}/month){p3}.",
+                {
+                  memberName: input.memberName,
+                  planName: input.planName,
+                  p2: money(input.priceCents),
+                  p3: input.trial
+                    ? tr(", starting with a 7-day free trial")
+                    : "",
+                },
+              ),
             },
-            { kind: "p", text: "Say hello and give them their first Task." },
+            {
+              kind: "p",
+              text: tr("Say hello and give them their first Task."),
+            },
           ]
         : [
             {
               kind: "p",
-              text: `${input.memberName}'s ${input.planName} membership has ended.`,
+              text: tr("{memberName}'s {planName} membership has ended.", {
+                memberName: input.memberName,
+                planName: input.planName,
+              }),
             },
           ],
-      button: { label: "See your members", url: `${input.siteUrl}/plans` },
-      footer: "You're getting this because you offer memberships on GYMX2.",
+      button: { label: tr("See your members"), url: `${input.siteUrl}/plans` },
+      footer: tr("You're getting this because you offer memberships on GYMX2."),
     },
   );
 }
@@ -935,6 +1196,7 @@ const COMMUNITY_FOOTER =
 // One email per new Community notification. Repeats (more likes on the same post while the first
 // is unread) don't send again; see community-notify.ts.
 export function communityEmail(input: {
+  locale?: Locale;
   siteUrl: string;
   type: CommunityEmailType;
   actorName: string;
@@ -942,6 +1204,7 @@ export function communityEmail(input: {
   snippet: string;
   link: string;
 }): Email {
+  const tr = trFor(input.locale);
   const actor = input.actorName;
   const short = oneLine(actor, 60);
   const snippet =
@@ -953,65 +1216,74 @@ export function communityEmail(input: {
   const vars = { name: actor };
   switch (input.type) {
     case "like":
-      return build("community.like", vars, {
-        subject: `${short} liked your post`,
-        heading: `${actor} liked your post`,
+      return build(input.locale, "community.like", vars, {
+        subject: tr("{short} liked your post", { short }),
+        heading: tr("{actor} liked your post", { actor }),
         blocks: [
           {
             kind: "p",
-            text: "Your post is getting some love in the GYMX2 Community.",
+            text: tr("Your post is getting some love in the GYMX2 Community."),
           },
         ],
-        button: { label: "See your post", url },
-        footer: `We send one email per post until you've seen it. ${COMMUNITY_FOOTER}`,
+        button: { label: tr("See your post"), url },
+        footer: `${tr("We send one email per post until you've seen it.")} ${tr(COMMUNITY_FOOTER)}`,
       });
     case "comment":
-      return build("community.comment", vars, {
-        subject: `${short} commented on your post`,
-        heading: `${actor} commented on your post`,
+      return build(input.locale, "community.comment", vars, {
+        subject: tr("{short} commented on your post", { short }),
+        heading: tr("{actor} commented on your post", { actor }),
         blocks: quote,
-        button: { label: "Reply on GYMX2", url },
-        footer: COMMUNITY_FOOTER,
+        button: { label: tr("Reply on GYMX2"), url },
+        footer: tr(COMMUNITY_FOOTER),
       });
     case "progress_reply":
-      return build("community.progress_reply", vars, {
-        subject: `${short} commented on your progress`,
-        heading: `${actor} commented on your progress post`,
+      return build(input.locale, "community.progress_reply", vars, {
+        subject: tr("{short} commented on your progress", { short }),
+        heading: tr("{actor} commented on your progress post", { actor }),
         blocks: quote,
-        button: { label: "See the comment", url },
-        footer: COMMUNITY_FOOTER,
+        button: { label: tr("See the comment"), url },
+        footer: tr(COMMUNITY_FOOTER),
       });
     case "reply":
-      return build("community.reply", vars, {
-        subject: `${short} replied to your comment`,
-        heading: `${actor} replied to your comment`,
+      return build(input.locale, "community.reply", vars, {
+        subject: tr("{short} replied to your comment", { short }),
+        heading: tr("{actor} replied to your comment", { actor }),
         blocks: quote,
-        button: { label: "Reply on GYMX2", url },
-        footer: COMMUNITY_FOOTER,
+        button: { label: tr("Reply on GYMX2"), url },
+        footer: tr(COMMUNITY_FOOTER),
       });
     case "announcement":
-      return build("community.announcement", vars, {
-        subject: `New announcement from ${short}`,
-        heading: `${actor} posted an announcement`,
+      return build(input.locale, "community.announcement", vars, {
+        subject: tr("New announcement from {short}", { short }),
+        heading: tr("{actor} posted an announcement", { actor }),
         blocks: quote,
-        button: { label: "Read it on GYMX2", url },
-        footer: `You're getting this because you're in ${actor}'s community. ${COMMUNITY_FOOTER}`,
+        button: { label: tr("Read it on GYMX2"), url },
+        footer: `${tr("You're getting this because you're in {actor}'s community.", { actor })} ${tr(COMMUNITY_FOOTER)}`,
       });
     case "removed":
-      return build("community.removed", vars, {
-        subject: "Something you posted was removed",
-        heading: "Something you posted was removed from Community",
+      return build(input.locale, "community.removed", vars, {
+        subject: tr("Something you posted was removed"),
+        heading: tr("Something you posted was removed from Community"),
         blocks: [
           {
             kind: "p",
-            text: "It was removed because it broke the GYMX2 community guidelines.",
+            text: tr(
+              "It was removed because it broke the GYMX2 community guidelines.",
+            ),
           },
           ...(snippet
-            ? [{ kind: "lines", lines: [`Reason: ${snippet}`] } as Block]
+            ? [
+                {
+                  kind: "lines",
+                  lines: [tr("Reason: {snippet}", { snippet })],
+                } as Block,
+              ]
             : []),
         ],
-        button: { label: "Read the Terms", url: `${input.siteUrl}/terms` },
-        footer: "Reply to support@gymx2.com if you think this was a mistake.",
+        button: { label: tr("Read the Terms"), url: `${input.siteUrl}/terms` },
+        footer: tr(
+          "Reply to support@gymx2.com if you think this was a mistake.",
+        ),
       });
   }
 }

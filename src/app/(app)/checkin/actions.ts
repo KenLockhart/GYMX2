@@ -72,11 +72,12 @@ export async function saveCheckin(
       await sendPush(
         (coaches ?? []).map((row) => row.coach_id as string),
         {
-          title: `${profile.display_name} checked in`,
-          body:
-            parsed.data.question ||
-            parsed.data.wins ||
-            "See how their week went.",
+          title: {
+            text: "{name} checked in",
+            vars: { name: profile.display_name },
+          },
+          body: parsed.data.question ||
+            parsed.data.wins || { text: "See how their week went." },
           url: "/checkins",
           tag: `checkin-${profile.id}`,
         },
@@ -114,17 +115,18 @@ export async function replyToCheckin(
     .eq("id", parsed.data.checkin_id)
     .maybeSingle();
   if (!checkin) return { error: "That check-in wasn't found." };
-  const { error } = await supabase
-    .from("checkin_replies")
-    .insert({
-      checkin_id: parsed.data.checkin_id,
-      coach_id: profile.id,
-      body: parsed.data.body,
-    });
+  const { error } = await supabase.from("checkin_replies").insert({
+    checkin_id: parsed.data.checkin_id,
+    coach_id: profile.id,
+    body: parsed.data.body,
+  });
   if (error) return { error: "We couldn't send your reply. Please try again." };
   after(() =>
     sendPush([checkin.member_id as string], {
-      title: `${profile.display_name} replied to your check-in`,
+      title: {
+        text: "{name} replied to your check-in",
+        vars: { name: profile.display_name },
+      },
       body: parsed.data.body,
       url: "/checkin",
       tag: "checkin-reply",

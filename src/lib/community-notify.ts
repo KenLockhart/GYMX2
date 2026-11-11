@@ -2,7 +2,7 @@ import "server-only";
 import { loadRecipient, sendEmail } from "@/lib/email";
 import { communityEmail } from "@/lib/email-templates";
 import { NOTIFICATION_SETTINGS } from "@/lib/notifications";
-import { sendPush } from "@/lib/push";
+import { type PushText, sendPush } from "@/lib/push";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -29,8 +29,8 @@ type Event = {
   link: string;
   // Unread notifications with the same key collapse into one ("Jordan and 3 others liked your post").
   groupKey: string;
-  title: string;
-  body: string;
+  title: PushText;
+  body: PushText;
   // The comment, announcement or removal reason, for the email.
   snippet?: string;
 };
@@ -120,6 +120,7 @@ export async function notifyCommunity(event: Event) {
           await sendEmail(
             recipient.email,
             communityEmail({
+              locale: recipient.locale,
               siteUrl,
               type: event.type === "removed" ? "removed" : event.type,
               actorName: event.actorName,

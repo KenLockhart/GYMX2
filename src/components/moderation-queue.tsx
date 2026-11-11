@@ -10,6 +10,7 @@ import {
 } from "@/app/(app)/community/actions";
 import { timeAgo } from "@/lib/community";
 import { T, useTr } from "@/i18n/t";
+import { useLocale } from "@/i18n/client";
 
 export type QueueItem = {
   key: string;
@@ -39,6 +40,7 @@ function Item({
   onDone: (key: string, outcome: string) => void;
 }) {
   const tr = useTr();
+  const locale = useLocale();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -89,16 +91,18 @@ function Item({
           <T>{item.summary}</T>
         </p>
         <p className="text-xs text-muted">
-          reported {timeAgo(item.reportedAt)}
+          {tr("reported {when}", {
+            when: timeAgo(item.reportedAt, undefined, locale),
+          })}
         </p>
       </div>
       <div className="rounded border border-border bg-surface-raised p-3">
         <p className="text-xs text-muted">
-          {item.kind === "post" ? tr("Post") : tr("Comment")} by{" "}
+          {item.kind === "post" ? tr("Post by") : tr("Comment by")}{" "}
           <span className="font-semibold text-foreground">
             {item.authorName}
           </span>{" "}
-          · {item.where} · {timeAgo(item.createdAt)}
+          · {item.where} · {timeAgo(item.createdAt, undefined, locale)}
           {item.alreadyRemoved && <T>{" · already removed"}</T>}
         </p>
         {item.body && (
@@ -120,7 +124,9 @@ function Item({
         )}
       </div>
       {item.autoFlag && (
-        <p className="text-xs text-muted">Automatic flag: {item.autoFlag}</p>
+        <p className="text-xs text-muted">
+          {tr("Automatic flag: {flag}", { flag: tr(item.autoFlag) })}
+        </p>
       )}
       {item.details.length > 0 && (
         <ul className="space-y-1 text-sm">
@@ -142,7 +148,7 @@ function Item({
             disabled={pending}
             className="btn-primary px-3 py-1.5 text-sm"
           >
-            Remove {item.kind}
+            {item.kind === "post" ? tr("Remove post") : tr("Remove comment")}
           </button>
         )}
         {item.canClearFlag && (
@@ -194,6 +200,7 @@ export function ModerationQueue({
   hint?: string;
   items: QueueItem[];
 }) {
+  const tr = useTr();
   const [items, setItems] = useState(initial);
   const [handled, setHandled] = useState<{ key: string; text: string }[]>([]);
 
@@ -205,7 +212,7 @@ export function ModerationQueue({
       {hint && <p className="text-sm text-muted">{hint}</p>}
       {handled.length > 0 && (
         <p role="status" className="text-sm text-accent">
-          <T>{handled[handled.length - 1].text}</T>
+          {handled[handled.length - 1].text}
         </p>
       )}
       {items.length === 0 ? (
@@ -226,7 +233,12 @@ export function ModerationQueue({
                   ...current,
                   {
                     key,
-                    text: `${outcome}: ${item.kind} by ${item.authorName}.`,
+                    text: tr(
+                      item.kind === "post"
+                        ? "{outcome}: post by {name}."
+                        : "{outcome}: comment by {name}.",
+                      { outcome: tr(outcome), name: item.authorName },
+                    ),
                   },
                 ]);
               }}

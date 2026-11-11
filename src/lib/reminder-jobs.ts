@@ -8,6 +8,9 @@ import {
 } from "@/lib/achievements";
 import { loadCoachActivity, loadMemberActivity } from "@/lib/achievements-data";
 import { formatEmailSessionTime } from "@/lib/calendar";
+import type { Locale } from "@/i18n/config";
+import { messages } from "@/i18n/messages";
+import { translate } from "@/i18n/phrases";
 import { loadRecipient, sendEmail } from "@/lib/email";
 import {
   checkinReminderEmail,
@@ -39,11 +42,11 @@ async function sendOnce(
   userId: string,
   kind: Kind,
   ref: string,
-  build: (name: string) => Email | null,
+  build: (name: string, locale: Locale) => Email | null,
 ) {
   const person = await loadRecipient(userId);
   if (!person?.wantsUpdates) return false;
-  const email = build(person.name);
+  const email = build(person.name, person.locale);
   if (!email) return false;
   const { data, error } = await createAdminClient()
     .from("reminder_log")
@@ -81,18 +84,28 @@ async function remindSessions(now: Date) {
 
   let sent = 0;
   for (const [memberId, list] of sessionsTomorrowByMember(sessions, now)) {
-    const ok = await sendOnce(memberId, "session", tomorrowKey(now), (name) =>
-      sessionReminderEmail({
-        siteUrl: getSiteUrl(),
-        name,
-        sessions: list.map((session) => ({
-          id: session.id,
-          title: session.title,
-          when: formatEmailSessionTime(session.starts_at, session.ends_at),
-          where: session.location,
-          coachName: session.coach?.display_name ?? "your coach",
-        })),
-      }),
+    const ok = await sendOnce(
+      memberId,
+      "session",
+      tomorrowKey(now),
+      (name, locale) =>
+        sessionReminderEmail({
+          siteUrl: getSiteUrl(),
+          name,
+          locale,
+          sessions: list.map((session) => ({
+            id: session.id,
+            title: session.title,
+            when: formatEmailSessionTime(
+              session.starts_at,
+              session.ends_at,
+              locale,
+            ),
+            where: session.location,
+            coachName:
+              session.coach?.display_name ?? translate("your coach", locale),
+          })),
+        }),
     );
     if (ok) sent += 1;
   }
@@ -117,15 +130,21 @@ async function remindTasks(now: Date) {
 
   let sent = 0;
   for (const [memberId, list] of tasksDueTomorrowByMember(rows, now)) {
-    const ok = await sendOnce(memberId, "task", tomorrowKey(now), (name) =>
-      taskDueEmail({
-        siteUrl: getSiteUrl(),
-        name,
-        tasks: list.map((row) => ({
-          title: row.task?.title ?? "A Task",
-          coachName: row.task?.coach?.display_name ?? "your coach",
-        })),
-      }),
+    const ok = await sendOnce(
+      memberId,
+      "task",
+      tomorrowKey(now),
+      (name, locale) =>
+        taskDueEmail({
+          siteUrl: getSiteUrl(),
+          name,
+          locale,
+          tasks: list.map((row) => ({
+            title: row.task?.title ?? translate("A Task", locale),
+            coachName:
+              row.task?.coach?.display_name ?? translate("your coach", locale),
+          })),
+        }),
     );
     if (ok) sent += 1;
   }
@@ -149,7 +168,8 @@ async function upcomingFor(
 ) {
   const db = createAdminClient();
   const until = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  const lines: { at: string; text: string }[] = [];
+  // Each line is written in the reader's language when the email is built.
+  const lines: { at: string; text: (locale: Locale) => string }[] = [];
   if (role === "coach") {
     const { data } = await db
       .from("calendar_sessions")
@@ -162,7 +182,8 @@ async function upcomingFor(
     for (const row of data ?? []) {
       lines.push({
         at: row.starts_at,
-        text: `${row.title} · ${formatEmailSessionTime(row.starts_at, row.ends_at)}`,
+        text: (locale) =>
+          `${row.title} · ${formatEmailSessionTime(row.starts_at, row.ends_at, locale)}`,
       });
     }
   } else {
@@ -191,7 +212,8 @@ async function upcomingFor(
     }[]) {
       lines.push({
         at: row.session.starts_at,
-        text: `${row.session.title} · ${formatEmailSessionTime(row.session.starts_at, row.session.ends_at)}`,
+        text: (locale) =>
+          `${row.session.title} · ${formatEmailSessionTime(row.session.starts_at, row.session.ends_at, locale)}`,
       });
     }
     for (const row of (tasks ?? []) as unknown as {
@@ -200,7 +222,11 @@ async function upcomingFor(
     }[]) {
       lines.push({
         at: `${row.due_on}T23:59:00Z`,
-        text: `Task due ${row.due_on.slice(5).replace("-", "/")}: ${row.task?.title ?? "a Task"}`,
+        text: (locale) =>
+          translate("Task due {date}: {title}", locale, {
+            date: row.due_on.slice(5).replace("-", "/"),
+            title: row.task?.title ?? translate("a Task", locale),
+          }),
       });
     }
   }
@@ -210,9 +236,13 @@ async function upcomingFor(
     .map((line) => line.text);
 }
 
-function challengeLines(challenges: Challenge[]) {
-  return challenges.map(
-    (challenge) => `${challenge.title} (goal ${challenge.goal})`,
+function challengeLines(challenges: Challenge[], locale: Locale) {
+  return challenges.map((challenge) =>
+    translate("{title} (goal {goal})", locale, {
+      title:
+        messages[locale].options.challenges[challenge.title] ?? challenge.title,
+      goal: challenge.goal,
+    }),
   );
 }
 
@@ -249,25 +279,38 @@ async function sendWeeklyDigests(now: Date) {
           .filter((badge) =>
             (recentBadges ?? []).some((row) => row.badge === badge.key),
           )
-          .map((badge) => `${badge.icon} ${badge.name}`);
+          .map((badge) => ({ icon: badge.icon, name: badge.name }));
 
-        const ok = await sendOnce(userId, "weekly", todayKey(now), (name) =>
-          weeklyDigestEmail({
-            siteUrl: getSiteUrl(),
-            name,
-            level: progress.level.name,
-            points: progress.points,
-            toNext: progress.level.toNext,
-            nextLevel: progress.level.next,
-            streak: progress.streak.current,
-            lastWeekDone: previous.filter(
-              (challenge) => challenge.done >= challenge.goal,
-            ).length,
-            challengeCount: previous.length,
-            newBadges,
-            challenges: challengeLines(progress.challenges),
-            upcoming,
-          }),
+        const ok = await sendOnce(
+          userId,
+          "weekly",
+          todayKey(now),
+          (name, locale) =>
+            weeklyDigestEmail({
+              siteUrl: getSiteUrl(),
+              name,
+              locale,
+              level:
+                messages[locale].options.levels[progress.level.name] ??
+                progress.level.name,
+              points: progress.points,
+              toNext: progress.level.toNext,
+              nextLevel: progress.level.next
+                ? (messages[locale].options.levels[progress.level.next] ??
+                  progress.level.next)
+                : null,
+              streak: progress.streak.current,
+              lastWeekDone: previous.filter(
+                (challenge) => challenge.done >= challenge.goal,
+              ).length,
+              challengeCount: previous.length,
+              newBadges: newBadges.map(
+                (badge) =>
+                  `${badge.icon} ${messages[locale].options.badges[badge.name]?.name ?? badge.name}`,
+              ),
+              challenges: challengeLines(progress.challenges, locale),
+              upcoming: upcoming.map((line) => line(locale)),
+            }),
         );
         if (ok) sent += 1;
       } catch (error) {
@@ -289,13 +332,18 @@ async function remindStreaks(now: Date) {
             ? memberProgress(await loadMemberActivity(userId), now)
             : coachProgress(await loadCoachActivity(userId), now);
         if (!streakAtRisk(progress.streak)) continue;
-        const ok = await sendOnce(userId, "streak", todayKey(now), (name) =>
-          streakReminderEmail({
-            siteUrl: getSiteUrl(),
-            name,
-            days: progress.streak.current,
-            coach: role === "coach",
-          }),
+        const ok = await sendOnce(
+          userId,
+          "streak",
+          todayKey(now),
+          (name, locale) =>
+            streakReminderEmail({
+              siteUrl: getSiteUrl(),
+              name,
+              locale,
+              days: progress.streak.current,
+              coach: role === "coach",
+            }),
         );
         if (ok) sent += 1;
       } catch (error) {
@@ -364,7 +412,7 @@ async function pushProgramDays(now: Date) {
         .select("user_id");
       if (!claimed?.length) continue;
       sent += await sendPush([row.member_id], {
-        title: `Day ${dayNumber} is ready`,
+        title: { text: "Day {n} is ready", vars: { n: dayNumber } },
         body: `${row.program?.title}: ${day.title}`,
         url: `/programs/${row.program?.id}`,
         tag: `program-${row.id}`,
@@ -402,8 +450,12 @@ async function remindCheckins(now: Date) {
   let sent = 0;
   for (const memberId of due) {
     try {
-      const emailed = await sendOnce(memberId, "checkin", week, (name) =>
-        checkinReminderEmail({ siteUrl: getSiteUrl(), name }),
+      const emailed = await sendOnce(
+        memberId,
+        "checkin",
+        week,
+        (name, locale) =>
+          checkinReminderEmail({ siteUrl: getSiteUrl(), name, locale }),
       );
       // Push goes to anyone with notifications on, once per week (the log row is claimed by the email step
       // when they get emails; otherwise claim it here).
@@ -418,8 +470,10 @@ async function remindCheckins(now: Date) {
         if (!claimed?.length) continue;
       }
       await sendPush([memberId], {
-        title: "How did your week go?",
-        body: "Your weekly check-in takes a minute. Your coach reads every one.",
+        title: { text: "How did your week go?" },
+        body: {
+          text: "Your weekly check-in takes a minute. Your coach reads every one.",
+        },
         url: "/checkin",
         tag: "checkin-reminder",
       });
