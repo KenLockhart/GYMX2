@@ -1,0 +1,664 @@
+.coach-profiles-gallery .page {
+  min-width: 0;
+  color: var(--foreground);
+}
+
+.coach-profiles-gallery .backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.coach-profiles-gallery .backLink:hover,
+.coach-profiles-gallery .backLink:focus-visible {
+  color: var(--accent);
+}
+
+.coach-profiles-gallery .backLink:focus-visible,
+.coach-profiles-gallery .featuredAction:focus-visible,
+.coach-profiles-gallery .cardLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.coach-profiles-gallery .pageHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin: 1.5rem 0 1.75rem;
+}
+
+.coach-profiles-gallery .eyebrow,
+.coach-profiles-gallery .featuredEyebrow {
+  margin: 0 0 0.4rem;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.coach-profiles-gallery .pageHeading h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  line-height: 0.98;
+}
+
+.coach-profiles-gallery .intro {
+  margin: 0.7rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.coach-profiles-gallery .stats {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.coach-profiles-gallery .stat {
+  display: grid;
+  min-width: 5.5rem;
+  gap: 0.1rem;
+  justify-items: center;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: linear-gradient(145deg, var(--surface-raised), var(--surface));
+  color: var(--muted);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.coach-profiles-gallery .statValue {
+  color: var(--foreground);
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-profiles-gallery .featured {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 23rem;
+  overflow: hidden;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 1.1rem;
+  background: var(--surface);
+  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 22%);
+}
+
+.coach-profiles-gallery .featured > .photo {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+}
+
+.coach-profiles-gallery .photo {
+  position: relative;
+  overflow: hidden;
+  background: #181c14;
+}
+
+.coach-profiles-gallery .photoImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 34%;
+}
+
+.coach-profiles-gallery .photoFallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background:
+    radial-gradient(70% 90% at 78% 18%, rgb(200 241 53 / 20%), transparent 66%),
+    radial-gradient(65% 75% at 22% 88%, rgb(128 150 76 / 20%), transparent 70%),
+    linear-gradient(145deg, #22271e, #0d0f0c 72%);
+}
+
+.coach-profiles-gallery .photoFallback span {
+  display: grid;
+  width: 5rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgb(200 241 53 / 42%);
+  border-radius: 50%;
+  background: rgb(13 15 12 / 44%);
+  color: var(--accent);
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+
+.coach-profiles-gallery .featuredScrim {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(10 12 9 / 97%) 0%, rgb(10 12 9 / 84%) 39%, rgb(10 12 9 / 34%) 72%, rgb(10 12 9 / 5%) 100%),
+    linear-gradient(0deg, rgb(10 12 9 / 73%), transparent 46%);
+}
+
+.coach-profiles-gallery .featuredContent {
+  width: min(100%, 38rem);
+  padding: clamp(1.5rem, 4vw, 3.25rem);
+}
+
+.coach-profiles-gallery .badge {
+  display: inline-flex;
+  min-height: 1.65rem;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.35rem 0.62rem;
+  border: 1px solid rgb(255 255 255 / 17%);
+  border-radius: 999px;
+  background: rgb(13 15 12 / 78%);
+  color: var(--foreground);
+  font-size: 0.65rem;
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  backdrop-filter: blur(10px);
+}
+
+.coach-profiles-gallery .reviewBadge {
+  border-color: rgb(200 241 53 / 50%);
+  color: var(--accent);
+}
+
+.coach-profiles-gallery .liveBadge {
+  border-color: rgb(181 232 83 / 38%);
+  color: var(--success);
+}
+
+.coach-profiles-gallery .badgeDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0.65rem currentColor;
+}
+
+.coach-profiles-gallery .featuredEyebrow {
+  margin-top: 1.3rem;
+  color: rgb(242 244 236 / 78%);
+}
+
+.coach-profiles-gallery .featuredContent h2 {
+  max-width: 32rem;
+  margin: 0;
+  font-size: clamp(2.7rem, 6.6vw, 5.25rem);
+  line-height: 0.9;
+  overflow-wrap: anywhere;
+  text-shadow: 0 2px 20px rgb(0 0 0 / 24%);
+}
+
+.coach-profiles-gallery .featuredHeadline {
+  display: -webkit-box;
+  max-width: 34rem;
+  margin: 0.8rem 0 0;
+  overflow: hidden;
+  color: rgb(242 244 236 / 91%);
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.coach-profiles-gallery .featuredStatus {
+  margin: 0.75rem 0 1.2rem;
+  color: rgb(242 244 236 / 73%);
+  font-size: 0.8rem;
+}
+
+.coach-profiles-gallery .featuredContent .completion {
+  width: min(100%, 20rem);
+}
+
+.coach-profiles-gallery .featuredAction {
+  display: inline-flex;
+  min-height: 2.8rem;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.35rem;
+  padding: 0.72rem 1.05rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.55rem;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.coach-profiles-gallery .featuredAction span {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.coach-profiles-gallery .featuredAction:hover {
+  background: #d6ff47;
+  box-shadow: 0 0.5rem 1.7rem rgb(200 241 53 / 20%);
+  transform: translateY(-1px);
+}
+
+.coach-profiles-gallery .rails {
+  display: grid;
+  gap: 2.15rem;
+  margin-top: 2.25rem;
+}
+
+.coach-profiles-gallery .rail {
+  min-width: 0;
+}
+
+.coach-profiles-gallery .railHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.coach-profiles-gallery .railHeading h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.3vw, 1.9rem);
+  line-height: 1;
+}
+
+.coach-profiles-gallery .railHeading p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.coach-profiles-gallery .railCount {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-profiles-gallery .track {
+  display: flex;
+  min-width: 0;
+  gap: 0.95rem;
+  overflow-x: auto;
+  margin: 0 -0.75rem;
+  padding: 0.2rem 0.75rem 0.8rem;
+  list-style: none;
+  scroll-padding-inline: 0.75rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.coach-profiles-gallery .cardSlot {
+  width: min(78vw, 20.25rem);
+  flex: 0 0 min(78vw, 20.25rem);
+  scroll-snap-align: start;
+}
+
+.coach-profiles-gallery .card {
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.coach-profiles-gallery .cardLink {
+  display: block;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.coach-profiles-gallery .card:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.coach-profiles-gallery .cardLink:focus-visible {
+  outline: none;
+}
+
+.coach-profiles-gallery .cardImage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+
+.coach-profiles-gallery .cardImage > .photo {
+  position: absolute;
+  inset: 0;
+}
+
+.coach-profiles-gallery .cardScrim {
+  position: absolute;
+  inset: 22% 0 0;
+  background: linear-gradient(0deg, rgb(7 9 6 / 92%), rgb(7 9 6 / 44%) 48%, transparent);
+}
+
+.coach-profiles-gallery .cardTitle {
+  position: absolute;
+  inset: auto 0.95rem 0.85rem;
+  z-index: 1;
+}
+
+.coach-profiles-gallery .cardTitle h3 {
+  margin: 0;
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+  line-height: 0.98;
+  overflow-wrap: anywhere;
+}
+
+.coach-profiles-gallery .cardTitle p {
+  display: -webkit-box;
+  max-width: 100%;
+  margin: 0.32rem 0 0;
+  overflow: hidden;
+  color: rgb(242 244 236 / 82%);
+  font-size: 0.73rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.coach-profiles-gallery .cardImage > .badge {
+  position: absolute;
+  z-index: 2;
+  top: 0.65rem;
+  left: 0.65rem;
+}
+
+.coach-profiles-gallery .cardBody {
+  display: flex;
+  min-height: 11.7rem;
+  flex-direction: column;
+  padding: 0.8rem 0.95rem 0.9rem;
+}
+
+.coach-profiles-gallery .statusLine {
+  min-height: 1.05rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.coach-profiles-gallery .metaLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.55rem;
+  margin-top: 0.35rem;
+  color: rgb(242 244 236 / 82%);
+  font-size: 0.73rem;
+  line-height: 1.35;
+}
+
+.coach-profiles-gallery .chips {
+  display: flex;
+  min-height: 1.75rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: flex-start;
+  margin-top: 0.65rem;
+}
+
+.coach-profiles-gallery .chip {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--muted);
+  font-size: 0.63rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coach-profiles-gallery .completion {
+  margin-top: auto;
+  padding-top: 0.65rem;
+}
+
+.coach-profiles-gallery .completionLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.coach-profiles-gallery .percent {
+  color: var(--foreground);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-profiles-gallery .meter {
+  height: 0.24rem;
+  overflow: hidden;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 13%);
+}
+
+.coach-profiles-gallery .meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.coach-profiles-gallery .cardAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.65rem;
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.coach-profiles-gallery .cardAction span {
+  font-size: 1rem;
+  transition: transform 160ms ease;
+}
+
+.coach-profiles-gallery .reviewNote {
+  margin: 1.6rem 0 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--accent);
+  background: linear-gradient(90deg, rgb(200 241 53 / 6%), transparent 75%);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.coach-profiles-gallery .emptyState {
+  display: grid;
+  min-height: 17rem;
+  justify-items: center;
+  align-content: center;
+  gap: 0.55rem;
+  margin-top: 1.5rem;
+  padding: 2.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background:
+    radial-gradient(60% 90% at 50% 0%, rgb(200 241 53 / 7%), transparent 80%),
+    var(--surface);
+  text-align: center;
+}
+
+.coach-profiles-gallery .emptyMark {
+  display: grid;
+  width: 3.1rem;
+  aspect-ratio: 1;
+  place-items: center;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgb(200 241 53 / 35%);
+  border-radius: 50%;
+  color: var(--accent);
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.coach-profiles-gallery .emptyState h2 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+
+.coach-profiles-gallery .emptyState p {
+  max-width: 30rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .coach-profiles-gallery .card:hover,
+  .coach-profiles-gallery .card:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0.6rem 1.6rem rgb(0 0 0 / 24%);
+    transform: translateY(-2px);
+  }
+
+  .coach-profiles-gallery .card:hover .photoImage,
+  .coach-profiles-gallery .card:focus-within .photoImage {
+    transform: scale(1.035);
+  }
+
+  .coach-profiles-gallery .photoImage {
+    transition: transform 320ms ease;
+  }
+
+  .coach-profiles-gallery .card:hover .cardAction span,
+  .coach-profiles-gallery .card:focus-within .cardAction span {
+    transform: translateX(3px);
+  }
+}
+
+@media (max-width: 760px) {
+  .coach-profiles-gallery .pageHeading {
+    display: block;
+    margin-top: 1.25rem;
+  }
+
+  .coach-profiles-gallery .stats {
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 1rem;
+  }
+
+  .coach-profiles-gallery .stat {
+    min-width: 5.1rem;
+    padding-inline: 0.7rem;
+  }
+
+  .coach-profiles-gallery .featured {
+    min-height: 28rem;
+    align-items: flex-end;
+  }
+
+  .coach-profiles-gallery .featured > .photo {
+    inset: 0;
+  }
+
+  .coach-profiles-gallery .featuredScrim {
+    background:
+      linear-gradient(0deg, rgb(10 12 9 / 98%) 0%, rgb(10 12 9 / 80%) 46%, rgb(10 12 9 / 12%) 100%),
+      linear-gradient(90deg, rgb(10 12 9 / 22%), transparent);
+  }
+
+  .coach-profiles-gallery .featuredContent {
+    padding: 1.35rem;
+  }
+
+  .coach-profiles-gallery .featuredContent h2 {
+    font-size: clamp(2.7rem, 12vw, 4rem);
+  }
+
+  .coach-profiles-gallery .rails {
+    gap: 1.8rem;
+    margin-top: 1.85rem;
+  }
+
+  .coach-profiles-gallery .railHeading p {
+    max-width: 17rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .coach-profiles-gallery .stat {
+    min-width: 0;
+    flex: 1;
+    padding-inline: 0.55rem;
+  }
+
+  .coach-profiles-gallery .stats {
+    width: 100%;
+  }
+
+  .coach-profiles-gallery .featured {
+    min-height: 27rem;
+  }
+
+  .coach-profiles-gallery .featuredContent {
+    padding: 1.1rem;
+  }
+
+  .coach-profiles-gallery .railHeading h2 {
+    font-size: 1.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-profiles-gallery .backLink,
+  .coach-profiles-gallery .card,
+  .coach-profiles-gallery .cardAction span,
+  .coach-profiles-gallery .featuredAction,
+  .coach-profiles-gallery .photoImage {
+    transition: none;
+  }
+}

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../components/admin-coach-profiles-gallery.css";
 
 :root {
   --background: #0d0f0c;
