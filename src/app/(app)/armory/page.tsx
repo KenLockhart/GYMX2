@@ -11,8 +11,12 @@ import {
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmoryItem } from "@/lib/types";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "The Armory" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("The Armory") };
+}
 
 type CatalogItem = Pick<
   ArmoryItem,
@@ -31,6 +35,7 @@ export default async function ArmoryPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const tr = await getTr();
   const { profile } = await requireAccount();
   const requested = (await searchParams).category;
   const category = isCategory(requested) ? requested : null;
@@ -54,31 +59,35 @@ export default async function ArmoryPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-5xl">The Armory</h1>
+          <h1 className="text-5xl">
+            <T>The Armory</T>
+          </h1>
           <p className="mt-2 max-w-xl text-muted">
             {profile.role === "coach"
-              ? "Ebooks, gear and programs for your members. Sell them here, link to where you already sell, or share free downloads."
-              : "Ebooks, gear and programs chosen by your coaches."}
+              ? tr(
+                  "Ebooks, gear and programs for your members. Sell them here, link to where you already sell, or share free downloads.",
+                )
+              : tr("Ebooks, gear and programs chosen by your coaches.")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {profile.role !== "admin" && (
             <Link href="/armory/purchases" className="btn-secondary">
-              My purchases
+              <T>My purchases</T>
             </Link>
           )}
           {canAdd && (
             <>
               <Link href="/armory/sales" className="btn-secondary">
-                Sales
+                <T>Sales</T>
               </Link>
               {profile.role === "coach" && (
                 <Link href="/armory/payouts" className="btn-secondary">
-                  Payouts
+                  <T>Payouts</T>
                 </Link>
               )}
               <Link href="/armory/new" className="btn-primary">
-                Add an item
+                <T>Add an item</T>
               </Link>
             </>
           )}
@@ -87,13 +96,13 @@ export default async function ArmoryPage({
 
       <nav
         className="flex flex-wrap gap-2 text-sm"
-        aria-label="Filter by category"
+        aria-label={tr("Filter by category")}
       >
         <Link
           href="/armory"
           className={`rounded-full border px-3 py-1 ${!category ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-raised"}`}
         >
-          All
+          <T>All</T>
         </Link>
         {ARMORY_CATEGORIES.map((option) => (
           <Link
@@ -101,24 +110,28 @@ export default async function ArmoryPage({
             href={`/armory?category=${option.value}`}
             className={`rounded-full border px-3 py-1 ${category === option.value ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-raised"}`}
           >
-            {option.label}
+            <T>{option.label}</T>
           </Link>
         ))}
       </nav>
 
       {error ? (
         <p role="alert" className="text-danger">
-          We couldn&apos;t load the Armory. Please refresh and try again.
+          <T>We couldn&apos;t load the Armory. Please refresh and try again.</T>
         </p>
       ) : items.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface p-4 text-muted">
           {canAdd
-            ? "Nothing here yet. Add your first ebook or piece of gear."
+            ? tr("Nothing here yet. Add your first ebook or piece of gear.")
             : profile.role === "member"
               ? category
-                ? `No ${categoryLabel(category).toLowerCase()} yet.`
-                : "Nothing here yet. Items from coaches you join will appear here."
-              : "Nothing here yet."}
+                ? tr("No {p0} yet.", {
+                    p0: categoryLabel(category).toLowerCase(),
+                  })
+                : tr(
+                    "Nothing here yet. Items from coaches you join will appear here.",
+                  )
+              : tr("Nothing here yet.")}
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -126,7 +139,7 @@ export default async function ArmoryPage({
             const image = publicImageUrl(supabaseUrl, item.image_path);
             const price =
               item.kind === "download"
-                ? "Free download"
+                ? tr("Free download")
                 : formatPrice(item.price_cents);
             return (
               <li key={item.id}>
@@ -146,7 +159,7 @@ export default async function ArmoryPage({
                       />
                     ) : (
                       <span className="font-display text-2xl font-bold uppercase text-muted">
-                        {categoryLabel(item.category)}
+                        <T>{categoryLabel(item.category)}</T>
                       </span>
                     )}
                   </div>
@@ -166,8 +179,8 @@ export default async function ArmoryPage({
                     {item.coach_id === profile.id && (
                       <p className="text-xs text-muted">
                         {item.visible_to_all
-                          ? "Everyone can see this"
-                          : "Your members only"}
+                          ? tr("Everyone can see this")
+                          : tr("Your members only")}
                       </p>
                     )}
                   </div>

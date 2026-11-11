@@ -3,6 +3,178 @@ import { options } from "./options";
 // Spanish for messages the server sends back in English (form errors and confirmations). Exact
 // matches first, then patterns for messages with names or numbers in them.
 export const esServerText: Record<string, string> = {
+  // Shared areas
+  "A photo didn't finish uploading. Please try again.":
+    "Una foto no terminó de subirse. Inténtalo de nuevo.",
+  "Add photos or one video, not both": "Agrega fotos o un video, no ambos.",
+  "Add where you'll meet.": "Agrega dónde se van a reunir.",
+  "Admins can't send messages.":
+    "Los administradores no pueden enviar mensajes.",
+  "Choose a coach.": "Elige un coach.",
+  "Choose a file to upload.": "Elige un archivo para subir.",
+  "Choose a post or a comment to report":
+    "Elige una publicación o un comentario para reportar.",
+  "Choose an item.": "Elige un artículo.",
+  "Choose up to 50 coaches": "Elige hasta 50 coaches.",
+  "Choose which coach community": "Elige la comunidad de qué coach.",
+  "Coach not found.": "No encontramos a ese coach.",
+  "Enter the price like 24.99, or leave it blank.":
+    "Escribe el precio, como 24.99, o déjalo en blanco.",
+  "Enter the price like 24.99.": "Escribe el precio, como 24.99.",
+  "Files can be up to 50 MB.": "Los archivos pueden pesar hasta 50 MB.",
+  "Images can be up to 5 MB.": "Las imágenes pueden pesar hasta 5 MB.",
+  "Join this coach before reviewing them.":
+    "Únete a este coach antes de dejarle una reseña.",
+  "Keep details to 1,000 characters.":
+    "Usa 1,000 caracteres o menos para los detalles.",
+  "Keep payments and contact on GYMX2: remove outside payment or phone details.":
+    "Mantén los pagos y el contacto en GYMX2: quita datos de pago externos o teléfonos.",
+  "Keep the details under 1,000 characters":
+    "Usa menos de 1,000 caracteres para los detalles.",
+  "Keep the reason under 500 characters.":
+    "Usa menos de 500 caracteres para el motivo.",
+  "Keep your message to 1,000 characters.":
+    "Usa 1,000 caracteres o menos para tu mensaje.",
+  "Keep your reply to 1,000 characters.":
+    "Usa 1,000 caracteres o menos para tu respuesta.",
+  "Leave this coach first (from their profile), then block them.":
+    "Primero deja a este coach (desde su perfil) y luego bloquéalo.",
+  "Leave this coach before blocking them.":
+    "Deja a este coach antes de bloquearlo.",
+  "Nothing to dismiss.": "No hay nada que descartar.",
+  "One of those answers didn't look right.":
+    "Una de esas respuestas no parece correcta.",
+  "Only coaches can post announcements and challenges.":
+    "Solo los coaches pueden publicar anuncios y retos.",
+  "Only members can block coaches.":
+    "Solo los miembros pueden bloquear coaches.",
+  "Only members can review coaches.":
+    "Solo los miembros pueden dejar reseñas a los coaches.",
+  "Only the coach can reply.": "Solo el coach puede responder.",
+  "Only this coach and their members can post here.":
+    "Solo este coach y sus miembros pueden publicar aquí.",
+  "Pick a length.": "Elige una duración.",
+  "Pick a star rating": "Elige una calificación de estrellas.",
+  "Pick at least one time.": "Elige al menos un horario.",
+  "Review removed.": "Reseña eliminada.",
+  "Review updated.": "Reseña actualizada.",
+  "Saving coaches is for members.": "Guardar coaches es para miembros.",
+  "Stripe couldn't refund this order. Please try again, or refund it from the Stripe dashboard.":
+    "Stripe no pudo reembolsar este pedido. Inténtalo de nuevo o reembólsalo desde el panel de Stripe.",
+  "Stripe has no payment for this order.":
+    "Stripe no tiene un pago para este pedido.",
+  "Thanks! Your review is posted.": "¡Gracias! Tu reseña está publicada.",
+  "That comment wasn't found.": "No encontramos ese comentario.",
+  "That photo upload didn't work. Please try again.":
+    "La subida de esa foto no funcionó. Inténtalo de nuevo.",
+  "That plan isn't available right now.":
+    "Ese plan no está disponible por ahora.",
+  "That post wasn't found.": "No encontramos esa publicación.",
+  "That review wasn't found.": "No encontramos esa reseña.",
+  "That video upload didn't work. Please try again.":
+    "La subida de ese video no funcionó. Inténtalo de nuevo.",
+  "The questionnaire is for members.": "El cuestionario es para miembros.",
+  "This coach hasn't finished setting up payments yet.":
+    "Este coach todavía no termina de configurar sus pagos.",
+  "This is your own plan.": "Este es tu propio plan.",
+  "This order was already refunded.": "Este pedido ya fue reembolsado.",
+  "Use 200 characters or fewer for the place.":
+    "Usa 200 caracteres o menos para el lugar.",
+  "Use JPG, PNG or WebP photos.": "Usa fotos JPG, PNG o WebP.",
+  "Use a PDF, EPUB, ZIP, MP3, MP4, PNG or JPG file.":
+    "Usa un archivo PDF, EPUB, ZIP, MP3, MP4, PNG o JPG.",
+  "Use a PNG, JPG or WebP image.": "Usa una imagen PNG, JPG o WebP.",
+  "Visible again.": "Visible de nuevo.",
+  "We couldn't attach your media. Please try again.":
+    "No pudimos adjuntar tus archivos. Inténtalo de nuevo.",
+  "We couldn't block this coach. Please try again.":
+    "No pudimos bloquear a este coach. Inténtalo de nuevo.",
+  "We couldn't dismiss that. Please try again.":
+    "No pudimos descartar eso. Inténtalo de nuevo.",
+  "We couldn't find that item.": "No encontramos ese artículo.",
+  "We couldn't find that order.": "No encontramos ese pedido.",
+  "We couldn't join that coach. Please try again.":
+    "No pudimos unirte a ese coach. Inténtalo de nuevo.",
+  "We couldn't leave that coach. Please try again.":
+    "No pudimos sacarte de ese coach. Inténtalo de nuevo.",
+  "We couldn't post that comment. Please try again.":
+    "No pudimos publicar ese comentario. Inténtalo de nuevo.",
+  "We couldn't post that. Please try again.":
+    "No pudimos publicar eso. Inténtalo de nuevo.",
+  "We couldn't remove that comment. Please try again.":
+    "No pudimos quitar ese comentario. Inténtalo de nuevo.",
+  "We couldn't remove that item. Please try again.":
+    "No pudimos quitar ese artículo. Inténtalo de nuevo.",
+  "We couldn't remove that post. Please try again.":
+    "No pudimos quitar esa publicación. Inténtalo de nuevo.",
+  "We couldn't reset your feed.": "No pudimos restablecer tu feed.",
+  "We couldn't save that item. Please try again.":
+    "No pudimos guardar ese artículo. Inténtalo de nuevo.",
+  "We couldn't save your preferences.": "No pudimos guardar tus preferencias.",
+  "We couldn't save your reply. Please try again.":
+    "No pudimos guardar tu respuesta. Inténtalo de nuevo.",
+  "We couldn't save your review.": "No pudimos guardar tu reseña.",
+  "We couldn't send that report. Please try again.":
+    "No pudimos enviar ese reporte. Inténtalo de nuevo.",
+  "We couldn't send your report. Please try again.":
+    "No pudimos enviar tu reporte. Inténtalo de nuevo.",
+  "We couldn't share that progress photo.":
+    "No pudimos compartir esa foto de progreso.",
+  "We couldn't start checkout. Please try again.":
+    "No pudimos iniciar el pago. Inténtalo de nuevo.",
+  "We couldn't unblock this coach. Please try again.":
+    "No pudimos desbloquear a este coach. Inténtalo de nuevo.",
+  "Write something or add a photo or video":
+    "Escribe algo o agrega una foto o un video.",
+  "You already have a membership with this coach. Manage it in My purchases.":
+    "Ya tienes una membresía con este coach. Adminístrala en Mis compras.",
+  "You blocked this coach. Unblock them to join.":
+    "Bloqueaste a este coach. Desbloquéalo para unirte.",
+  "You can reply to a comment, not to a reply.":
+    "Puedes responder a un comentario, no a una respuesta.",
+  "You can't comment on that post.": "No puedes comentar esa publicación.",
+  "You can't delete that comment.": "No puedes eliminar ese comentario.",
+  "You can't delete that post.": "No puedes eliminar esa publicación.",
+  "You can't edit that comment.": "No puedes editar ese comentario.",
+  "You can't edit that post.": "No puedes editar esa publicación.",
+  "You can't follow that person.": "No puedes seguir a esa persona.",
+  "You can't handle this report.": "No puedes atender este reporte.",
+  "You can't mute that person.": "No puedes silenciar a esa persona.",
+  "You can't post there.": "No puedes publicar ahí.",
+  "You can't remove that post.": "No puedes quitar esa publicación.",
+  "You can't remove this comment.": "No puedes quitar este comentario.",
+  "You can't remove this post.": "No puedes quitar esta publicación.",
+  "You can't report this review.": "No puedes reportar esta reseña.",
+  "You can't review this post.": "No puedes revisar esta publicación.",
+  "You have a paid membership with this coach. Cancel it in My purchases first.":
+    "Tienes una membresía de pago con este coach. Primero cancélala en Mis compras.",
+  "You're commenting a lot. Try again in a few minutes.":
+    "Estás comentando mucho. Inténtalo de nuevo en unos minutos.",
+  "You're posting a lot. Take a breather and try again in a few minutes.":
+    "Estás publicando mucho. Tómate un respiro e inténtalo de nuevo en unos minutos.",
+  "You've sent a lot of reports today. Try again tomorrow.":
+    "Enviaste muchos reportes hoy. Inténtalo de nuevo mañana.",
+  "Remove guarantees about results.": "Quita las garantías sobre resultados.",
+  "Remove medical claims: diagnosing, treating or prescribing is outside fitness coaching.":
+    "Quita las afirmaciones médicas: diagnosticar, tratar o recetar está fuera del coaching de fitness.",
+  "Only mention medical or dietitian titles you hold; GYMX2 will ask for proof.":
+    "Menciona solo títulos médicos o de nutrición que tengas; GYMX2 pedirá comprobante.",
+  "Hidden from public pages.": "Oculto de las páginas públicas.",
+  "A post can have up to 6 photos or one video":
+    "Una publicación puede tener hasta 6 fotos o un video.",
+  "Replies go one level deep, on the same post":
+    "Las respuestas solo tienen un nivel, en la misma publicación.",
+  "Sign in to send messages": "Inicia sesión para enviar mensajes.",
+  "Up to 4 photos per message": "Hasta 4 fotos por mensaje.",
+  "Write a message or add a photo": "Escribe un mensaje o agrega una foto.",
+  "You can only message your coaches and your members":
+    "Solo puedes escribirles a tus coaches y a tus miembros.",
+  "You can't remove this comment": "No puedes quitar este comentario.",
+  "You can't remove this post": "No puedes quitar esta publicación.",
+  "You can't review this post": "No puedes revisar esta publicación.",
+  "Order not found": "No encontramos ese pedido.",
+  "Review not found.": "No encontramos esa reseña.",
+  "Report not found.": "No encontramos ese reporte.",
   // Member screens
   "A session can last up to 24 hours.":
     "Una sesión puede durar hasta 24 horas.",
@@ -346,4 +518,15 @@ export const esServerPatterns: [RegExp, (...parts: string[]) => string][] = [
     () =>
       "Este video todavía se usa en una Tarea. Primero elimina esa Tarea y vuelve a intentarlo.",
   ],
+  [
+    /^Up to (\d+) photos per (message|post)\.$/,
+    (n, kind) =>
+      `Hasta ${n} fotos por ${kind === "post" ? "publicación" : "mensaje"}.`,
+  ],
+  [/^Renews (.+)$/, (date) => `Se renueva el ${date}`],
+  [/^Ends (.+)$/, (date) => `Termina el ${date}`],
+  [/^Free trial until (.+)$/, (date) => `Prueba gratis hasta el ${date}`],
+  [/^Free trial, ends (.+)$/, (date) => `Prueba gratis, termina el ${date}`],
+  [/^Shipped · Tracking (.+)$/, (code) => `Enviado · Rastreo ${code}`],
+  [/^(.+)'s community$/, (name) => `Comunidad de ${name}`],
 ];

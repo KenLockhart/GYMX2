@@ -1,10 +1,14 @@
 "use client";
 
-import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
+import {
+  EmbeddedCheckout,
+  EmbeddedCheckoutProvider,
+} from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { startTransition, useActionState, useState } from "react";
 import { buyArmoryItem } from "@/app/(app)/armory/payments";
 import type { CheckoutState } from "@/lib/types";
+import { T, useTr } from "@/i18n/t";
 
 // Stripe.js is loaded once per page, the first time someone opens checkout.
 let stripePromise: Promise<Stripe | null> | null = null;
@@ -25,10 +29,17 @@ export function BuyPanel({
   buttonLabel: string;
   publishableKey: string;
 }) {
-  const [state, formAction, pending] = useActionState<CheckoutState, FormData>(buyArmoryItem, {});
+  const tr = useTr();
+  const [state, formAction, pending] = useActionState<CheckoutState, FormData>(
+    buyArmoryItem,
+    {},
+  );
   // Each checkout gets its own key, so closing and buying again starts fresh.
   const [closedSecret, setClosedSecret] = useState<string | null>(null);
-  const clientSecret = state.clientSecret && state.clientSecret !== closedSecret ? state.clientSecret : null;
+  const clientSecret =
+    state.clientSecret && state.clientSecret !== closedSecret
+      ? state.clientSecret
+      : null;
 
   if (clientSecret && publishableKey) {
     return (
@@ -42,8 +53,12 @@ export function BuyPanel({
             <EmbeddedCheckout />
           </EmbeddedCheckoutProvider>
         </div>
-        <button type="button" onClick={() => setClosedSecret(clientSecret)} className="text-link text-sm">
-          Cancel checkout
+        <button
+          type="button"
+          onClick={() => setClosedSecret(clientSecret)}
+          className="text-link text-sm"
+        >
+          <T>Cancel checkout</T>
         </button>
       </div>
     );
@@ -61,10 +76,12 @@ export function BuyPanel({
       <input type="hidden" name="item_id" value={itemId} />
       {sizes.length > 0 && (
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Size</span>
+          <span className="text-sm font-medium">
+            <T>Size</T>
+          </span>
           <select name="size" required defaultValue="" className="field-input">
             <option value="" disabled>
-              Choose a size
+              <T>Choose a size</T>
             </option>
             {sizes.map((size) => (
               <option key={size} value={size}>
@@ -75,7 +92,7 @@ export function BuyPanel({
         </label>
       )}
       <button type="submit" disabled={pending} className="btn-primary">
-        {pending ? "Opening checkout..." : buttonLabel}
+        {pending ? tr("Opening checkout...") : buttonLabel}
       </button>
       {state.error && (
         <p role="alert" className="text-sm text-danger">

@@ -1,5 +1,7 @@
 "use client";
 
+import { useTr } from "@/i18n/t";
+
 import { useState, useTransition } from "react";
 import { setFollow, setMute } from "@/app/(app)/community/preferences/actions";
 
@@ -14,6 +16,7 @@ export function PeopleList({
   people: { id: string; name: string }[];
   action: "unfollow" | "unmute";
 }) {
+  const tr = useTr();
   const [people, setPeople] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -51,7 +54,7 @@ export function PeopleList({
                 disabled={pending}
                 className="btn-secondary px-3 py-1.5 text-sm"
               >
-                {action === "unfollow" ? "Unfollow" : "Unmute"}
+                {action === "unfollow" ? tr("Unfollow") : tr("Unmute")}
               </button>
             </li>
           ))}
@@ -59,7 +62,7 @@ export function PeopleList({
       )}
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
     </section>

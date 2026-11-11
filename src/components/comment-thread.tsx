@@ -10,6 +10,7 @@ import {
 } from "@/app/(app)/community/actions";
 import { COMMENT_MAX, timeAgo, type CommentDTO } from "@/lib/community";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import { T, useTr } from "@/i18n/t";
 
 type Row = {
   id: string;
@@ -35,6 +36,7 @@ function CommentBox({
   onAdded: (comment: CommentDTO) => void;
   autoFocus?: boolean;
 }) {
+  const tr = useTr();
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -47,7 +49,7 @@ function CommentBox({
         start(async () => {
           const result = await addComment({ postId, parentId, body });
           if (result.error || !result.comment)
-            return setError(result.error ?? "That didn't post.");
+            return setError(result.error ?? tr("That didn't post."));
           setBody("");
           onAdded(result.comment);
         });
@@ -72,12 +74,12 @@ function CommentBox({
           disabled={pending || !body.trim()}
           className="btn-primary px-3"
         >
-          {pending ? "..." : parentId ? "Reply" : "Comment"}
+          {pending ? "..." : parentId ? tr("Reply") : tr("Comment")}
         </button>
       </div>
       {error && (
         <p role="alert" className="text-xs text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
     </form>
@@ -97,6 +99,7 @@ function CommentItem({
   onRemove: (id: string) => void;
   onReply?: () => void;
 }) {
+  const tr = useTr();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(comment.body);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +111,7 @@ function CommentItem({
           <span className="font-semibold">{comment.author.name}</span>
           {comment.author.role === "coach" && (
             <span className="rounded bg-accent px-1 text-[10px] font-bold uppercase text-accent-foreground">
-              Coach
+              <T>Coach</T>
             </span>
           )}
           <span className="text-xs text-muted">
@@ -119,7 +122,7 @@ function CommentItem({
         {editing ? (
           <div className="mt-1 flex gap-2">
             <label className="sr-only" htmlFor={`edit-comment-${comment.id}`}>
-              Edit comment
+              <T>Edit comment</T>
             </label>
             <input
               id={`edit-comment-${comment.id}`}
@@ -145,7 +148,7 @@ function CommentItem({
               }
               className="btn-primary px-3 py-1.5 text-sm"
             >
-              Save
+              <T>Save</T>
             </button>
           </div>
         ) : (
@@ -159,7 +162,7 @@ function CommentItem({
             onClick={onReply}
             className="cursor-pointer hover:text-foreground"
           >
-            Reply
+            <T>Reply</T>
           </button>
         )}
         {comment.mine && !editing && (
@@ -169,13 +172,13 @@ function CommentItem({
               onClick={() => setEditing(true)}
               className="cursor-pointer hover:text-foreground"
             >
-              Edit
+              <T>Edit</T>
             </button>
             <button
               type="button"
               disabled={pending}
               onClick={() => {
-                if (!window.confirm("Delete this comment?")) return;
+                if (!window.confirm(tr("Delete this comment?"))) return;
                 start(async () => {
                   const result = await deleteComment(comment.id);
                   if (result.error) return setError(result.error);
@@ -184,17 +187,17 @@ function CommentItem({
               }}
               className="cursor-pointer hover:text-danger"
             >
-              Delete
+              <T>Delete</T>
             </button>
           </>
         )}
         {!comment.mine && (
           <ReportButton
             commentId={comment.id}
-            label={`comment by ${comment.author.name}`}
+            label={tr("comment by {name}", { name: comment.author.name })}
           />
         )}
-        {error && <span className="text-danger">{error}</span>}
+        {error && <span className="text-danger">{tr(error)}</span>}
       </div>
       {replies}
     </li>
@@ -208,6 +211,7 @@ export function CommentThread({
   postId: string;
   initialComments: CommentDTO[];
 }) {
+  const tr = useTr();
   const [comments, setComments] = useState(initialComments);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
@@ -284,17 +288,17 @@ export function CommentThread({
       className="scroll-mt-24 space-y-4 rounded-lg border border-border bg-surface p-4"
     >
       <h2 id="comments-heading" className="text-xl">
-        Comments
+        <T>Comments</T>
       </h2>
       <CommentBox
         postId={postId}
         parentId={null}
-        placeholder="Add a comment"
+        placeholder={tr("Add a comment")}
         onAdded={upsert}
       />
       {topLevel.length === 0 ? (
         <p className="text-sm text-muted">
-          No comments yet. Start the conversation.
+          <T>No comments yet. Start the conversation.</T>
         </p>
       ) : (
         <ul className="space-y-4">
@@ -327,7 +331,9 @@ export function CommentThread({
                           <CommentBox
                             postId={postId}
                             parentId={comment.id}
-                            placeholder={`Reply to ${comment.author.name}`}
+                            placeholder={tr("Reply to {name}", {
+                              name: comment.author.name,
+                            })}
                             autoFocus
                             onAdded={(reply) => {
                               upsert(reply);

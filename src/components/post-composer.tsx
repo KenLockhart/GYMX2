@@ -14,6 +14,7 @@ import {
   type PostKind,
 } from "@/lib/community";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import { T, useTr } from "@/i18n/t";
 
 type Community = { id: string; name: string };
 
@@ -59,6 +60,7 @@ export function PostComposer({
   // A Track progress photo being shared.
   progressPhoto?: { id: string; url: string } | null;
 }) {
+  const tr = useTr();
   const router = useRouter();
   const photoInput = useRef<HTMLInputElement>(null);
   const videoInput = useRef<HTMLInputElement>(null);
@@ -82,12 +84,14 @@ export function PostComposer({
     setError(null);
     const files = [...(list ?? [])];
     if (photos.length + files.length > MAX_POST_PHOTOS)
-      return setError(`Up to ${MAX_POST_PHOTOS} photos per post.`);
+      return setError(
+        tr("Up to {MAX_POST_PHOTOS} photos per post.", { MAX_POST_PHOTOS }),
+      );
     for (const file of files) {
       if (!(extensionOf(file.name) in PHOTO_TYPES))
-        return setError("Use JPG, PNG or WebP photos.");
+        return setError(tr("Use JPG, PNG or WebP photos."));
       if (file.size > MAX_PHOTO_BYTES)
-        return setError("Each photo can be up to 10 MB.");
+        return setError(tr("Each photo can be up to 10 MB."));
     }
     setVideo(null);
     setPhotos([
@@ -101,9 +105,9 @@ export function PostComposer({
     const file = list?.[0];
     if (!file) return;
     if (!file.type.startsWith("video/"))
-      return setError("Choose a video file.");
+      return setError(tr("Choose a video file."));
     if (file.size > MAX_VIDEO_BYTES)
-      return setError("Videos can be up to 1 GB and 10 minutes.");
+      return setError(tr("Videos can be up to 1 GB and 10 minutes."));
     photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
     setPhotos([]);
     setVideo(file);
@@ -114,7 +118,7 @@ export function PostComposer({
       photos.map(({ file }) => ({ name: file.name, size: file.size })),
     );
     if (!prepared.uploads)
-      throw new Error(prepared.error ?? "We couldn't start the upload.");
+      throw new Error(prepared.error ?? tr("We couldn't start the upload."));
     const storage = createBrowserSupabase().storage.from("community-media");
     const done = [];
     for (const [index, { file }] of photos.entries()) {
@@ -149,7 +153,9 @@ export function PostComposer({
         onError: () =>
           reject(
             new Error(
-              "The video upload stopped. Check your connection and try again.",
+              tr(
+                "The video upload stopped. Check your connection and try again.",
+              ),
             ),
           ),
         onSuccess: () => {
@@ -159,7 +165,9 @@ export function PostComposer({
           else
             reject(
               new Error(
-                "The video uploaded but couldn't be attached. Please try again.",
+                tr(
+                  "The video uploaded but couldn't be attached. Please try again.",
+                ),
               ),
             );
         },
@@ -172,7 +180,7 @@ export function PostComposer({
     event.preventDefault();
     if (busy) return;
     if (!body.trim() && photos.length === 0 && !video && !shared)
-      return setError("Write something or add a photo or video.");
+      return setError(tr("Write something or add a photo or video."));
     setError(null);
     setProgress(0);
     try {
@@ -200,7 +208,7 @@ export function PostComposer({
       setError(
         failure instanceof Error
           ? failure.message
-          : "We couldn't post that. Please try again.",
+          : tr("We couldn't post that. Please try again."),
       );
     } finally {
       setProgress(null);
@@ -215,7 +223,7 @@ export function PostComposer({
       className="space-y-3 rounded-lg border border-border bg-surface p-4"
     >
       <label htmlFor="post-body" className="sr-only">
-        Write a post
+        <T>Write a post</T>
       </label>
       <textarea
         id="post-body"
@@ -224,7 +232,9 @@ export function PostComposer({
         value={body}
         onChange={(event) => setBody(event.target.value)}
         disabled={busy}
-        placeholder="Share a workout, a win or something that's motivating you..."
+        placeholder={tr(
+          "Share a workout, a win or something that's motivating you...",
+        )}
         className="field-input"
       />
 
@@ -233,12 +243,14 @@ export function PostComposer({
           {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage link */}
           <img
             src={shared.url}
-            alt="Progress photo to share"
+            alt={tr("Progress photo to share")}
             className="size-20 rounded object-cover"
           />
           <span className="text-muted">
-            Your progress photo. A copy is shared; the original stays private in
-            Track.
+            <T>
+              Your progress photo. A copy is shared; the original stays private
+              in Track.
+            </T>
           </span>
           <button
             type="button"
@@ -246,14 +258,16 @@ export function PostComposer({
             disabled={busy}
             className="cursor-pointer text-muted hover:text-danger"
           >
-            Remove
+            <T>Remove</T>
           </button>
         </div>
       )}
       {kind === "progress" && (
         <p className="text-xs text-muted">
-          Progress posts start as Only me. Choose your coach community or
-          Everyone if you want to share it.
+          <T>
+            Progress posts start as Only me. Choose your coach community or
+            Everyone if you want to share it.
+          </T>
         </p>
       )}
 
@@ -264,7 +278,7 @@ export function PostComposer({
               {/* eslint-disable-next-line @next/next/no-img-element -- a local preview */}
               <img
                 src={photo.preview}
-                alt={`Photo ${index + 1}`}
+                alt={tr("Photo {p0}", { p0: index + 1 })}
                 className="size-20 rounded object-cover"
               />
               <button
@@ -274,7 +288,7 @@ export function PostComposer({
                   setPhotos(photos.filter((item) => item !== photo));
                 }}
                 disabled={busy}
-                aria-label={`Remove photo ${index + 1}`}
+                aria-label={tr("Remove photo {p0}", { p0: index + 1 })}
                 className="absolute -right-1 -top-1 grid size-6 cursor-pointer place-items-center rounded-full bg-background text-xs shadow"
               >
                 ×
@@ -292,7 +306,7 @@ export function PostComposer({
             disabled={busy}
             className="cursor-pointer text-muted hover:text-danger"
           >
-            Remove
+            <T>Remove</T>
           </button>
         </p>
       )}
@@ -325,7 +339,7 @@ export function PostComposer({
           disabled={busy || photos.length >= MAX_POST_PHOTOS}
           className="btn-secondary px-3 py-2 text-sm"
         >
-          Add photos
+          <T>Add photos</T>
         </button>
         <button
           type="button"
@@ -333,10 +347,10 @@ export function PostComposer({
           disabled={busy}
           className="btn-secondary px-3 py-2 text-sm"
         >
-          Add video
+          <T>Add video</T>
         </button>
         <select
-          aria-label="Post type"
+          aria-label={tr("Post type")}
           value={kind}
           onChange={(event) => {
             const next = event.target.value as PostKind;
@@ -349,12 +363,12 @@ export function PostComposer({
         >
           {kinds.map((item) => (
             <option key={item.value} value={item.value}>
-              {item.label}
+              <T>{item.label}</T>
             </option>
           ))}
         </select>
         <select
-          aria-label="Who can see this"
+          aria-label={tr("Who can see this")}
           value={audience === "coach_community" ? `coach:${coachId}` : audience}
           onChange={(event) => {
             const value = event.target.value;
@@ -366,22 +380,30 @@ export function PostComposer({
           disabled={busy}
           className="field-input w-auto py-2 text-sm"
         >
-          <option value="everyone">Everyone on GYMX2</option>
+          <option value="everyone">
+            <T>Everyone on GYMX2</T>
+          </option>
           {communities.map((community) => (
             <option key={community.id} value={`coach:${community.id}`}>
               {role === "coach"
-                ? "My community"
+                ? tr("My community")
                 : `${community.name}'s community`}
             </option>
           ))}
-          <option value="only_me">Only me</option>
+          <option value="only_me">
+            <T>Only me</T>
+          </option>
         </select>
         <button
           type="submit"
           disabled={busy}
           className="btn-primary ml-auto px-4 py-2 text-sm"
         >
-          {busy ? (progress ? `Uploading ${progress}%` : "Posting...") : "Post"}
+          {busy
+            ? progress
+              ? tr("Uploading {progress}%", { progress })
+              : tr("Posting...")
+            : tr("Post")}
         </button>
       </div>
       {busy && progress !== null && (photos.length > 0 || video) && (
@@ -400,12 +422,14 @@ export function PostComposer({
       )}
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
       <p className="text-xs text-muted">
-        Up to 6 photos (10 MB each) or one video (10 minutes, 1 GB). Be kind;
-        posts can be reported.
+        <T>
+          Up to 6 photos (10 MB each) or one video (10 minutes, 1 GB). Be kind;
+          posts can be reported.
+        </T>
       </p>
     </form>
   );

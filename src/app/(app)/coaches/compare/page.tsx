@@ -5,8 +5,12 @@ import { requireAccount } from "@/lib/auth";
 import { loadDiscoveryCards } from "@/lib/discovery-server";
 import { loadOpenSlots } from "@/lib/intros-server";
 import { idSchema } from "@/lib/validation";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Compare coaches" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Compare coaches") };
+}
 
 export default async function ComparePage({
   searchParams,
@@ -34,13 +38,17 @@ export default async function ComparePage({
   if (cards.length < 2)
     return (
       <div className="space-y-4">
-        <h1 className="text-5xl">Compare coaches</h1>
+        <h1 className="text-5xl">
+          <T>Compare coaches</T>
+        </h1>
         <p className="text-muted">
-          Tick &ldquo;Compare&rdquo; on two or three coaches, then choose
-          Compare.
+          <T>
+            Tick &ldquo;Compare&rdquo; on two or three coaches, then choose
+            Compare.
+          </T>
         </p>
         <Link href="/coaches" className="btn-primary">
-          Browse coaches
+          <T>Browse coaches</T>
         </Link>
       </div>
     );
@@ -49,12 +57,16 @@ export default async function ComparePage({
     <div className="space-y-6">
       <div>
         <Link href="/coaches" className="text-link text-sm">
-          Back to coaches
+          <T>Back to coaches</T>
         </Link>
-        <h1 className="mt-2 text-5xl">Compare coaches</h1>
+        <h1 className="mt-2 text-5xl">
+          <T>Compare coaches</T>
+        </h1>
         <p className="mt-2 max-w-xl text-muted">
-          The best value in each row is highlighted. Everything here comes from
-          each coach&apos;s approved profile.
+          <T>
+            The best value in each row is highlighted. Everything here comes
+            from each coach&apos;s approved profile.
+          </T>
         </p>
       </div>
       <CompareTable cards={cards} nextIntro={nextIntro} isMember={isMember} />

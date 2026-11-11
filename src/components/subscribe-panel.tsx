@@ -8,6 +8,7 @@ import { startTransition, useActionState, useState } from "react";
 import { subscribeToPlan } from "@/app/(app)/plans/actions";
 import { getStripeJs } from "@/components/buy-panel";
 import type { CheckoutState } from "@/lib/types";
+import { T, useTr } from "@/i18n/t";
 
 // The Subscribe button for one plan, and Stripe's checkout shown on the page once it's pressed.
 export function SubscribePanel({
@@ -19,6 +20,7 @@ export function SubscribePanel({
   buttonLabel: string;
   publishableKey: string;
 }) {
+  const tr = useTr();
   const [state, formAction, pending] = useActionState<CheckoutState, FormData>(
     subscribeToPlan,
     {},
@@ -46,7 +48,7 @@ export function SubscribePanel({
           onClick={() => setClosedSecret(clientSecret)}
           className="text-link text-sm"
         >
-          Cancel checkout
+          <T>Cancel checkout</T>
         </button>
       </div>
     );
@@ -63,7 +65,7 @@ export function SubscribePanel({
     >
       <input type="hidden" name="plan_id" value={planId} />
       <button type="submit" disabled={pending} className="btn-primary w-full">
-        {pending ? "Opening checkout..." : buttonLabel}
+        {pending ? tr("Opening checkout...") : buttonLabel}
       </button>
       {state.error && (
         <p role="alert" className="text-sm text-danger">

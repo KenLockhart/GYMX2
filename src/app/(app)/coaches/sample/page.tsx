@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CoachProfile } from "@/components/coach-profile/coach-profile-view";
 import { requireAccount } from "@/lib/auth";
 import { SAMPLE_COACH } from "@/lib/coach-sample";
+import { getTr } from "@/i18n/server";
 
 export const metadata: Metadata = {
   title: "Sample coach profile",
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 // Coach Jasmine: the labeled design sample for coach profiles. Not a real coach, never in search
 // results, and booking and saving are switched off.
 export default async function SampleCoachPage() {
+  const tr = await getTr();
   const { profile } = await requireAccount();
   return (
     <div className="space-y-4">
@@ -19,7 +21,9 @@ export default async function SampleCoachPage() {
         href={profile.role === "member" ? "/coaches" : "/dashboard"}
         className="text-link text-sm"
       >
-        {profile.role === "member" ? "Back to coaches" : "Back to dashboard"}
+        {profile.role === "member"
+          ? tr("Back to coaches")
+          : tr("Back to dashboard")}
       </Link>
       <CoachProfile profile={SAMPLE_COACH} />
     </div>

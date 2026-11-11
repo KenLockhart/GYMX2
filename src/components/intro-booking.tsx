@@ -8,6 +8,9 @@ import { LocalDateTime } from "@/components/coach-profile/profile-client";
 import { timeLabel, useLocalZone } from "@/components/intro-times";
 import { INTRO_FORMAT_LABEL, type OpenSlot, slotsByDay } from "@/lib/intros";
 import type { MemberIntro } from "@/lib/intros-server";
+import { T, useTr } from "@/i18n/t";
+import { LOCALE_TAG } from "@/i18n/config";
+import { useLocale } from "@/i18n/client";
 
 export function IntroBooking({
   coach,
@@ -20,9 +23,11 @@ export function IntroBooking({
   existing: MemberIntro | null;
   canBook: boolean;
 }) {
+  const locale = useLocale();
+  const tr = useTr();
   const router = useRouter();
   const zone = useLocalZone();
-  const days = slotsByDay(slots, zone);
+  const days = slotsByDay(slots, zone, locale);
   const [dayKey, setDayKey] = useState(days[0]?.key ?? "");
   const [slotId, setSlotId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -36,29 +41,37 @@ export function IntroBooking({
     return (
       <div className="space-y-4 rounded-2xl border border-accent/60 bg-surface p-5">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent">
-          {past ? "Your intro" : "You're booked"}
+          {past ? tr("Your intro") : tr("You're booked")}
         </p>
         <p className="font-display text-3xl font-bold uppercase leading-tight">
           <LocalDateTime iso={existing.startsAt} />
         </p>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-muted">Length</dt>
+            <dt className="text-muted">
+              <T>Length</T>
+            </dt>
             <dd>{existing.minutes} minutes</dd>
           </div>
           <div>
-            <dt className="text-muted">How</dt>
+            <dt className="text-muted">
+              <T>How</T>
+            </dt>
             <dd>{INTRO_FORMAT_LABEL[existing.format]}</dd>
           </div>
           {existing.location && (
             <div className="sm:col-span-2">
-              <dt className="text-muted">Where</dt>
+              <dt className="text-muted">
+                <T>Where</T>
+              </dt>
               <dd>{existing.location}</dd>
             </div>
           )}
           {existing.meetingUrl && (
             <div className="sm:col-span-2">
-              <dt className="text-muted">Video link</dt>
+              <dt className="text-muted">
+                <T>Video link</T>
+              </dt>
               <dd>
                 <a
                   href={existing.meetingUrl}
@@ -73,7 +86,9 @@ export function IntroBooking({
           )}
           {existing.message && (
             <div className="sm:col-span-2">
-              <dt className="text-muted">Your message</dt>
+              <dt className="text-muted">
+                <T>Your message</T>
+              </dt>
               <dd className="whitespace-pre-line">{existing.message}</dd>
             </div>
           )}
@@ -83,14 +98,14 @@ export function IntroBooking({
             You&apos;ve had your free intro with {coach.firstName}. Ready to
             start?{" "}
             <Link href={`/coaches/${coach.id}`} className="text-link">
-              See plans
+              <T>See plans</T>
             </Link>
           </p>
         ) : (
           <>
             {error && (
               <p role="alert" className="text-sm text-danger">
-                {error}
+                {tr(error)}
               </p>
             )}
             <div className="flex flex-wrap gap-2">
@@ -99,14 +114,20 @@ export function IntroBooking({
                   href={`/calendar/${existing.sessionId}`}
                   className="btn-primary"
                 >
-                  Open in your calendar
+                  <T>Open in your calendar</T>
                 </Link>
               )}
               <button
                 type="button"
                 disabled={pending}
                 onClick={() => {
-                  if (!window.confirm(`Cancel your intro with ${coach.name}?`))
+                  if (
+                    !window.confirm(
+                      tr("Cancel your intro with {name}?", {
+                        name: coach.name,
+                      }),
+                    )
+                  )
                     return;
                   setError(null);
                   start(async () => {
@@ -117,7 +138,7 @@ export function IntroBooking({
                 }}
                 className="btn-secondary"
               >
-                {pending ? "Cancelling..." : "Cancel intro"}
+                {pending ? tr("Cancelling...") : tr("Cancel intro")}
               </button>
             </div>
           </>
@@ -131,9 +152,9 @@ export function IntroBooking({
       <p className="rounded-2xl border border-border bg-surface p-6 text-muted">
         {coach.firstName} has no open intro times right now. Save them from{" "}
         <Link href="/coaches" className="text-link">
-          the coaches page
+          <T>the coaches page</T>
         </Link>{" "}
-        and check back soon.
+        <T>and check back soon.</T>
       </p>
     );
 
@@ -142,7 +163,7 @@ export function IntroBooking({
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!chosen) return setError("Pick a time first.");
+        if (!chosen) return setError(tr("Pick a time first."));
         setError(null);
         start(async () => {
           const result = await bookIntro(chosen.id, message);
@@ -155,7 +176,9 @@ export function IntroBooking({
       }}
     >
       <fieldset className="space-y-3">
-        <legend className="text-lg font-semibold">1. Pick a day</legend>
+        <legend className="text-lg font-semibold">
+          <T>1. Pick a day</T>
+        </legend>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
           {days.map((d) => (
             <button
@@ -179,7 +202,9 @@ export function IntroBooking({
 
       {day && (
         <fieldset className="space-y-3">
-          <legend className="text-lg font-semibold">2. Pick a time</legend>
+          <legend className="text-lg font-semibold">
+            <T>2. Pick a time</T>
+          </legend>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {day.slots.map((slot) => (
               <label
@@ -195,7 +220,7 @@ export function IntroBooking({
                   className="sr-only"
                 />
                 <span className="block font-semibold tabular-nums">
-                  {timeLabel(slot.startsAt, zone)}
+                  {timeLabel(slot.startsAt, zone, locale)}
                 </span>
                 <span className="block text-xs text-muted">
                   {slot.minutes} min · {INTRO_FORMAT_LABEL[slot.format]}
@@ -216,7 +241,9 @@ export function IntroBooking({
       )}
 
       <label className="block space-y-2">
-        <span className="text-lg font-semibold">3. Say hello (optional)</span>
+        <span className="text-lg font-semibold">
+          <T>3. Say hello (optional)</T>
+        </span>
         <span className="block text-sm text-muted">
           One message for {coach.firstName}: your goal, your schedule, anything
           they should know. They&apos;ll see it with the booking.
@@ -227,7 +254,9 @@ export function IntroBooking({
           rows={4}
           maxLength={1000}
           className="field-input"
-          placeholder={`Hi ${coach.firstName}, I'd like to…`}
+          placeholder={tr("Hi {firstName}, I'd like to…", {
+            firstName: coach.firstName,
+          })}
         />
         <span className="block text-right text-xs text-muted">
           {message.length}/1000
@@ -236,7 +265,7 @@ export function IntroBooking({
 
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
       {canBook ? (
@@ -247,18 +276,29 @@ export function IntroBooking({
             className="btn-primary"
           >
             {pending
-              ? "Booking..."
+              ? tr("Booking...")
               : chosen
-                ? `Book ${timeLabel(chosen.startsAt, zone)} on ${new Date(chosen.startsAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: zone })}`
-                : "Pick a time to book"}
+                ? tr("Book {time} on {date}", {
+                    time: timeLabel(chosen.startsAt, zone, locale),
+                    date: new Date(chosen.startsAt).toLocaleDateString(
+                      LOCALE_TAG[locale],
+                      {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        timeZone: zone,
+                      },
+                    ),
+                  })
+                : tr("Pick a time to book")}
           </button>
           <p className="text-xs text-muted">
-            Free. It doesn&apos;t start a membership.
+            <T>Free. It doesn&apos;t start a membership.</T>
           </p>
         </div>
       ) : (
         <p className="text-sm text-muted">
-          Only members can book intros. This is how they see your times.
+          <T>Only members can book intros. This is how they see your times.</T>
         </p>
       )}
     </form>

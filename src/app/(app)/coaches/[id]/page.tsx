@@ -18,8 +18,12 @@ import { isStripeTestMode, stripePublishableKey } from "@/lib/stripe";
 import { CoachProfile as RichProfile } from "@/components/coach-profile/coach-profile-view";
 import { loadPublishedView } from "@/lib/coach-profile-server";
 import { CoachSafetyLinks, ReportReviewButton } from "@/components/safety";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Coach" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Coach") };
+}
 
 type CoachProfile = Pick<
   Profile,
@@ -48,6 +52,7 @@ export default async function CoachPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const tr = await getTr();
   const { profile } = await requireAccount();
   const { id } = await params;
   if (!idSchema.safeParse(id).success) notFound();
@@ -171,9 +176,11 @@ export default async function CoachPage({
       role="status"
       className="rounded-lg border border-border bg-surface p-4 text-sm"
     >
-      You blocked {coach.display_name}. They can&apos;t be joined or booked and
-      don&apos;t show in your coach search. They aren&apos;t told. Unblock at
-      the bottom of this page.
+      <T vars={{ name: coach.display_name }}>
+        {
+          "You blocked {name}. They can't be joined or booked and don't show in your coach search. They aren't told. Unblock at the bottom of this page."
+        }
+      </T>
     </p>
   ) : null;
 
@@ -185,18 +192,18 @@ export default async function CoachPage({
     const actions =
       profile.id === coach.id ? (
         <Link href="/profile/coach" className="btn-secondary">
-          Edit your profile
+          <T>Edit your profile</T>
         </Link>
       ) : isMember && !blocked ? (
         <div className="flex flex-wrap items-start gap-2">
           {isJoined && (
             <Link href={`/messages/${coach.id}`} className="btn-primary">
-              Message
+              <T>Message</T>
             </Link>
           )}
           {!isJoined && !canJoinFree && (
             <a href="#pricing" className="btn-primary">
-              See plans
+              <T>See plans</T>
             </a>
           )}
           {(isJoined || canJoinFree) && (
@@ -204,21 +211,24 @@ export default async function CoachPage({
               action={isJoined ? leaveCoach : joinCoach}
               confirmMessage={
                 isJoined
-                  ? `Leave ${coach.display_name}? Your unfinished Tasks and upcoming sessions with them will be removed.`
+                  ? tr(
+                      "Leave {display_name}? Your unfinished Tasks and upcoming sessions with them will be removed.",
+                      { display_name: coach.display_name },
+                    )
                   : undefined
               }
               className="space-y-2"
             >
               <input type="hidden" name="coach_id" value={coach.id} />
               <SubmitButton
-                pendingText={isJoined ? "Leaving..." : "Joining..."}
+                pendingText={isJoined ? tr("Leaving...") : tr("Joining...")}
                 className={isJoined ? "btn-secondary" : "btn-primary"}
               >
                 {isJoined
-                  ? "Leave"
+                  ? tr("Leave")
                   : canJoinFree && showPlans
-                    ? "Join free"
-                    : "Join"}
+                    ? tr("Join free")
+                    : tr("Join")}
               </SubmitButton>
               <FormStatus />
             </ActionForm>
@@ -229,7 +239,7 @@ export default async function CoachPage({
       <div className="space-y-6">
         {isMember && (
           <Link href="/coaches" className="text-link text-sm">
-            Back to coaches
+            <T>Back to coaches</T>
           </Link>
         )}
         {blockedNotice}
@@ -241,7 +251,7 @@ export default async function CoachPage({
             You&apos;re in! Welcome to {membership.plan_name}. Manage your
             membership any time in{" "}
             <Link href="/armory/purchases" className="text-link">
-              My purchases
+              <T>My purchases</T>
             </Link>
             .
           </p>
@@ -255,24 +265,29 @@ export default async function CoachPage({
           pricingExtra={
             !blocked && showPlans && (plans.length > 0 || membership) ? (
               <section className="space-y-3">
-                <h3 className="text-xl font-semibold">Join a membership</h3>
+                <h3 className="text-xl font-semibold">
+                  <T>Join a membership</T>
+                </h3>
                 {membership ? (
                   <p className="max-w-2xl rounded-lg border border-accent bg-surface p-4 text-sm">
-                    You&apos;re on{" "}
+                    <T>You&apos;re on</T>{" "}
                     <span className="font-semibold">
                       {membership.plan_name}
                     </span>{" "}
-                    · {membershipStatusLabel(membership)} ·{" "}
+                    · <T>{membershipStatusLabel(membership)}</T> ·{" "}
                     <Link href="/armory/purchases" className="text-link">
-                      Manage
+                      <T>Manage</T>
                     </Link>
                   </p>
                 ) : (
                   <>
                     {coach.join_mode === "paid" && (
                       <p className="text-sm text-muted">
-                        {coach.display_name} coaches subscribers only. Pick a
-                        plan to join.
+                        <T vars={{ name: coach.display_name }}>
+                          {
+                            "{name} coaches subscribers only. Pick a plan to join."
+                          }
+                        </T>
                       </p>
                     )}
                     <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -286,7 +301,7 @@ export default async function CoachPage({
                             <p className="mt-1 text-3xl font-bold">
                               {formatMoney(plan.price_cents)}
                               <span className="text-base font-normal text-muted">
-                                /month
+                                <T>/month</T>
                               </span>
                             </p>
                             {plan.trial_days > 0 && (
@@ -305,23 +320,25 @@ export default async function CoachPage({
                               planId={plan.id}
                               buttonLabel={
                                 plan.trial_days > 0
-                                  ? "Start free trial"
-                                  : "Subscribe"
+                                  ? tr("Start free trial")
+                                  : tr("Subscribe")
                               }
                               publishableKey={stripePublishableKey()}
                             />
                           ) : (
                             <p className="text-xs text-muted">
-                              Members can subscribe here.
+                              <T>Members can subscribe here.</T>
                             </p>
                           )}
                         </li>
                       ))}
                     </ul>
                     <p className="text-xs text-muted">
-                      Billed monthly by Stripe. Cancel any time from My
-                      purchases; you keep access until the end of the month
-                      you&apos;ve paid for.
+                      <T>
+                        Billed monthly by Stripe. Cancel any time from My
+                        purchases; you keep access until the end of the month
+                        you&apos;ve paid for.
+                      </T>
                       {isStripeTestMode() &&
                         " Test mode: use card 4242 4242 4242 4242."}
                     </p>
@@ -351,14 +368,14 @@ export default async function CoachPage({
             <p className="text-muted">
               {profile.id === coach.id ? (
                 <>
-                  You haven&apos;t added any links yet.{" "}
+                  <T>You haven&apos;t added any links yet.</T>{" "}
                   <Link href="/profile" className="text-link">
-                    Add them on your profile
+                    <T>Add them on your profile</T>
                   </Link>
                   .
                 </>
               ) : (
-                "No links added yet."
+                tr("No links added yet.")
               )}
             </p>
           ) : (
@@ -371,7 +388,7 @@ export default async function CoachPage({
                     rel="noopener noreferrer nofollow"
                     className="btn-secondary px-4 py-2 text-sm"
                   >
-                    {link.label}
+                    <T>{link.label}</T>
                   </a>
                 </li>
               ))}
@@ -386,14 +403,14 @@ export default async function CoachPage({
     <div className="space-y-6">
       {isMember && (
         <Link href="/coaches" className="text-link text-sm">
-          Back to coaches
+          <T>Back to coaches</T>
         </Link>
       )}
       {blockedNotice}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-accent">
-            Coach
+            <T>Coach</T>
           </p>
           <h1 className="mt-1 text-5xl">{coach.display_name}</h1>
           <div className="mt-3">
@@ -409,7 +426,7 @@ export default async function CoachPage({
           <div className="flex shrink-0 flex-wrap items-start gap-2">
             {isJoined && (
               <Link href={`/messages/${coach.id}`} className="btn-primary">
-                Message
+                <T>Message</T>
               </Link>
             )}
             {(isJoined || canJoinFree) && (
@@ -417,21 +434,24 @@ export default async function CoachPage({
                 action={isJoined ? leaveCoach : joinCoach}
                 confirmMessage={
                   isJoined
-                    ? `Leave ${coach.display_name}? Your unfinished Tasks and upcoming sessions with them will be removed.`
+                    ? tr(
+                        "Leave {display_name}? Your unfinished Tasks and upcoming sessions with them will be removed.",
+                        { display_name: coach.display_name },
+                      )
                     : undefined
                 }
                 className="space-y-2"
               >
                 <input type="hidden" name="coach_id" value={coach.id} />
                 <SubmitButton
-                  pendingText={isJoined ? "Leaving..." : "Joining..."}
+                  pendingText={isJoined ? tr("Leaving...") : tr("Joining...")}
                   className={isJoined ? "btn-secondary" : "btn-primary"}
                 >
                   {isJoined
-                    ? "Leave"
+                    ? tr("Leave")
                     : canJoinFree && showPlans
-                      ? "Join free"
-                      : "Join"}
+                      ? tr("Join free")
+                      : tr("Join")}
                 </SubmitButton>
                 <FormStatus />
               </ActionForm>
@@ -448,7 +468,7 @@ export default async function CoachPage({
           You&apos;re in! Welcome to {membership.plan_name}. Manage your
           membership any time in{" "}
           <Link href="/armory/purchases" className="text-link">
-            My purchases
+            <T>My purchases</T>
           </Link>
           .
         </p>
@@ -456,14 +476,16 @@ export default async function CoachPage({
 
       {showPlans && (plans.length > 0 || membership) && (
         <section className="space-y-3">
-          <h2 className="text-2xl">Memberships</h2>
+          <h2 className="text-2xl">
+            <T>Memberships</T>
+          </h2>
           {membership ? (
             <p className="max-w-2xl rounded-lg border border-accent bg-surface p-4 text-sm">
-              You&apos;re on{" "}
+              <T>You&apos;re on</T>{" "}
               <span className="font-semibold">{membership.plan_name}</span> ·{" "}
-              {membershipStatusLabel(membership)} ·{" "}
+              <T>{membershipStatusLabel(membership)}</T> ·{" "}
               <Link href="/armory/purchases" className="text-link">
-                Manage
+                <T>Manage</T>
               </Link>
             </p>
           ) : (
@@ -485,7 +507,7 @@ export default async function CoachPage({
                       <p className="mt-1 text-3xl font-bold">
                         {formatMoney(plan.price_cents)}
                         <span className="text-base font-normal text-muted">
-                          /month
+                          <T>/month</T>
                         </span>
                       </p>
                       {plan.trial_days > 0 && (
@@ -503,21 +525,26 @@ export default async function CoachPage({
                       <SubscribePanel
                         planId={plan.id}
                         buttonLabel={
-                          plan.trial_days > 0 ? "Start free trial" : "Subscribe"
+                          plan.trial_days > 0
+                            ? tr("Start free trial")
+                            : tr("Subscribe")
                         }
                         publishableKey={stripePublishableKey()}
                       />
                     ) : (
                       <p className="text-xs text-muted">
-                        Members can subscribe here.
+                        <T>Members can subscribe here.</T>
                       </p>
                     )}
                   </li>
                 ))}
               </ul>
               <p className="text-xs text-muted">
-                Billed monthly by Stripe. Cancel any time from My purchases; you
-                keep access until the end of the month you&apos;ve paid for.
+                <T>
+                  Billed monthly by Stripe. Cancel any time from My purchases;
+                  you keep access until the end of the month you&apos;ve paid
+                  for.
+                </T>
                 {isStripeTestMode() &&
                   " Test mode: use card 4242 4242 4242 4242."}
               </p>
@@ -543,14 +570,14 @@ export default async function CoachPage({
           <p className="text-muted">
             {profile.id === coach.id ? (
               <>
-                You haven&apos;t added any links yet.{" "}
+                <T>You haven&apos;t added any links yet.</T>{" "}
                 <Link href="/profile" className="text-link">
-                  Add them on your profile
+                  <T>Add them on your profile</T>
                 </Link>
                 .
               </>
             ) : (
-              "No links added yet."
+              tr("No links added yet.")
             )}
           </p>
         ) : (
@@ -563,7 +590,7 @@ export default async function CoachPage({
                   rel="noopener noreferrer nofollow"
                   className="btn-secondary px-4 py-2 text-sm"
                 >
-                  {link.label}
+                  <T>{link.label}</T>
                 </a>
               </li>
             ))}

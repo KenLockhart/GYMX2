@@ -9,6 +9,7 @@ import {
   QUESTIONS,
   type QuestionKey,
 } from "@/lib/match-questions";
+import { T, useTr } from "@/i18n/t";
 
 type Option = { value: string; label: string; hint?: string };
 
@@ -21,6 +22,7 @@ export function MatchQuiz({
   initial: MatchAnswers;
   firstName: string;
 }) {
+  const tr = useTr();
   const router = useRouter();
   const [answers, setAnswers] = useState<MatchAnswers>(initial);
   // -1 is the welcome screen; QUESTIONS.length is the review screen.
@@ -52,7 +54,7 @@ export function MatchQuiz({
           ? current
           : [...current, value];
       if (!current.includes(value) && current.length >= max)
-        setError(`Pick up to ${max}.`);
+        setError(tr("Pick up to {max}.", { max }));
       setAnswers({ ...answers, [key]: next });
       return;
     }
@@ -90,16 +92,20 @@ export function MatchQuiz({
         <div className="flex items-center justify-between text-sm text-muted">
           <span>
             {index < 0
-              ? "About 2 minutes"
+              ? tr("About 2 minutes")
               : index < total
-                ? `Question ${index + 1} of ${total}`
-                : "Review"}
+                ? tr("Question {p0} of {total}", { p0: index + 1, total })
+                : tr("Review")}
           </span>
-          {question && !question.core && <span>Optional</span>}
+          {question && !question.core && (
+            <span>
+              <T>Optional</T>
+            </span>
+          )}
         </div>
         <div
           role="progressbar"
-          aria-label="Questionnaire progress"
+          aria-label={tr("Questionnaire progress")}
           aria-valuenow={progress}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -115,30 +121,38 @@ export function MatchQuiz({
       {index < 0 && (
         <section className="space-y-5 rounded-3xl border border-border bg-surface p-6 sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-widest text-accent">
-            Find your coach match
+            <T>Find your coach match</T>
           </p>
           <h1
             ref={heading}
             tabIndex={-1}
             className="text-4xl leading-none outline-none [overflow-wrap:anywhere] sm:text-5xl"
           >
-            Hey {firstName}, let&apos;s find your kind of coach
+            <T vars={{ firstName }}>
+              {"Hey {firstName}, let's find your kind of coach"}
+            </T>
           </h1>
           <p className="text-muted">
-            A few quick questions about how you like to train. We&apos;ll use
-            them to show how well each coach fits you. Skip anything you like,
-            and change your answers any time.
+            <T>
+              A few quick questions about how you like to train. We&apos;ll use
+              them to show how well each coach fits you. Skip anything you like,
+              and change your answers any time.
+            </T>
           </p>
           <ul className="space-y-1.5 text-sm text-muted">
-            <li>• Your answers are private. Coaches never see them.</li>
-            <li>• Match scores are a guide, not a promise of results.</li>
+            <li>
+              <T>• Your answers are private. Coaches never see them.</T>
+            </li>
+            <li>
+              <T>• Match scores are a guide, not a promise of results.</T>
+            </li>
           </ul>
           <button
             type="button"
             onClick={() => go(0)}
             className="btn-primary w-full sm:w-auto"
           >
-            Let&apos;s go
+            <T>Let&apos;s go</T>
           </button>
         </section>
       )}
@@ -156,7 +170,7 @@ export function MatchQuiz({
               tabIndex={-1}
               className="text-3xl leading-tight outline-none [overflow-wrap:anywhere] sm:text-5xl"
             >
-              {question.title}
+              <T>{question.title}</T>
             </h1>
             {"subtitle" in question && question.subtitle && (
               <p className="text-muted">{question.subtitle}</p>
@@ -205,12 +219,14 @@ export function MatchQuiz({
                     {selected ? "✓" : ""}
                   </span>
                   <span>
-                    <span className="block font-semibold">{option.label}</span>
+                    <span className="block font-semibold">
+                      <T>{option.label}</T>
+                    </span>
                     {option.hint && (
                       <span
                         className={`block text-sm ${selected ? "text-accent-foreground/80" : "text-muted"}`}
                       >
-                        {option.hint}
+                        <T>{option.hint}</T>
                       </span>
                     )}
                   </span>
@@ -220,7 +236,7 @@ export function MatchQuiz({
           </div>
           {error && (
             <p role="alert" className="text-sm text-danger">
-              {error}
+              {tr(error)}
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -229,7 +245,7 @@ export function MatchQuiz({
               onClick={() => go(index - 1)}
               className="btn-secondary"
             >
-              Back
+              <T>Back</T>
             </button>
             <div className="flex gap-2">
               <button
@@ -237,14 +253,14 @@ export function MatchQuiz({
                 onClick={() => skip(question.key)}
                 className="px-3 text-sm text-muted hover:text-foreground"
               >
-                Skip
+                <T>Skip</T>
               </button>
               <button
                 type="button"
                 onClick={() => go(index + 1)}
                 className="btn-primary"
               >
-                Next
+                <T>Next</T>
               </button>
             </div>
           </div>
@@ -258,7 +274,7 @@ export function MatchQuiz({
             tabIndex={-1}
             className="text-4xl leading-none outline-none [overflow-wrap:anywhere] sm:text-5xl"
           >
-            Look right?
+            <T>Look right?</T>
           </h1>
           <dl className="divide-y divide-border">
             {QUESTIONS.map((q, i) => {
@@ -269,9 +285,11 @@ export function MatchQuiz({
                   className="flex items-start justify-between gap-4 py-3"
                 >
                   <div className="min-w-0">
-                    <dt className="text-sm text-muted">{q.title}</dt>
+                    <dt className="text-sm text-muted">
+                      <T>{q.title}</T>
+                    </dt>
                     <dd className={label ? "font-semibold" : "text-muted"}>
-                      {label ?? "Skipped"}
+                      {label ?? tr("Skipped")}
                     </dd>
                   </div>
                   <button
@@ -279,7 +297,7 @@ export function MatchQuiz({
                     onClick={() => go(i)}
                     className="shrink-0 text-sm text-accent hover:underline"
                   >
-                    Change
+                    <T>Change</T>
                   </button>
                 </div>
               );
@@ -287,7 +305,7 @@ export function MatchQuiz({
           </dl>
           {error && (
             <p role="alert" className="text-sm text-danger">
-              {error}
+              {tr(error)}
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -297,14 +315,14 @@ export function MatchQuiz({
               disabled={pending}
               className="btn-primary"
             >
-              {pending ? "Saving..." : "Save my answers"}
+              {pending ? tr("Saving...") : tr("Save my answers")}
             </button>
             <button
               type="button"
               onClick={() => go(total - 1)}
               className="btn-secondary"
             >
-              Back
+              <T>Back</T>
             </button>
           </div>
         </section>

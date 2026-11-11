@@ -24,8 +24,10 @@ import {
   timeAgo,
   type PostDTO,
 } from "@/lib/community";
+import { T, useTr } from "@/i18n/t";
 
 function PhotoGrid({ photos }: { photos: PostDTO["photos"] }) {
+  const tr = useTr();
   if (photos.length === 0) return null;
   const single = photos.length === 1;
   return (
@@ -43,7 +45,10 @@ function PhotoGrid({ photos }: { photos: PostDTO["photos"] }) {
           {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage links */}
           <img
             src={photo.url}
-            alt={`Photo ${index + 1} of ${photos.length}`}
+            alt={tr("Photo {p0} of {length}", {
+              p0: index + 1,
+              length: photos.length,
+            })}
             width={photo.width ?? undefined}
             height={photo.height ?? undefined}
             loading="lazy"
@@ -56,12 +61,13 @@ function PhotoGrid({ photos }: { photos: PostDTO["photos"] }) {
 }
 
 function Video({ video }: { video: NonNullable<PostDTO["video"]> }) {
+  const tr = useTr();
   if (video.status !== "ready" || !video.url) {
     return (
       <p className="rounded-lg bg-surface-raised p-6 text-center text-sm text-muted">
         {video.status === "failed"
-          ? "This video couldn't be processed."
-          : "The video is still processing. Check back in a minute."}
+          ? tr("This video couldn't be processed.")
+          : tr("The video is still processing. Check back in a minute.")}
       </p>
     );
   }
@@ -69,7 +75,7 @@ function Video({ video }: { video: NonNullable<PostDTO["video"]> }) {
     <div className="relative aspect-video overflow-hidden rounded-lg bg-black">
       <iframe
         src={video.url}
-        title="Post video"
+        title={tr("Post video")}
         loading="lazy"
         allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
         allowFullScreen
@@ -96,6 +102,7 @@ export function PostCard({
   onDismissChange?: (postId: string, dismissed: boolean) => void;
   linkToPost?: boolean;
 }) {
+  const tr = useTr();
   const router = useRouter();
   const [post, setPost] = useState(initial);
   const [dismissed, setDismissed] = useState<"hidden" | "muted" | null>(null);
@@ -122,7 +129,7 @@ export function PostCard({
           likedByMe: wasLiked,
           likeCount: initial.likeCount,
         }));
-        setError(result.error ?? "That didn't work.");
+        setError(result.error ?? tr("That didn't work."));
         return;
       }
       setPost((current) => ({
@@ -166,8 +173,10 @@ export function PostCard({
       <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface p-4 text-sm text-muted">
         <span>
           {dismissed === "hidden"
-            ? "Post hidden. You won't see it in your feed."
-            : `You muted ${post.author.name}. Their posts won't show in your feed.`}
+            ? tr("Post hidden. You won't see it in your feed.")
+            : tr("You muted {name}. Their posts won't show in your feed.", {
+                name: post.author.name,
+              })}
         </span>
         <button
           type="button"
@@ -175,7 +184,7 @@ export function PostCard({
           disabled={pending}
           className="shrink-0 cursor-pointer font-semibold text-foreground hover:text-accent"
         >
-          Undo
+          <T>Undo</T>
         </button>
       </div>
     );
@@ -183,7 +192,9 @@ export function PostCard({
 
   function moderate() {
     const reason = window.prompt(
-      "Remove this post from your community? Add a short reason for the author (optional).",
+      tr(
+        "Remove this post from your community? Add a short reason for the author (optional).",
+      ),
     );
     if (reason === null) return;
     setError(null);
@@ -207,7 +218,9 @@ export function PostCard({
   function remove() {
     if (
       !window.confirm(
-        "Delete this post for everyone? Its photos and video are deleted too.",
+        tr(
+          "Delete this post for everyone? Its photos and video are deleted too.",
+        ),
       )
     )
       return;
@@ -221,7 +234,10 @@ export function PostCard({
   return (
     <article
       className={`space-y-3 rounded-lg border bg-surface p-4 ${announcement ? "border-accent" : "border-border"}`}
-      aria-label={`${kindLabel(post.kind)} by ${post.author.name}`}
+      aria-label={tr("{p0} by {name}", {
+        p0: kindLabel(post.kind),
+        name: post.author.name,
+      })}
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -235,16 +251,16 @@ export function PostCard({
                 aria-pressed={post.followingAuthor}
                 className={`cursor-pointer text-xs font-semibold hover:text-foreground ${post.followingAuthor ? "text-muted" : "text-accent"}`}
               >
-                {post.followingAuthor ? "Following" : "Follow"}
+                {post.followingAuthor ? tr("Following") : tr("Follow")}
               </button>
             )}
             {post.author.role === "coach" && (
               <span className="rounded bg-accent px-1.5 text-[10px] font-bold uppercase text-accent-foreground">
-                Coach
+                <T>Coach</T>
               </span>
             )}
             <span className="rounded border border-border px-1.5 text-xs text-muted">
-              {kindLabel(post.kind)}
+              <T>{kindLabel(post.kind)}</T>
             </span>
             <PillarTag pillar={post.pillar} />
           </p>
@@ -265,7 +281,7 @@ export function PostCard({
                 href={`/groups/${post.coach.id}`}
                 className="hover:underline"
               >
-                {audienceLabel(post)}
+                <T>{audienceLabel(post)}</T>
               </Link>
             ) : (
               audienceLabel(post)
@@ -281,7 +297,7 @@ export function PostCard({
               disabled={pending}
               className="cursor-pointer text-muted hover:text-foreground"
             >
-              Hide
+              <T>Hide</T>
             </button>
             {post.canRemove && (
               <button
@@ -290,17 +306,17 @@ export function PostCard({
                 disabled={pending}
                 className="cursor-pointer text-muted hover:text-danger"
               >
-                Remove
+                <T>Remove</T>
               </button>
             )}
             <button
               type="button"
               onClick={() => dismiss("muted")}
               disabled={pending}
-              aria-label={`Mute ${post.author.name}`}
+              aria-label={tr("Mute {name}", { name: post.author.name })}
               className="cursor-pointer text-muted hover:text-foreground"
             >
-              Mute
+              <T>Mute</T>
             </button>
           </div>
         )}
@@ -311,7 +327,7 @@ export function PostCard({
               onClick={() => setEditing(true)}
               className="cursor-pointer text-muted hover:text-foreground"
             >
-              Edit
+              <T>Edit</T>
             </button>
             <button
               type="button"
@@ -319,7 +335,7 @@ export function PostCard({
               disabled={pending}
               className="cursor-pointer text-muted hover:text-danger"
             >
-              Delete
+              <T>Delete</T>
             </button>
           </div>
         )}
@@ -328,7 +344,7 @@ export function PostCard({
       {editing ? (
         <div className="space-y-2">
           <label className="sr-only" htmlFor={`edit-${post.id}`}>
-            Edit post
+            <T>Edit post</T>
           </label>
           <textarea
             id={`edit-${post.id}`}
@@ -342,7 +358,7 @@ export function PostCard({
           />
           <div className="flex flex-wrap items-center gap-2">
             <select
-              aria-label="Post type"
+              aria-label={tr("Post type")}
               value={draft.kind}
               onChange={(event) =>
                 setDraft({
@@ -354,7 +370,7 @@ export function PostCard({
             >
               {kindsFor(viewerRole).map((kind) => (
                 <option key={kind.value} value={kind.value}>
-                  {kind.label}
+                  <T>{kind.label}</T>
                 </option>
               ))}
             </select>
@@ -364,7 +380,7 @@ export function PostCard({
               disabled={pending}
               className="btn-primary px-3 py-2 text-sm"
             >
-              {pending ? "Saving..." : "Save"}
+              {pending ? tr("Saving...") : tr("Save")}
             </button>
             <button
               type="button"
@@ -374,7 +390,7 @@ export function PostCard({
               }}
               className="btn-secondary px-3 py-2 text-sm"
             >
-              Cancel
+              <T>Cancel</T>
             </button>
           </div>
         </div>
@@ -395,7 +411,7 @@ export function PostCard({
           aria-pressed={post.likedByMe}
           className={`cursor-pointer font-semibold hover:text-foreground ${post.likedByMe ? "text-accent" : ""}`}
         >
-          {post.likedByMe ? "♥ Liked" : "♡ Like"}
+          {post.likedByMe ? tr("♥ Liked") : tr("♡ Like")}
           <span className="ml-1.5 font-normal text-muted">
             {post.likeCount}
           </span>
@@ -405,14 +421,14 @@ export function PostCard({
             href={`/community/post/${post.id}#comments`}
             className="font-semibold hover:text-foreground"
           >
-            Comment
+            <T>Comment</T>
             <span className="ml-1.5 font-normal text-muted">
               {post.commentCount}
             </span>
           </Link>
         ) : (
           <a href="#comments" className="font-semibold hover:text-foreground">
-            Comment
+            <T>Comment</T>
             <span className="ml-1.5 font-normal text-muted">
               {post.commentCount}
             </span>
@@ -422,14 +438,14 @@ export function PostCard({
           <span className="ml-auto">
             <ReportButton
               postId={post.id}
-              label={`post by ${post.author.name}`}
+              label={tr("post by {name}", { name: post.author.name })}
             />
           </span>
         )}
       </footer>
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
     </article>

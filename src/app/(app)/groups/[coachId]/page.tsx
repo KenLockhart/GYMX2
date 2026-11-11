@@ -10,8 +10,12 @@ import { loadGroupRoster, type GroupPost } from "@/lib/groups";
 import { describeFlags, detectFlags } from "@/lib/message-flags";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Coach community" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Coach community") };
+}
 
 // One coach's community: posts (announcements, challenges and member posts) and the group chat.
 export default async function CoachCommunityPage({
@@ -21,6 +25,7 @@ export default async function CoachCommunityPage({
   params: Promise<{ coachId: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
+  const tr = await getTr();
   const { profile } = await requireAccount();
   const { coachId } = await params;
   const { tab: requested } = await searchParams;
@@ -34,13 +39,15 @@ export default async function CoachCommunityPage({
   if (!inGroup && !isAdmin) notFound();
   const tab = requested === "chat" ? "chat" : "posts";
 
-  const title = isCoach ? "Your community" : `${roster.coachName}'s community`;
+  const title = isCoach
+    ? tr("Your community")
+    : `${roster.coachName}'s community`;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       {!isCoach && (
         <Link href="/groups" className="text-link text-sm">
-          All coach communities
+          <T>All coach communities</T>
         </Link>
       )}
       <div>
@@ -48,15 +55,19 @@ export default async function CoachCommunityPage({
         <p className="mt-2 text-muted">
           {roster.memberCount} {roster.memberCount === 1 ? "member" : "members"}
           {isCoach
-            ? " · Everyone who joins you is in here. You can remove any post or chat message."
+            ? tr(
+                " · Everyone who joins you is in here. You can remove any post or chat message.",
+              )
             : isAdmin
-              ? " · You can read this community but not post."
-              : " · Only you, your coach and their members see what's posted here."}
+              ? tr(" · You can read this community but not post.")
+              : tr(
+                  " · Only you, your coach and their members see what's posted here.",
+                )}
         </p>
       </div>
 
       <nav
-        aria-label="Community sections"
+        aria-label={tr("Community sections")}
         className="flex gap-1 border-b border-border"
       >
         {(
@@ -79,7 +90,7 @@ export default async function CoachCommunityPage({
                 : "border-transparent text-muted hover:text-foreground"
             }`}
           >
-            {item.label}
+            <T>{item.label}</T>
           </Link>
         ))}
       </nav>
@@ -115,6 +126,7 @@ async function PostsTab({
   coachName: string;
   canPost: boolean;
 }) {
+  const tr = await getTr();
   // Row security still decides every post; this only narrows the feed to this community.
   const feed = await loadFeed(viewer.id, 0, coachId);
   const isCoach = viewer.id === coachId;
@@ -133,7 +145,7 @@ async function PostsTab({
           role="alert"
           className="rounded-lg border border-danger bg-surface p-4 text-sm"
         >
-          We couldn&apos;t load the posts. Refresh to try again.
+          <T>We couldn&apos;t load the posts. Refresh to try again.</T>
         </p>
       ) : (
         <FeedList
@@ -143,8 +155,10 @@ async function PostsTab({
           coachId={coachId}
           emptyText={
             isCoach
-              ? "Nothing here yet. Post an announcement or a challenge to get your members going."
-              : "No posts yet. Share a workout or a win with the group."
+              ? tr(
+                  "Nothing here yet. Post an announcement or a challenge to get your members going.",
+                )
+              : tr("No posts yet. Share a workout or a win with the group.")
           }
         />
       )}

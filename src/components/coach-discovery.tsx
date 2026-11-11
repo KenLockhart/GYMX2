@@ -15,6 +15,7 @@ import {
   NO_FILTERS,
   sortCoaches,
 } from "@/lib/discovery";
+import { T, useTr } from "@/i18n/t";
 
 type Tab = "all" | "saved" | "passed" | "blocked";
 
@@ -25,13 +26,14 @@ function Portrait({
   card: CoachCard;
   className?: string;
 }) {
+  const tr = useTr();
   return (
     <div className={`relative overflow-hidden bg-surface-raised ${className}`}>
       {card.photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage link
         <img
           src={card.photoUrl}
-          alt={`Portrait of ${card.name}`}
+          alt={tr("Portrait of {name}", { name: card.name })}
           className="size-full object-cover object-top"
         />
       ) : (
@@ -57,12 +59,12 @@ function Portrait({
         )}
         {card.match && !card.match.eligible && (
           <span className="rounded-full bg-background/85 px-2 py-0.5 text-xs text-muted">
-            Not a match now
+            <T>Not a match now</T>
           </span>
         )}
         {!card.acceptingClients && card.hasProfile && (
           <span className="rounded-full bg-background/85 px-2 py-0.5 text-xs text-muted">
-            Waitlist
+            <T>Waitlist</T>
           </span>
         )}
       </div>
@@ -71,6 +73,7 @@ function Portrait({
 }
 
 function Facts({ card }: { card: CoachCard }) {
+  const tr = useTr();
   return (
     <div className="space-y-1.5">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -92,7 +95,7 @@ function Facts({ card }: { card: CoachCard }) {
             >
               <path d="M9 12.5l2 2 4-4.5M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
             </svg>
-            Verified
+            <T>Verified</T>
           </span>
         )}
       </p>
@@ -103,10 +106,10 @@ function Facts({ card }: { card: CoachCard }) {
         {[
           card.location,
           card.formats.includes("online") && card.formats.includes("in_person")
-            ? "Online & in-person"
+            ? tr("Online & in-person")
             : card.formats.includes("in_person")
-              ? "In-person"
-              : "Online",
+              ? tr("In-person")
+              : tr("Online"),
         ]
           .filter(Boolean)
           .join(" • ")}
@@ -121,7 +124,9 @@ function Facts({ card }: { card: CoachCard }) {
             <span className="text-muted">({card.rating.count})</span>
           </span>
         ) : (
-          <span className="text-muted">No reviews yet</span>
+          <span className="text-muted">
+            <T>No reviews yet</T>
+          </span>
         )}
         {card.experienceYears !== null && (
           <span>{card.experienceYears} yrs</span>
@@ -136,7 +141,9 @@ function Facts({ card }: { card: CoachCard }) {
         </p>
       )}
       {!card.hasProfile && (
-        <p className="text-xs text-muted">Full profile coming soon</p>
+        <p className="text-xs text-muted">
+          <T>Full profile coming soon</T>
+        </p>
       )}
     </div>
   );
@@ -149,6 +156,7 @@ export function CoachDiscovery({
   cards: CoachCard[];
   canSave: boolean;
 }) {
+  const tr = useTr();
   const [cards, setCards] = useState(initial);
   const [filters, setFilters] = useState<DiscoveryFilters>(NO_FILTERS);
   const [sort, setSort] = useState<DiscoverySort>("match");
@@ -238,7 +246,7 @@ export function CoachDiscovery({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           role="tablist"
-          aria-label="Which coaches"
+          aria-label={tr("Which coaches")}
           className="flex gap-1 rounded-full border border-border p-1"
         >
           {(["all", "saved", "passed", "blocked"] as const)
@@ -256,19 +264,19 @@ export function CoachDiscovery({
                 className={`rounded-full px-3 py-1.5 text-sm ${tab === t ? "bg-accent font-semibold text-accent-foreground" : "text-muted hover:text-foreground"}`}
               >
                 {t === "all"
-                  ? "Coaches"
+                  ? tr("Coaches")
                   : t === "saved"
-                    ? "Saved"
+                    ? tr("Saved")
                     : t === "passed"
-                      ? "Passed"
-                      : "Blocked"}{" "}
+                      ? tr("Passed")
+                      : tr("Blocked")}{" "}
                 ({counts[t]})
               </button>
             ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="sr-only" htmlFor="sort">
-            Sort
+            <T>Sort</T>
           </label>
           <select
             id="sort"
@@ -276,15 +284,25 @@ export function CoachDiscovery({
             onChange={(e) => setSort(e.target.value as DiscoverySort)}
             className="field-input w-auto py-2 text-sm"
           >
-            <option value="match">Best match</option>
-            <option value="rating">Top rated</option>
-            <option value="price">Lowest price</option>
-            <option value="experience">Most experience</option>
-            <option value="name">Name</option>
+            <option value="match">
+              <T>Best match</T>
+            </option>
+            <option value="rating">
+              <T>Top rated</T>
+            </option>
+            <option value="price">
+              <T>Lowest price</T>
+            </option>
+            <option value="experience">
+              <T>Most experience</T>
+            </option>
+            <option value="name">
+              <T>Name</T>
+            </option>
           </select>
           <div
             role="group"
-            aria-label="View"
+            aria-label={tr("View")}
             className="flex rounded-md border border-border"
           >
             {(["grid", "stack"] as const).map((v) => (
@@ -295,7 +313,7 @@ export function CoachDiscovery({
                 onClick={() => setView(v)}
                 className={`px-3 py-2 text-sm ${view === v ? "bg-surface-raised font-semibold" : "text-muted"}`}
               >
-                {v === "grid" ? "Grid" : "One at a time"}
+                {v === "grid" ? tr("Grid") : tr("One at a time")}
               </button>
             ))}
           </div>
@@ -307,7 +325,7 @@ export function CoachDiscovery({
         open={count > 0}
       >
         <summary className="cursor-pointer select-none px-4 py-3 font-semibold">
-          Filters
+          <T>Filters</T>
           {count > 0 && (
             <span className="ml-2 rounded-full bg-accent px-2 text-xs text-accent-foreground">
               {count}
@@ -319,7 +337,7 @@ export function CoachDiscovery({
 
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
       <p className="text-sm text-muted" aria-live="polite">
@@ -329,14 +347,16 @@ export function CoachDiscovery({
       {shown.length === 0 ? (
         <p className="rounded-2xl border border-border bg-surface p-6 text-center text-muted">
           {tab === "saved"
-            ? "Save coaches you like to compare them later."
+            ? tr("Save coaches you like to compare them later.")
             : tab === "blocked"
-              ? "You haven't blocked anyone."
+              ? tr("You haven't blocked anyone.")
               : tab === "passed"
-                ? "Coaches you pass on show here, so you can change your mind."
+                ? tr(
+                    "Coaches you pass on show here, so you can change your mind.",
+                  )
                 : count > 0
-                  ? "No coaches match those filters. Try removing one."
-                  : "No coaches yet."}
+                  ? tr("No coaches match those filters. Try removing one.")
+                  : tr("No coaches yet.")}
         </p>
       ) : view === "stack" && tab !== "blocked" ? (
         <Stack cards={shown} canSave={canSave} onFlag={flag} />
@@ -362,21 +382,21 @@ export function CoachDiscovery({
                     onChange={() => toggleCompare(card.id)}
                     className="accent-[var(--accent)]"
                   />
-                  Compare
+                  <T>Compare</T>
                 </label>
                 <div className="mt-auto flex flex-wrap gap-2 pt-1">
                   <Link
                     href={`/coaches/${card.id}`}
                     className="btn-primary flex-1 px-3 py-2 text-sm"
                   >
-                    View profile
+                    <T>View profile</T>
                   </Link>
                   {card.joined && (
                     <Link
                       href={`/messages/${card.id}`}
                       className="btn-secondary px-3 py-2 text-sm"
                     >
-                      Message
+                      <T>Message</T>
                     </Link>
                   )}
                   {card.blocked && (
@@ -385,7 +405,7 @@ export function CoachDiscovery({
                       onClick={() => unblock(card.id)}
                       className="btn-secondary px-3 py-2 text-sm"
                     >
-                      Unblock
+                      <T>Unblock</T>
                     </button>
                   )}
                   {canSave && !card.blocked && (
@@ -395,25 +415,25 @@ export function CoachDiscovery({
                         aria-pressed={card.saved}
                         aria-label={
                           card.saved
-                            ? `Unsave ${card.name}`
-                            : `Save ${card.name}`
+                            ? tr("Unsave {name}", { name: card.name })
+                            : tr("Save {name}", { name: card.name })
                         }
                         onClick={() => flag(card.id, "saved", !card.saved)}
                         className={`btn-secondary px-3 py-2 text-sm ${card.saved ? "border-accent text-accent" : ""}`}
                       >
-                        {card.saved ? "Saved" : "Save"}
+                        {card.saved ? tr("Saved") : tr("Save")}
                       </button>
                       <button
                         type="button"
                         aria-label={
                           card.passed
-                            ? `Bring back ${card.name}`
-                            : `Pass on ${card.name}`
+                            ? tr("Bring back {name}", { name: card.name })
+                            : tr("Pass on {name}", { name: card.name })
                         }
                         onClick={() => flag(card.id, "passed", !card.passed)}
                         className="px-2 text-sm text-muted hover:text-foreground"
                       >
-                        {card.passed ? "Undo pass" : "Pass"}
+                        {card.passed ? tr("Undo pass") : tr("Pass")}
                       </button>
                     </>
                   )}
@@ -427,7 +447,7 @@ export function CoachDiscovery({
       {compare.length > 0 && (
         <div
           role="region"
-          aria-label="Compare coaches"
+          aria-label={tr("Compare coaches")}
           className="sticky bottom-3 z-20 mx-auto flex max-w-xl flex-wrap items-center gap-3 rounded-2xl border border-accent/60 bg-background/95 px-4 py-3 shadow-xl backdrop-blur"
         >
           <p className="min-w-0 flex-1 truncate text-sm">
@@ -446,17 +466,19 @@ export function CoachDiscovery({
             onClick={() => setCompare([])}
             className="text-sm text-muted hover:text-foreground"
           >
-            Clear
+            <T>Clear</T>
           </button>
           {compare.length >= 2 ? (
             <Link
               href={`/coaches/compare?ids=${compare.join(",")}`}
               className="btn-primary px-4 py-2 text-sm"
             >
-              Compare
+              <T>Compare</T>
             </Link>
           ) : (
-            <span className="text-xs text-muted">Pick one more</span>
+            <span className="text-xs text-muted">
+              <T>Pick one more</T>
+            </span>
           )}
         </div>
       )}
@@ -475,6 +497,7 @@ function Stack({
   canSave: boolean;
   onFlag: (id: string, kind: "saved" | "passed", on: boolean) => void;
 }) {
+  const tr = useTr();
   const [index, setIndex] = useState(0);
   const [drag, setDrag] = useState(0);
   const startX = useRef<number | null>(null);
@@ -493,13 +516,15 @@ function Stack({
   if (done || !card)
     return (
       <div className="rounded-2xl border border-border bg-surface p-6 text-center">
-        <p className="font-semibold">That&apos;s everyone for now.</p>
+        <p className="font-semibold">
+          <T>That&apos;s everyone for now.</T>
+        </p>
         <button
           type="button"
           onClick={() => setIndex(0)}
           className="btn-secondary mt-3"
         >
-          Start over
+          <T>Start over</T>
         </button>
       </div>
     );
@@ -514,7 +539,12 @@ function Stack({
     >
       <article
         tabIndex={0}
-        aria-label={`${card.name}. ${index + 1} of ${cards.length}. ${canSave ? "Left arrow passes, right arrow saves." : ""}`}
+        aria-label={tr("{name}. {p1} of {length}. {p3}", {
+          name: card.name,
+          p1: index + 1,
+          length: cards.length,
+          p3: canSave ? tr("Left arrow passes, right arrow saves.") : "",
+        })}
         onPointerDown={(e) => {
           startX.current = e.clientX;
         }}
@@ -551,12 +581,16 @@ function Stack({
           type="button"
           onClick={() => next(canSave ? "pass" : "skip")}
           className="btn-secondary size-14 rounded-full p-0"
-          aria-label={canSave ? `Pass on ${card.name}` : "Next coach"}
+          aria-label={
+            canSave
+              ? tr("Pass on {name}", { name: card.name })
+              : tr("Next coach")
+          }
         >
           ✕
         </button>
         <Link href={`/coaches/${card.id}`} className="btn-primary px-5">
-          View profile
+          <T>View profile</T>
         </Link>
         <button
           type="button"
@@ -565,9 +599,9 @@ function Stack({
           aria-label={
             canSave
               ? card.saved
-                ? `${card.name} is saved. Next coach`
-                : `Save ${card.name}`
-              : "Next coach"
+                ? tr("{name} is saved. Next coach", { name: card.name })
+                : tr("Save {name}", { name: card.name })
+              : tr("Next coach")
           }
         >
           ♥
@@ -584,31 +618,38 @@ function Filters({
   filters: DiscoveryFilters;
   onChange: (f: DiscoveryFilters) => void;
 }) {
+  const tr = useTr();
   const set = (change: Partial<DiscoveryFilters>) =>
     onChange({ ...filters, ...change });
   return (
     <div className="space-y-4 border-t border-border p-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Search</span>
+          <span className="font-semibold">
+            <T>Search</T>
+          </span>
           <input
             value={filters.search}
             onChange={(e) => set({ search: e.target.value })}
-            placeholder="Name, specialty or city"
+            placeholder={tr("Name, specialty or city")}
             className="field-input"
           />
         </label>
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Location</span>
+          <span className="font-semibold">
+            <T>Location</T>
+          </span>
           <input
             value={filters.location}
             onChange={(e) => set({ location: e.target.value })}
-            placeholder="Atlanta"
+            placeholder={tr("Atlanta")}
             className="field-input"
           />
         </label>
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Training format</span>
+          <span className="font-semibold">
+            <T>Training format</T>
+          </span>
           <select
             value={filters.format}
             onChange={(e) =>
@@ -616,13 +657,21 @@ function Filters({
             }
             className="field-input"
           >
-            <option value="any">Any</option>
-            <option value="online">Online</option>
-            <option value="in_person">In person</option>
+            <option value="any">
+              <T>Any</T>
+            </option>
+            <option value="online">
+              <T>Online</T>
+            </option>
+            <option value="in_person">
+              <T>In person</T>
+            </option>
           </select>
         </label>
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Monthly price up to</span>
+          <span className="font-semibold">
+            <T>Monthly price up to</T>
+          </span>
           <select
             value={filters.maxPrice ?? ""}
             onChange={(e) =>
@@ -630,14 +679,18 @@ function Filters({
             }
             className="field-input"
           >
-            <option value="">Any price</option>
+            <option value="">
+              <T>Any price</T>
+            </option>
             <option value="7500">$75</option>
             <option value="15000">$150</option>
             <option value="25000">$250</option>
           </select>
         </label>
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Experience</span>
+          <span className="font-semibold">
+            <T>Experience</T>
+          </span>
           <select
             value={filters.minYears ?? ""}
             onChange={(e) =>
@@ -645,14 +698,24 @@ function Filters({
             }
             className="field-input"
           >
-            <option value="">Any</option>
-            <option value="2">2+ years</option>
-            <option value="5">5+ years</option>
-            <option value="10">10+ years</option>
+            <option value="">
+              <T>Any</T>
+            </option>
+            <option value="2">
+              <T>2+ years</T>
+            </option>
+            <option value="5">
+              <T>5+ years</T>
+            </option>
+            <option value="10">
+              <T>10+ years</T>
+            </option>
           </select>
         </label>
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Rating</span>
+          <span className="font-semibold">
+            <T>Rating</T>
+          </span>
           <select
             value={filters.minRating ?? ""}
             onChange={(e) =>
@@ -660,43 +723,59 @@ function Filters({
             }
             className="field-input"
           >
-            <option value="">Any</option>
-            <option value="4">4+ stars</option>
-            <option value="4.5">4.5+ stars</option>
+            <option value="">
+              <T>Any</T>
+            </option>
+            <option value="4">
+              <T>4+ stars</T>
+            </option>
+            <option value="4.5">
+              <T>4.5+ stars</T>
+            </option>
           </select>
         </label>
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Coaching style</span>
+          <span className="font-semibold">
+            <T>Coaching style</T>
+          </span>
           <select
             value={filters.motivation ?? ""}
             onChange={(e) => set({ motivation: e.target.value || null })}
             className="field-input"
           >
-            <option value="">Any</option>
+            <option value="">
+              <T>Any</T>
+            </option>
             {COACH_STYLE.motivation.options.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                <T>{o.label}</T>
               </option>
             ))}
           </select>
         </label>
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Accountability</span>
+          <span className="font-semibold">
+            <T>Accountability</T>
+          </span>
           <select
             value={filters.accountability ?? ""}
             onChange={(e) => set({ accountability: e.target.value || null })}
             className="field-input"
           >
-            <option value="">Any</option>
+            <option value="">
+              <T>Any</T>
+            </option>
             {COACH_STYLE.accountability.options.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                <T>{o.label}</T>
               </option>
             ))}
           </select>
         </label>
         <label className="space-y-1 text-sm">
-          <span className="font-semibold">Language</span>
+          <span className="font-semibold">
+            <T>Language</T>
+          </span>
           <select
             value={filters.language}
             onChange={(e) =>
@@ -704,13 +783,19 @@ function Filters({
             }
             className="field-input"
           >
-            <option value="any">Any</option>
-            <option value="spanish">Speaks Spanish</option>
+            <option value="any">
+              <T>Any</T>
+            </option>
+            <option value="spanish">
+              <T>Speaks Spanish</T>
+            </option>
           </select>
         </label>
       </div>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-semibold">Specialty or goal</legend>
+        <legend className="text-sm font-semibold">
+          <T>Specialty or goal</T>
+        </legend>
         <div className="flex flex-wrap gap-2">
           {POPULATIONS.map((p) => {
             const on = filters.populations.includes(p);
@@ -749,7 +834,7 @@ function Filters({
               onChange={(e) => set({ [key]: e.target.checked })}
               className="accent-[var(--accent)]"
             />
-            {label}
+            <T>{label}</T>
           </label>
         ))}
       </div>
@@ -759,7 +844,7 @@ function Filters({
           onClick={() => onChange(NO_FILTERS)}
           className="text-sm text-accent hover:underline"
         >
-          Clear all filters
+          <T>Clear all filters</T>
         </button>
       )}
     </div>

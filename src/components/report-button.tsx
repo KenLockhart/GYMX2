@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { reportContent } from "@/app/(app)/community/actions";
 import { REPORT_DETAILS_MAX, REPORT_REASONS } from "@/lib/reports";
+import { T, useTr } from "@/i18n/t";
 
 // "Report" opens a short form inline. Reports go to GYMX2's moderators; the author isn't told who.
 export function ReportButton({
@@ -14,6 +15,7 @@ export function ReportButton({
   commentId?: string | null;
   label: string;
 }) {
+  const tr = useTr();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState("");
@@ -25,7 +27,7 @@ export function ReportButton({
   if (done)
     return (
       <span className="text-xs text-muted">
-        Reported. Thanks for telling us.
+        <T>Reported. Thanks for telling us.</T>
       </span>
     );
   if (!open)
@@ -33,10 +35,10 @@ export function ReportButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={`Report ${label}`}
+        aria-label={tr("Report {label}", { label })}
         className="cursor-pointer text-xs text-muted hover:text-danger"
       >
-        Report
+        <T>Report</T>
       </button>
     );
 
@@ -59,10 +61,10 @@ export function ReportButton({
     <form
       onSubmit={submit}
       className="basis-full space-y-2 rounded-lg border border-border bg-surface-raised p-3 text-sm"
-      aria-label={`Report ${label}`}
+      aria-label={tr("Report {label}", { label })}
     >
       <label htmlFor={`${id}-reason`} className="block font-semibold">
-        Why are you reporting this?
+        <T>Why are you reporting this?</T>
       </label>
       <select
         id={`${id}-reason`}
@@ -72,16 +74,16 @@ export function ReportButton({
         className="field-input py-1.5"
       >
         <option value="" disabled>
-          Choose a reason
+          <T>Choose a reason</T>
         </option>
         {REPORT_REASONS.map((item) => (
           <option key={item.value} value={item.value}>
-            {item.label}
+            <T>{item.label}</T>
           </option>
         ))}
       </select>
       <label htmlFor={`${id}-details`} className="sr-only">
-        Details (optional)
+        <T>Details (optional)</T>
       </label>
       <textarea
         id={`${id}-details`}
@@ -89,7 +91,7 @@ export function ReportButton({
         maxLength={REPORT_DETAILS_MAX}
         value={details}
         onChange={(event) => setDetails(event.target.value)}
-        placeholder="Anything else moderators should know (optional)"
+        placeholder={tr("Anything else moderators should know (optional)")}
         className="field-input"
       />
       <div className="flex gap-2">
@@ -98,23 +100,23 @@ export function ReportButton({
           disabled={pending || !reason}
           className="btn-primary px-3 py-1.5 text-sm"
         >
-          {pending ? "Sending..." : "Send report"}
+          {pending ? tr("Sending...") : tr("Send report")}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="btn-secondary px-3 py-1.5 text-sm"
         >
-          Cancel
+          <T>Cancel</T>
         </button>
       </div>
       {error && (
         <p role="alert" className="text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
       <p className="text-xs text-muted">
-        The person won&apos;t see who reported them.
+        <T>The person won&apos;t see who reported them.</T>
       </p>
     </form>
   );

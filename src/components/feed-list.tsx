@@ -1,5 +1,7 @@
 "use client";
 
+import { useTr } from "@/i18n/t";
+
 import { useState, useTransition } from "react";
 import { loadMorePosts } from "@/app/(app)/community/actions";
 import { PostCard } from "@/components/post-card";
@@ -18,6 +20,7 @@ export function FeedList({
   coachId?: string | null;
   emptyText: string;
 }) {
+  const tr = useTr();
   const [posts, setPosts] = useState(initialPosts);
   const [more, setMore] = useState(initialMore);
   // Hidden or muted cards stay on screen (with Undo) but are gone from the server's feed, so
@@ -51,7 +54,7 @@ export function FeedList({
         ]);
         setMore(next.more);
       } catch {
-        setError("We couldn't load more posts. Please try again.");
+        setError(tr("We couldn't load more posts. Please try again."));
       }
     });
   }
@@ -98,12 +101,12 @@ export function FeedList({
           disabled={pending}
           className="btn-secondary w-full"
         >
-          {pending ? "Loading..." : "Show more posts"}
+          {pending ? tr("Loading...") : tr("Show more posts")}
         </button>
       )}
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
     </div>

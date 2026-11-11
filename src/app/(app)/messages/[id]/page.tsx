@@ -8,14 +8,19 @@ import { createClient } from "@/lib/supabase/server";
 import type { Message } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
 import { loadContacts } from "../contacts";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Conversation" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Conversation") };
+}
 
 export default async function ConversationPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const tr = await getTr();
   const { profile } = await requireAccount();
   if (profile.role === "admin") redirect("/admin/messages");
   const { id } = await params;
@@ -49,7 +54,7 @@ export default async function ConversationPage({
   const displayName =
     contact?.display_name ??
     rows[0]?.other?.display_name ??
-    (rows.length > 0 ? "Former contact" : undefined);
+    (rows.length > 0 ? tr("Former contact") : undefined);
   // Only people the viewer is connected with, or has talked to before, have a conversation page.
   if (!displayName) notFound();
 
@@ -72,7 +77,7 @@ export default async function ConversationPage({
   return (
     <div className="space-y-6">
       <Link href="/messages" className="text-link text-sm">
-        Back to messages
+        <T>Back to messages</T>
       </Link>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-4xl">{displayName}</h1>
@@ -81,13 +86,16 @@ export default async function ConversationPage({
             href={isCoach ? `/members/${id}` : `/coaches/${id}`}
             className="text-link text-sm"
           >
-            {isCoach ? "Member details" : "Coach profile"}
+            {isCoach ? tr("Member details") : tr("Coach profile")}
           </Link>
         )}
       </div>
       {messageResult.error ? (
         <p role="alert" className="text-danger">
-          We couldn&apos;t load this conversation. Please refresh and try again.
+          <T>
+            We couldn&apos;t load this conversation. Please refresh and try
+            again.
+          </T>
         </p>
       ) : (
         <Chat
