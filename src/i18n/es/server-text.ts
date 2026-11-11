@@ -3,6 +3,68 @@ import { options } from "./options";
 // Spanish for messages the server sends back in English (form errors and confirmations). Exact
 // matches first, then patterns for messages with names or numbers in them.
 export const esServerText: Record<string, string> = {
+  // Coach tools
+  "Admins run the program, so they can't join it.":
+    "Los administradores dirigen el programa, así que no pueden unirse.",
+  "You've already applied.": "Ya enviaste tu solicitud.",
+  "Thanks! An admin will review your application.":
+    "¡Gracias! Un administrador revisará tu solicitud.",
+  "Payouts aren't switched on yet. Please check back soon.":
+    "Los pagos todavía no están activados. Vuelve pronto.",
+  "Only approved affiliates can set up payouts.":
+    "Solo los afiliados aprobados pueden configurar pagos.",
+  "We couldn't reach Stripe. Please try again.":
+    "No pudimos conectar con Stripe. Inténtalo de nuevo.",
+  "Set up payouts first.": "Primero configura los pagos.",
+  "We couldn't open Stripe. Finish setting up payouts first, then try again.":
+    "No pudimos abrir Stripe. Primero termina de configurar los pagos y vuelve a intentarlo.",
+  "That link name is taken. Try another.":
+    "Ese nombre de enlace ya está en uso. Prueba con otro.",
+  "We couldn't send your application. Please try again.":
+    "No pudimos enviar tu solicitud. Inténtalo de nuevo.",
+  "We couldn't save. Check your connection.":
+    "No pudimos guardar. Revisa tu conexión.",
+  "Photos can be up to 5 MB.": "Las fotos pueden pesar hasta 5 MB.",
+  "That photo upload didn't work.": "La subida de esa foto no funcionó.",
+  "The photo didn't finish uploading. Please try again.":
+    "La foto no terminó de subirse. Inténtalo de nuevo.",
+  "We couldn't save the photo.": "No pudimos guardar la foto.",
+  "Fill in your profile first.": "Primero llena tu perfil.",
+  "We couldn't take your profile down.": "No pudimos despublicar tu perfil.",
+  "Choose how members join you.": "Elige cómo se unen a ti los miembros.",
+  "Payments aren't switched on yet.": "Los pagos todavía no están activados.",
+  "We couldn't save that plan. Please try again.":
+    "No pudimos guardar ese plan. Inténtalo de nuevo.",
+  "The plan was saved, but Stripe didn't accept it. Save it again in a moment.":
+    "El plan se guardó, pero Stripe no lo aceptó. Vuelve a guardarlo en un momento.",
+  "Only members can subscribe to coaches.":
+    "Solo los miembros pueden suscribirse a coaches.",
+  "Choose a plan.": "Elige un plan.",
+  "We couldn't find that membership.": "No encontramos esa membresía.",
+  "We couldn't update your membership. Please try again.":
+    "No pudimos actualizar tu membresía. Inténtalo de nuevo.",
+  "Card updates aren't available right now. Email support@gymx2.com and we'll help.":
+    "Por ahora no se puede actualizar la tarjeta. Escríbenos a support@gymx2.com y te ayudamos.",
+  "Plan updated. Current subscribers keep their price.":
+    "Plan actualizado. Los suscriptores actuales conservan su precio.",
+  "Plan added.": "Plan agregado.",
+  "Cancelled. You keep access until the end of the period you've paid for, and won't be charged again.":
+    "Cancelada. Conservas el acceso hasta el final del periodo que pagaste y no se te volverá a cobrar.",
+  "Your membership will keep renewing.": "Tu membresía se seguirá renovando.",
+  "You can list up to 20 credentials.": "Puedes agregar hasta 20 credenciales.",
+  "We couldn't add that. Please try again.":
+    "No pudimos agregar eso. Inténtalo de nuevo.",
+  "That credential wasn't found.": "No encontramos esa credencial.",
+  "Use a PDF, JPG, PNG or WebP file.": "Usa un archivo PDF, JPG, PNG o WebP.",
+  "Documents can be up to 10 MB.": "Los documentos pueden pesar hasta 10 MB.",
+  "That upload didn't work.": "Esa subida no funcionó.",
+  "The document didn't finish uploading.":
+    "El documento no terminó de subirse.",
+  "We couldn't attach the document.": "No pudimos adjuntar el documento.",
+  "The expiry date is before the issue date":
+    "La fecha de vencimiento es anterior a la de emisión.",
+  "Add the organization": "Agrega la organización.",
+  "Add the credential name": "Agrega el nombre de la credencial.",
   // Shared areas
   "A photo didn't finish uploading. Please try again.":
     "Una foto no terminó de subirse. Inténtalo de nuevo.",
@@ -529,4 +591,5 @@ export const esServerPatterns: [RegExp, (...parts: string[]) => string][] = [
   [/^Free trial, ends (.+)$/, (date) => `Prueba gratis, termina el ${date}`],
   [/^Shipped · Tracking (.+)$/, (code) => `Enviado · Rastreo ${code}`],
   [/^(.+)'s community$/, (name) => `Comunidad de ${name}`],
+  [/^Still needed: (.+)\.$/, (list) => `Falta: ${list}.`],
 ];

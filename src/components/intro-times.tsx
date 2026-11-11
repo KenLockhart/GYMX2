@@ -16,6 +16,7 @@ import {
 } from "@/lib/intros";
 import type { CoachIntroSlot } from "@/lib/intros-server";
 import { LOCALE_TAG, type Locale } from "@/i18n/config";
+import { T, useTr } from "@/i18n/t";
 
 const subscribe = () => () => {};
 // The server renders UTC; the browser redraws in the viewer's own time zone.
@@ -67,6 +68,7 @@ function plannedStarts(
 }
 
 export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
+  const tr = useTr();
   const router = useRouter();
   const zone = useLocalZone();
   const [date, setDate] = useState(todayValue);
@@ -131,16 +133,22 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
               setStatus({
                 message:
                   r.added === 0
-                    ? "Those times were already on your list."
-                    : `Added ${r.added} ${r.added === 1 ? "time" : "times"}.`,
+                    ? tr("Those times were already on your list.")
+                    : r.added === 1
+                      ? tr("Added 1 time.")
+                      : tr("Added {added} times.", { added: r.added ?? 0 }),
               }),
           );
         }}
       >
-        <h2 className="text-2xl">Add intro times</h2>
+        <h2 className="text-2xl">
+          <T>Add intro times</T>
+        </h2>
         <div className="grid grid-cols-2 gap-3">
           <label className="space-y-1 text-sm">
-            <span className="font-medium">Date</span>
+            <span className="font-medium">
+              <T>Date</T>
+            </span>
             <input
               type="date"
               value={date}
@@ -151,7 +159,9 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
             />
           </label>
           <label className="space-y-1 text-sm">
-            <span className="font-medium">First start</span>
+            <span className="font-medium">
+              <T>First start</T>
+            </span>
             <input
               type="time"
               value={time}
@@ -162,7 +172,9 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
             />
           </label>
           <label className="space-y-1 text-sm">
-            <span className="font-medium">Length</span>
+            <span className="font-medium">
+              <T>Length</T>
+            </span>
             <select
               value={minutes}
               onChange={(e) => setMinutes(Number(e.target.value))}
@@ -170,13 +182,15 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
             >
               {INTRO_MINUTES.map((m) => (
                 <option key={m} value={m}>
-                  {m} minutes
+                  <T vars={{ m }}>{"{m} minutes"}</T>
                 </option>
               ))}
             </select>
           </label>
           <label className="space-y-1 text-sm">
-            <span className="font-medium">Back to back</span>
+            <span className="font-medium">
+              <T>Back to back</T>
+            </span>
             <select
               value={count}
               onChange={(e) => setCount(Number(e.target.value))}
@@ -184,19 +198,23 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
             >
               {[1, 2, 3, 4, 6, 8].map((n) => (
                 <option key={n} value={n}>
-                  {n === 1 ? "Just one" : `${n} in a row`}
+                  {n === 1 ? tr("Just one") : `${n} in a row`}
                 </option>
               ))}
             </select>
           </label>
           <label className="col-span-2 space-y-1 text-sm">
-            <span className="font-medium">Repeat</span>
+            <span className="font-medium">
+              <T>Repeat</T>
+            </span>
             <select
               value={weeks}
               onChange={(e) => setWeeks(Number(e.target.value))}
               className="field-input"
             >
-              <option value={1}>Don&apos;t repeat</option>
+              <option value={1}>
+                <T>Don&apos;t repeat</T>
+              </option>
               {[2, 4, 8, 12].map((n) => (
                 <option key={n} value={n}>
                   Same time for {n} weeks
@@ -206,7 +224,9 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
           </label>
         </div>
         <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">How you&apos;ll meet</legend>
+          <legend className="text-sm font-medium">
+            <T>How you&apos;ll meet</T>
+          </legend>
           <div className="flex gap-2">
             {(["online", "in_person"] as const).map((f) => (
               <button
@@ -216,37 +236,41 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
                 onClick={() => setFormat(f)}
                 className={`flex-1 rounded-md border px-3 py-2 text-sm ${format === f ? "border-accent bg-accent/10 font-semibold text-accent" : "border-border text-muted"}`}
               >
-                {INTRO_FORMAT_LABEL[f]}
+                <T>{INTRO_FORMAT_LABEL[f]}</T>
               </button>
             ))}
           </div>
         </fieldset>
         {format === "online" ? (
           <label className="block space-y-1 text-sm">
-            <span className="font-medium">Video link (optional)</span>
+            <span className="font-medium">
+              <T>Video link (optional)</T>
+            </span>
             <input
               type="url"
               value={meetingUrl}
               onChange={(e) => setMeetingUrl(e.target.value)}
-              placeholder="https://"
+              placeholder={tr("https://")}
               className="field-input"
             />
             <span className="block text-xs text-muted">
-              Shared only with the member who books.
+              <T>Shared only with the member who books.</T>
             </span>
           </label>
         ) : (
           <label className="block space-y-1 text-sm">
-            <span className="font-medium">Where</span>
+            <span className="font-medium">
+              <T>Where</T>
+            </span>
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               maxLength={200}
-              placeholder="Gym name and address"
+              placeholder={tr("Gym name and address")}
               className="field-input"
             />
             <span className="block text-xs text-muted">
-              Shared only with the member who books.
+              <T>Shared only with the member who books.</T>
             </span>
           </label>
         )}
@@ -266,8 +290,10 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
           className="btn-primary w-full"
         >
           {pending
-            ? "Adding..."
-            : `Add ${planned.length} ${planned.length === 1 ? "time" : "times"}`}
+            ? tr("Adding...")
+            : planned.length === 1
+              ? tr("Add 1 time")
+              : tr("Add {length} times", { length: planned.length })}
         </button>
       </form>
 
@@ -277,25 +303,31 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
             <p className="font-display text-3xl font-bold">
               {upcoming.length - booked.length}
             </p>
-            <p className="text-sm text-muted">Open times</p>
+            <p className="text-sm text-muted">
+              <T>Open times</T>
+            </p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-4 text-center">
             <p className="font-display text-3xl font-bold text-accent">
               {booked.length}
             </p>
-            <p className="text-sm text-muted">Booked</p>
+            <p className="text-sm text-muted">
+              <T>Booked</T>
+            </p>
           </div>
         </div>
         {days.length === 0 ? (
           <p className="rounded-2xl border border-border bg-surface p-6 text-muted">
-            No upcoming intro times. Add some and a &ldquo;Book intro
-            session&rdquo; button appears on your profile.
+            <T>
+              No upcoming intro times. Add some and a &ldquo;Book intro
+              session&rdquo; button appears on your profile.
+            </T>
           </p>
         ) : (
           days.map((day) => (
             <section key={day.key} aria-label={day.label} className="space-y-2">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted [font-family:var(--font-inter)]">
-                {day.label}
+                <T>{day.label}</T>
               </h3>
               <ul className="divide-y divide-border rounded-2xl border border-border bg-surface">
                 {day.slots.map(({ id }) => {
@@ -310,7 +342,8 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
                           {timeLabel(slot.startsAt, zone)}
                         </p>
                         <p className="text-xs text-muted">
-                          {slot.minutes} min · {INTRO_FORMAT_LABEL[slot.format]}
+                          {slot.minutes} min ·{" "}
+                          <T>{INTRO_FORMAT_LABEL[slot.format]}</T>
                         </p>
                       </div>
                       <div className="min-w-0 flex-1">
@@ -318,7 +351,7 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
                           <>
                             <p>
                               <span className="mr-2 rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
-                                Booked
+                                <T>Booked</T>
                               </span>
                               <span className="font-semibold">
                                 {slot.booking.memberName}
@@ -342,7 +375,7 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
                             href={`/calendar/${slot.booking.sessionId}`}
                             className="btn-secondary px-3 py-1.5 text-sm"
                           >
-                            Open
+                            <T>Open</T>
                           </Link>
                         )}
                         <button
@@ -352,7 +385,12 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
                             if (slot.booking) {
                               if (
                                 !window.confirm(
-                                  `Cancel ${slot.booking.memberName}'s intro? We'll let them know.`,
+                                  tr(
+                                    "Cancel {name}'s intro? We'll let them know.",
+                                    {
+                                      name: slot.booking.memberName,
+                                    },
+                                  ),
                                 )
                               )
                                 return;
@@ -362,7 +400,7 @@ export function IntroTimes({ slots }: { slots: CoachIntroSlot[] }) {
                           }}
                           className="px-2 py-1.5 text-sm text-muted hover:text-danger"
                         >
-                          {slot.booking ? "Cancel intro" : "Remove"}
+                          {slot.booking ? tr("Cancel intro") : tr("Remove")}
                         </button>
                       </div>
                     </li>

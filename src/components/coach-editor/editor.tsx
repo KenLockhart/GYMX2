@@ -43,6 +43,7 @@ import {
   TextArea,
   TextInput,
 } from "./fields";
+import { T, useTr } from "@/i18n/t";
 
 const STEPS = [
   { key: "basics", label: "Basics" },
@@ -89,6 +90,7 @@ export function CoachProfileEditor({
   published: boolean;
   initialCredentials: OwnCredential[];
 }) {
+  const tr = useTr();
   const [credentials, setCredentials] = useState(initialCredentials);
   const [draft, setDraft] = useState(initial);
   const [step, setStep] = useState<StepKey>("basics");
@@ -157,23 +159,29 @@ export function CoachProfileEditor({
     <div ref={topRef} className="scroll-mt-4 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-5xl">Your coach profile</h1>
+          <h1 className="text-5xl">
+            <T>Your coach profile</T>
+          </h1>
           <p className="mt-2 max-w-xl text-muted">
-            This is what members see when they find you. It saves as you type;
-            when it&apos;s ready, submit it and GYMX2 will review it before it
-            goes live.
+            <T>
+              This is what members see when they find you. It saves as you type;
+              when it&apos;s ready, submit it and GYMX2 will review it before it
+              goes live.
+            </T>
           </p>
         </div>
         <div className="text-sm sm:text-right">
-          <p className="font-semibold">{STATUS_TEXT[status]}</p>
+          <p className="font-semibold">
+            <T>{STATUS_TEXT[status]}</T>
+          </p>
           <p role="status" className="text-muted" aria-live="polite">
             {save.state === "saving"
-              ? "Saving..."
+              ? tr("Saving...")
               : save.state === "saved"
-                ? "All changes saved"
+                ? tr("All changes saved")
                 : save.state === "error"
                   ? ""
-                  : "Changes save automatically"}
+                  : tr("Changes save automatically")}
           </p>
         </div>
       </div>
@@ -187,27 +195,37 @@ export function CoachProfileEditor({
       )}
       {status === "changes_requested" && reviewNote && (
         <div className="rounded-xl border border-accent bg-accent/5 p-4 text-sm">
-          <p className="font-semibold text-accent">GYMX2 asked for changes</p>
+          <p className="font-semibold text-accent">
+            <T>GYMX2 asked for changes</T>
+          </p>
           <p className="mt-1 whitespace-pre-line">{reviewNote}</p>
         </div>
       )}
       {isLive && status === "draft" && (
         <Note>
-          Your approved profile is live. Changes you make here stay private
-          until you submit them and GYMX2 approves them.
+          <T>
+            Your approved profile is live. Changes you make here stay private
+            until you submit them and GYMX2 approves them.
+          </T>
         </Note>
       )}
 
       <div>
         <div className="flex items-center justify-between text-sm">
-          <span>Profile {completion.percent}% complete</span>
+          <span>
+            <T vars={{ percent: completion.percent }}>
+              {"Profile {percent}% complete"}
+            </T>
+          </span>
           <span className="text-muted">
-            Step {index + 1} of {STEPS.length}
+            <T vars={{ n: index + 1, total: STEPS.length }}>
+              {"Step {n} of {total}"}
+            </T>
           </span>
         </div>
         <div
           role="progressbar"
-          aria-label="Profile completion"
+          aria-label={tr("Profile completion")}
           aria-valuenow={completion.percent}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -222,11 +240,11 @@ export function CoachProfileEditor({
 
       <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)]">
         <nav
-          aria-label="Profile steps"
+          aria-label={tr("Profile steps")}
           className="md:sticky md:top-4 md:self-start"
         >
           <label className="sr-only" htmlFor="step-select">
-            Step
+            <T>Step</T>
           </label>
           <select
             id="step-select"
@@ -236,7 +254,7 @@ export function CoachProfileEditor({
           >
             {STEPS.map((s, i) => (
               <option key={s.key} value={s.key}>
-                {i + 1}. {s.label}
+                {i + 1}. <T>{s.label}</T>
                 {stepDone(s.key) ? " ✓" : ""}
               </option>
             ))}
@@ -256,7 +274,7 @@ export function CoachProfileEditor({
                   >
                     {stepDone(s.key) ? "✓" : i + 1}
                   </span>
-                  {s.label}
+                  <T>{s.label}</T>
                   {stepDone(s.key) && <span className="sr-only"> (done)</span>}
                 </button>
               </li>
@@ -268,35 +286,41 @@ export function CoachProfileEditor({
           aria-label={STEPS[index].label}
           className="min-w-0 space-y-6 rounded-2xl border border-border bg-surface p-5 sm:p-6"
         >
-          <h2 className="text-3xl">{STEPS[index].label}</h2>
+          <h2 className="text-3xl">
+            <T>{STEPS[index].label}</T>
+          </h2>
 
           {step === "basics" && (
             <>
               <TextArea
-                label="Your headline"
+                label={tr("Your headline")}
                 value={draft.headline}
                 onChange={(v) => update("headline", v)}
                 max={160}
                 rows={2}
-                placeholder="I'm the coach who will celebrate your first push-up just as much as your first 100-pound deadlift."
-                hint="One sentence that sounds like you. It sits right under your name."
+                placeholder={tr(
+                  "I'm the coach who will celebrate your first push-up just as much as your first 100-pound deadlift.",
+                )}
+                hint={tr(
+                  "One sentence that sounds like you. It sits right under your name.",
+                )}
               />
               <ChipInput
-                label="Top specialties"
+                label={tr("Top specialties")}
                 values={draft.specialties}
                 onChange={(v) => update("specialties", v)}
                 max={3}
                 maxLength={30}
-                placeholder="Strength"
-                hint="Up to three, shown under your name."
+                placeholder={tr("Strength")}
+                hint={tr("Up to three, shown under your name.")}
               />
               <TextInput
-                label="Location"
+                label={tr("Location")}
                 value={draft.location}
                 onChange={(v) => update("location", v)}
                 max={80}
-                placeholder="Atlanta, GA"
-                hint="City and state is plenty. Never your home address."
+                placeholder={tr("Atlanta, GA")}
+                hint={tr("City and state is plenty. Never your home address.")}
               />
               <CheckboxGroup<"online" | "in_person">
                 legend="How you train clients"
@@ -308,7 +332,7 @@ export function CoachProfileEditor({
                 onChange={(v) => update("formats", v)}
               />
               <SelectInput
-                label="How do you describe yourself? (optional)"
+                label={tr("How do you describe yourself? (optional)")}
                 value={draft.identity}
                 options={[
                   { value: "woman", label: "Woman" },
@@ -317,7 +341,9 @@ export function CoachProfileEditor({
                 ]}
                 emptyLabel="Prefer not to say"
                 onChange={(v) => update("identity", v)}
-                hint="Never shown on your profile. Some members ask for a coach who is a woman or a man; this lets them find you."
+                hint={tr(
+                  "Never shown on your profile. Some members ask for a coach who is a woman or a man; this lets them find you.",
+                )}
               />
               <RadioCards
                 legend="Taking new clients?"
@@ -350,7 +376,7 @@ export function CoachProfileEditor({
           {step === "bio" && (
             <>
               <TextArea
-                label="About me"
+                label={tr("About me")}
                 value={draft.about.intro}
                 onChange={(v) => updateIn("about", { intro: v })}
                 max={2000}
@@ -358,19 +384,21 @@ export function CoachProfileEditor({
                 placeholder={
                   "Fitness should make you feel stronger, more confident and more capable, not intimidated.\n\nI love working with people who are ready to make a change but aren't sure where to begin."
                 }
-                hint="Your story, why you coach and your philosophy. Leave a blank line between paragraphs. At least 80 characters."
+                hint={tr(
+                  "Your story, why you coach and your philosophy. Leave a blank line between paragraphs. At least 80 characters.",
+                )}
               />
               <ChipInput
-                label="Three words that describe you"
+                label={tr("Three words that describe you")}
                 values={draft.about.threeWords}
                 onChange={(v) => updateIn("about", { threeWords: v })}
                 max={3}
                 maxLength={20}
-                placeholder="Encouraging"
+                placeholder={tr("Encouraging")}
               />
               <div className="space-y-4">
                 <p className="text-sm font-semibold">
-                  Answer any of these (optional)
+                  <T>Answer any of these (optional)</T>
                 </p>
                 {BIO_PROMPTS.map((prompt) => {
                   const answer =
@@ -402,29 +430,29 @@ export function CoachProfileEditor({
                 })}
               </div>
               <TextArea
-                label="My ideal client is someone who…"
+                label={tr("My ideal client is someone who…")}
                 value={draft.idealClient}
                 onChange={(v) => update("idealClient", v)}
                 max={500}
                 rows={3}
               />
               <ChipInput
-                label="Interests and hobbies"
+                label={tr("Interests and hobbies")}
                 values={draft.about.interests}
                 onChange={(v) => updateIn("about", { interests: v })}
                 max={8}
                 maxLength={40}
-                placeholder="Trail walks"
+                placeholder={tr("Trail walks")}
               />
               <ChipInput
-                label="Fun facts"
+                label={tr("Fun facts")}
                 values={draft.about.funFacts}
                 onChange={(v) => updateIn("about", { funFacts: v })}
                 max={4}
                 maxLength={120}
               />
               <TextInput
-                label="Favorite motivational quote"
+                label={tr("Favorite motivational quote")}
                 value={draft.about.quote}
                 onChange={(v) => updateIn("about", { quote: v })}
                 max={200}
@@ -443,7 +471,9 @@ export function CoachProfileEditor({
             <>
               <CheckboxGroup
                 legend="Who you work best with"
-                hint="Pick the groups you have real experience with, then add a line about each."
+                hint={tr(
+                  "Pick the groups you have real experience with, then add a line about each.",
+                )}
                 options={POPULATIONS}
                 values={draft.populations.map((p) => p.label)}
                 onChange={(labels) =>
@@ -479,12 +509,14 @@ export function CoachProfileEditor({
                 </div>
               )}
               <TextArea
-                label="Who might be better served by another specialist?"
+                label={tr("Who might be better served by another specialist?")}
                 value={draft.betterServedBy}
                 onChange={(v) => update("betterServedBy", v)}
                 max={500}
                 rows={3}
-                hint="Being clear about this builds trust. You can mention who you'd refer people to."
+                hint={tr(
+                  "Being clear about this builds trust. You can mention who you'd refer people to.",
+                )}
               />
             </>
           )}
@@ -504,7 +536,7 @@ export function CoachProfileEditor({
                     }
                   />
                   <SelectInput
-                    label="Sometimes also (optional)"
+                    label={tr("Sometimes also (optional)")}
                     value={draft.style[key].secondary}
                     options={COACH_STYLE[key].options.filter(
                       (o) => o.value !== draft.style[key].primary,
@@ -519,17 +551,19 @@ export function CoachProfileEditor({
                 </div>
               ))}
               <ChipInput
-                label="Personality traits"
+                label={tr("Personality traits")}
                 values={draft.style.traits}
                 onChange={(v) => updateIn("style", { traits: v })}
                 max={8}
                 maxLength={40}
-                placeholder="Celebrates milestones"
+                placeholder={tr("Celebrates milestones")}
               />
               <div className="space-y-3">
                 <RadioCards
                   legend="Your coaching love language"
-                  hint="How you naturally motivate people. Members pick theirs, and the two are compared."
+                  hint={tr(
+                    "How you naturally motivate people. Members pick theirs, and the two are compared.",
+                  )}
                   options={LOVE_LANGUAGES}
                   value={draft.loveLanguages.primary}
                   onChange={(v) =>
@@ -543,7 +577,7 @@ export function CoachProfileEditor({
                   }
                 />
                 <SelectInput
-                  label="Second love language (optional)"
+                  label={tr("Second love language (optional)")}
                   value={draft.loveLanguages.secondary}
                   options={LOVE_LANGUAGES.filter(
                     (l) => l.value !== draft.loveLanguages.primary,
@@ -558,7 +592,7 @@ export function CoachProfileEditor({
                 />
               </div>
               <TextArea
-                label="Anything else about your style"
+                label={tr("Anything else about your style")}
                 value={draft.style.note}
                 onChange={(v) => updateIn("style", { note: v })}
                 max={300}
@@ -584,7 +618,9 @@ export function CoachProfileEditor({
                 ]}
                 value={draft.coaching.customization}
                 onChange={(v) => updateIn("coaching", { customization: v })}
-                hint="Be exact: members should know what they're paying for."
+                hint={tr(
+                  "Be exact: members should know what they're paying for.",
+                )}
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 {COACHING_DETAIL_FIELDS.map((field) => (
@@ -607,7 +643,7 @@ export function CoachProfileEditor({
 
           {step === "results" && (
             <>
-              <Field label="Years of coaching experience">
+              <Field label={tr("Years of coaching experience")}>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -632,28 +668,32 @@ export function CoachProfileEditor({
                 />
               </Field>
               <ChipInput
-                label="Areas of expertise"
+                label={tr("Areas of expertise")}
                 values={draft.results.expertise}
                 onChange={(v) => updateIn("results", { expertise: v })}
                 max={6}
                 maxLength={40}
-                placeholder="First-time lifters"
+                placeholder={tr("First-time lifters")}
               />
               <TextArea
-                label="How you coach"
+                label={tr("How you coach")}
                 value={draft.results.methodology}
                 onChange={(v) => updateIn("results", { methodology: v })}
                 max={1000}
                 rows={4}
-                placeholder="Every client starts with a movement check and a four-week foundation block…"
+                placeholder={tr(
+                  "Every client starts with a movement check and a four-week foundation block…",
+                )}
               />
               <div className="space-y-3">
                 <p className="text-sm font-semibold">
-                  Client stories (optional, up to 3)
+                  <T>Client stories (optional, up to 3)</T>
                 </p>
                 <p className="text-xs text-muted">
-                  Shown as self-reported. Share only with your client&apos;s
-                  permission, use no full names, and never promise results.
+                  <T>
+                    Shown as self-reported. Share only with your client&apos;s
+                    permission, use no full names, and never promise results.
+                  </T>
                 </p>
                 {draft.results.stories.map((story, i) => (
                   <div
@@ -661,7 +701,7 @@ export function CoachProfileEditor({
                     className="space-y-3 rounded-xl border border-border p-4"
                   >
                     <TextInput
-                      label="Title"
+                      label={tr("Title")}
                       value={story.title}
                       max={80}
                       onChange={(v) =>
@@ -673,7 +713,7 @@ export function CoachProfileEditor({
                       }
                     />
                     <TextArea
-                      label="What happened"
+                      label={tr("What happened")}
                       value={story.summary}
                       max={500}
                       rows={3}
@@ -696,7 +736,7 @@ export function CoachProfileEditor({
                       }
                       className="cursor-pointer text-sm text-muted hover:text-danger"
                     >
-                      Remove story
+                      <T>Remove story</T>
                     </button>
                   </div>
                 ))}
@@ -713,7 +753,7 @@ export function CoachProfileEditor({
                     }
                     className="btn-secondary px-4 py-2 text-sm"
                   >
-                    Add a story
+                    <T>Add a story</T>
                   </button>
                 )}
               </div>
@@ -729,17 +769,19 @@ export function CoachProfileEditor({
                 onChange={(v) => updateIn("nutrition", { offers: v })}
               />
               <TextInput
-                label="Nutrition qualifications"
+                label={tr("Nutrition qualifications")}
                 value={draft.nutrition.qualifications}
                 onChange={(v) => updateIn("nutrition", { qualifications: v })}
                 max={200}
-                placeholder="Precision Nutrition Level 1"
+                placeholder={tr("Precision Nutrition Level 1")}
               />
               <Note>
-                Your profile always notes that meal plans for medical
-                conditions, diagnosis and medication are for doctors and
-                registered dietitians. Only call yourself a dietitian if
-                you&apos;re licensed as one.
+                <T>
+                  Your profile always notes that meal plans for medical
+                  conditions, diagnosis and medication are for doctors and
+                  registered dietitians. Only call yourself a dietitian if
+                  you&apos;re licensed as one.
+                </T>
               </Note>
             </>
           )}
@@ -747,23 +789,25 @@ export function CoachProfileEditor({
           {step === "availability" && (
             <>
               <SelectInput
-                label="Time zone"
+                label={tr("Time zone")}
                 value={draft.availability.timeZone}
                 options={TIME_ZONES}
                 onChange={(v) => v && updateIn("availability", { timeZone: v })}
               />
               <div className="space-y-3">
-                <p className="text-sm font-semibold">When you coach</p>
+                <p className="text-sm font-semibold">
+                  <T>When you coach</T>
+                </p>
                 {draft.availability.schedule.map((slot, i) => (
                   <div
                     key={i}
                     className="grid gap-2 sm:grid-cols-[1fr_1.5fr_auto] sm:items-end"
                   >
                     <TextInput
-                      label="Days"
+                      label={tr("Days")}
                       value={slot.days}
                       max={40}
-                      placeholder="Mon to Thu"
+                      placeholder={tr("Mon to Thu")}
                       onChange={(v) =>
                         updateIn("availability", {
                           schedule: draft.availability.schedule.map((s, j) =>
@@ -773,10 +817,10 @@ export function CoachProfileEditor({
                       }
                     />
                     <TextInput
-                      label="Hours"
+                      label={tr("Hours")}
                       value={slot.hours}
                       max={80}
-                      placeholder="6:00 to 9:00 AM, 5:00 to 8:00 PM"
+                      placeholder={tr("6:00 to 9:00 AM, 5:00 to 8:00 PM")}
                       onChange={(v) =>
                         updateIn("availability", {
                           schedule: draft.availability.schedule.map((s, j) =>
@@ -794,10 +838,10 @@ export function CoachProfileEditor({
                           ),
                         })
                       }
-                      aria-label={`Remove time ${i + 1}`}
+                      aria-label={tr("Remove time {p0}", { p0: i + 1 })}
                       className="btn-secondary px-3 py-2.5"
                     >
-                      Remove
+                      <T>Remove</T>
                     </button>
                   </div>
                 ))}
@@ -814,37 +858,41 @@ export function CoachProfileEditor({
                     }
                     className="btn-secondary px-4 py-2 text-sm"
                   >
-                    Add times
+                    <T>Add times</T>
                   </button>
                 )}
               </div>
               <TextInput
-                label="Training locations"
+                label={tr("Training locations")}
                 value={draft.availability.locations}
                 onChange={(v) => updateIn("availability", { locations: v })}
                 max={200}
-                placeholder="Online anywhere; in person in Midtown Atlanta"
+                placeholder={tr(
+                  "Online anywhere; in person in Midtown Atlanta",
+                )}
               />
               <TextInput
-                label="Languages"
+                label={tr("Languages")}
                 value={draft.availability.languages}
                 onChange={(v) => updateIn("availability", { languages: v })}
                 max={120}
-                placeholder="English, Spanish"
+                placeholder={tr("English, Spanish")}
               />
               <TextInput
-                label="Accessibility"
+                label={tr("Accessibility")}
                 value={draft.availability.accessibility}
                 onChange={(v) => updateIn("availability", { accessibility: v })}
                 max={300}
-                placeholder="Seated and low-impact options for every program"
+                placeholder={tr(
+                  "Seated and low-impact options for every program",
+                )}
               />
               <TextInput
-                label="Capacity"
+                label={tr("Capacity")}
                 value={draft.availability.capacity}
                 onChange={(v) => updateIn("availability", { capacity: v })}
                 max={120}
-                placeholder="Taking 4 new clients this month"
+                placeholder={tr("Taking 4 new clients this month")}
               />
             </>
           )}
@@ -853,9 +901,11 @@ export function CoachProfileEditor({
 
           {step === "video" && (
             <Note>
-              Intro video uploads arrive with a later update. Start thinking
-              about 60 to 90 seconds on who you are, why you coach, who you love
-              helping and what the first month looks like.
+              <T>
+                Intro video uploads arrive with a later update. Start thinking
+                about 60 to 90 seconds on who you are, why you coach, who you
+                love helping and what the first month looks like.
+              </T>
             </Note>
           )}
 
@@ -863,7 +913,9 @@ export function CoachProfileEditor({
             <div className="space-y-5">
               <div className="space-y-2">
                 <p className="font-semibold">
-                  {completion.ready ? "Ready to submit" : "Before you submit"}
+                  {completion.ready
+                    ? tr("Ready to submit")
+                    : tr("Before you submit")}
                 </p>
                 {completion.missingRequired.length > 0 && (
                   <ul className="space-y-1 text-sm">
@@ -874,7 +926,7 @@ export function CoachProfileEditor({
                           onClick={() => go(check.step as StepKey)}
                           className="text-link cursor-pointer"
                         >
-                          {check.label}
+                          <T>{check.label}</T>
                         </button>
                       </li>
                     ))}
@@ -912,10 +964,10 @@ export function CoachProfileEditor({
                   className="btn-primary"
                 >
                   {status === "submitted"
-                    ? "Submitted"
+                    ? tr("Submitted")
                     : pending
-                      ? "Submitting..."
-                      : "Submit for review"}
+                      ? tr("Submitting...")
+                      : tr("Submit for review")}
                 </button>
                 {isLive && (
                   <button
@@ -924,7 +976,9 @@ export function CoachProfileEditor({
                     onClick={() => {
                       if (
                         !window.confirm(
-                          "Take your profile down? Members will see your basic coach page until you're approved again.",
+                          tr(
+                            "Take your profile down? Members will see your basic coach page until you're approved again.",
+                          ),
                         )
                       )
                         return;
@@ -937,12 +991,12 @@ export function CoachProfileEditor({
                     }}
                     className="btn-secondary"
                   >
-                    Unpublish
+                    <T>Unpublish</T>
                   </button>
                 )}
                 {isLive && (
                   <Link href={`/coaches/${coachId}`} className="btn-secondary">
-                    See your live profile
+                    <T>See your live profile</T>
                   </Link>
                 )}
               </div>
@@ -952,12 +1006,14 @@ export function CoachProfileEditor({
                 </p>
               )}
               <p className="text-xs text-muted">
-                GYMX2 reviews every profile, usually within two business days.
-                You&apos;ll see the result here.
+                <T>
+                  GYMX2 reviews every profile, usually within two business days.
+                  You&apos;ll see the result here.
+                </T>
               </p>
               <div className="rounded-2xl border border-dashed border-border p-3 sm:p-5">
                 <p className="mb-4 text-xs uppercase tracking-widest text-muted">
-                  Preview: what members will see
+                  <T>Preview: what members will see</T>
                 </p>
                 <CoachProfile
                   profile={toCoachView(draft, {
@@ -980,7 +1036,7 @@ export function CoachProfileEditor({
               disabled={index === 0}
               className="btn-secondary"
             >
-              Back
+              <T>Back</T>
             </button>
             {index < STEPS.length - 1 && (
               <button
@@ -988,7 +1044,9 @@ export function CoachProfileEditor({
                 onClick={() => go(STEPS[index + 1].key)}
                 className="btn-primary"
               >
-                Next: {STEPS[index + 1].label}
+                <T vars={{ step: tr(STEPS[index + 1].label) }}>
+                  {"Next: {step}"}
+                </T>
               </button>
             )}
           </div>
@@ -1024,6 +1082,7 @@ function PhotoStep({
   url: string | null;
   onChange: (url: string | null) => void;
 }) {
+  const tr = useTr();
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -1037,14 +1096,14 @@ function PhotoStep({
         size: file.size,
       });
       if (!prepared.path || !prepared.token)
-        return setError(prepared.error ?? "Upload failed.");
+        return setError(prepared.error ?? tr("Upload failed."));
       const { error: uploadError } = await createBrowserSupabase()
         .storage.from("coach-photos")
         .uploadToSignedUrl(prepared.path, prepared.token, file, {
           contentType: file.type,
         });
       if (uploadError)
-        return setError("The photo didn't upload. Please try again.");
+        return setError(tr("The photo didn't upload. Please try again."));
       const result = await setCoachPhoto(prepared.path);
       if (result.error) return setError(result.error);
       onChange(result.url ?? null);
@@ -1064,23 +1123,31 @@ function PhotoStep({
             />
           ) : (
             <p className="grid size-full place-items-center p-4 text-center text-sm text-muted">
-              No photo yet
+              <T>No photo yet</T>
             </p>
           )}
         </div>
         <div className="space-y-3 text-sm">
           <ul className="list-disc space-y-1 pl-5 text-muted">
-            <li>A clear, friendly photo of you, from the waist or chest up.</li>
             <li>
-              Good light, a plain background, and athletic or professional
-              clothing.
+              <T>A clear, friendly photo of you, from the waist or chest up.</T>
             </li>
             <li>
-              Only photos you own or have permission to use. No logos of other
-              brands.
+              <T>
+                Good light, a plain background, and athletic or professional
+                clothing.
+              </T>
             </li>
             <li>
-              JPG, PNG or WebP, up to 5 MB. It&apos;s shown in a 4:5 frame.
+              <T>
+                Only photos you own or have permission to use. No logos of other
+                brands.
+              </T>
+            </li>
+            <li>
+              <T>
+                JPG, PNG or WebP, up to 5 MB. It&apos;s shown in a 4:5 frame.
+              </T>
             </li>
           </ul>
           <input
@@ -1101,10 +1168,10 @@ function PhotoStep({
               className="btn-primary"
             >
               {pending
-                ? "Uploading..."
+                ? tr("Uploading...")
                 : url
-                  ? "Replace photo"
-                  : "Upload photo"}
+                  ? tr("Replace photo")
+                  : tr("Upload photo")}
             </button>
             {url && (
               <button
@@ -1119,17 +1186,19 @@ function PhotoStep({
                 }
                 className="btn-secondary"
               >
-                Remove
+                <T>Remove</T>
               </button>
             )}
           </div>
           {error && (
             <p role="alert" className="text-danger">
-              {error}
+              {tr(error)}
             </p>
           )}
           <p className="text-xs text-muted" data-coach={coachId}>
-            Your photo goes live with the rest of your profile after review.
+            <T>
+              Your photo goes live with the rest of your profile after review.
+            </T>
           </p>
         </div>
       </div>
@@ -1144,6 +1213,7 @@ function PricingStep({
   draft: CoachDraft;
   update: <K extends keyof CoachDraft>(key: K, value: CoachDraft[K]) => void;
 }) {
+  const tr = useTr();
   const packages = draft.packages;
   function change(i: number, value: Partial<CoachDraft["packages"][number]>) {
     update(
@@ -1154,10 +1224,12 @@ function PricingStep({
   return (
     <div className="space-y-6">
       <Note>
-        Show exactly what each option costs and includes. Monthly plans are paid
-        through your GYMX2 Memberships (set them up in{" "}
+        <T>
+          Show exactly what each option costs and includes. Monthly plans are
+          paid through your GYMX2 Memberships (set them up in
+        </T>{" "}
         <Link href="/plans" className="text-link">
-          Plans
+          <T>Plans</T>
         </Link>
         ); the other options here are shown to members as details to discuss.
         Your starting price is always your cheapest monthly option.
@@ -1166,19 +1238,19 @@ function PricingStep({
         <div key={i} className="space-y-3 rounded-xl border border-border p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <TextInput
-              label="Name"
+              label={tr("Name")}
               value={item.name}
               max={60}
               onChange={(v) => change(i, { name: v })}
-              placeholder="Online Coaching"
+              placeholder={tr("Online Coaching")}
             />
             <SelectInput
-              label="Type"
+              label={tr("Type")}
               value={item.kind}
               options={PACKAGE_KINDS}
               onChange={(v) => v && change(i, { kind: v })}
             />
-            <Field label="Price (US dollars)">
+            <Field label={tr("Price (US dollars)")}>
               <input
                 type="number"
                 inputMode="decimal"
@@ -1205,30 +1277,30 @@ function PricingStep({
               {item.priceCents > 0 &&
                 (["monthly", "premium", "group"].includes(item.kind)
                   ? " / month"
-                  : " one time")}
+                  : tr(" one time"))}
             </p>
             <TextInput
-              label="Sessions included"
+              label={tr("Sessions included")}
               value={item.sessions}
               max={80}
               onChange={(v) => change(i, { sessions: v })}
-              placeholder="4 live sessions a month"
+              placeholder={tr("4 live sessions a month")}
             />
             <TextInput
-              label="Length"
+              label={tr("Length")}
               value={item.duration}
               max={60}
               onChange={(v) => change(i, { duration: v })}
-              placeholder="45 minutes each"
+              placeholder={tr("45 minutes each")}
             />
           </div>
           <ChipInput
-            label="What's included"
+            label={tr("What's included")}
             values={item.includes}
             onChange={(v) => change(i, { includes: v })}
             max={6}
             maxLength={80}
-            placeholder="Weekly check-ins"
+            placeholder={tr("Weekly check-ins")}
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-sm">
@@ -1246,7 +1318,7 @@ function PricingStep({
                 }
                 className="accent-[var(--accent)]"
               />
-              Highlight as my pick
+              <T>Highlight as my pick</T>
             </label>
             <button
               type="button"
@@ -1258,7 +1330,7 @@ function PricingStep({
               }
               className="cursor-pointer text-sm text-muted hover:text-danger"
             >
-              Remove option
+              <T>Remove option</T>
             </button>
           </div>
         </div>
@@ -1282,11 +1354,13 @@ function PricingStep({
           }
           className="btn-secondary px-4 py-2 text-sm"
         >
-          Add a pricing option
+          <T>Add a pricing option</T>
         </button>
       )}
       <div className="space-y-4 border-t border-border pt-5">
-        <p className="text-sm font-semibold">Commitment and policies</p>
+        <p className="text-sm font-semibold">
+          <T>Commitment and policies</T>
+        </p>
         <div className="grid gap-4 sm:grid-cols-2">
           {POLICY_FIELDS.map((field) => (
             <TextInput

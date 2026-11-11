@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
+import { T, useTr } from "@/i18n/t";
 
 export function Field({
   label,
@@ -16,10 +17,14 @@ export function Field({
   return (
     <div className="space-y-1.5">
       <label htmlFor={htmlFor} className="block text-sm font-semibold">
-        {label}
+        <T>{label}</T>
       </label>
       {children}
-      {hint && <p className="text-xs text-muted">{hint}</p>}
+      {hint && (
+        <p className="text-xs text-muted">
+          <T>{hint}</T>
+        </p>
+      )}
     </div>
   );
 }
@@ -78,7 +83,9 @@ export function TextArea({
       htmlFor={id}
       hint={
         <span className="flex justify-between gap-3">
-          <span>{hint}</span>
+          <span>
+            <T>{hint}</T>
+          </span>
           <span className="tabular-nums">
             {value.length}/{max}
           </span>
@@ -116,6 +123,7 @@ export function ChipInput({
   placeholder?: string;
   hint?: ReactNode;
 }) {
+  const tr = useTr();
   const id = useId();
   const [draft, setDraft] = useState("");
   function add() {
@@ -130,7 +138,7 @@ export function ChipInput({
       htmlFor={id}
       hint={
         <>
-          {hint} {values.length}/{max}
+          <T>{hint}</T> {values.length}/{max}
         </>
       }
     >
@@ -145,7 +153,7 @@ export function ChipInput({
               <button
                 type="button"
                 onClick={() => onChange(values.filter((v) => v !== value))}
-                aria-label={`Remove ${value}`}
+                aria-label={tr("Remove {value}", { value })}
                 className="grid size-6 cursor-pointer place-items-center rounded-full text-muted hover:text-danger"
               >
                 ×
@@ -175,7 +183,7 @@ export function ChipInput({
             onClick={add}
             className="btn-secondary shrink-0 px-4"
           >
-            Add
+            <T>Add</T>
           </button>
         </div>
       )}
@@ -205,8 +213,14 @@ export function CheckboxGroup<T extends string>({
   );
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm font-semibold">{legend}</legend>
-      {hint && <p className="text-xs text-muted">{hint}</p>}
+      <legend className="text-sm font-semibold">
+        <T>{legend}</T>
+      </legend>
+      {hint && (
+        <p className="text-xs text-muted">
+          <T>{hint}</T>
+        </p>
+      )}
       <div className={`grid gap-2 ${columns === 2 ? "sm:grid-cols-2" : ""}`}>
         {items.map((item) => {
           const checked = values.includes(item.value);
@@ -227,7 +241,7 @@ export function CheckboxGroup<T extends string>({
                 }
                 className="accent-[var(--accent)]"
               />
-              {item.label}
+              <T>{item.label}</T>
             </label>
           );
         })}
@@ -252,8 +266,14 @@ export function RadioCards<T extends string>({
   const name = useId();
   return (
     <fieldset className="space-y-2">
-      <legend className="text-sm font-semibold">{legend}</legend>
-      {hint && <p className="text-xs text-muted">{hint}</p>}
+      <legend className="text-sm font-semibold">
+        <T>{legend}</T>
+      </legend>
+      {hint && (
+        <p className="text-xs text-muted">
+          <T>{hint}</T>
+        </p>
+      )}
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map((option) => {
           const checked = value === option.value;
@@ -270,10 +290,12 @@ export function RadioCards<T extends string>({
                 className="mt-0.5 accent-[var(--accent)]"
               />
               <span>
-                <span className="font-medium">{option.label}</span>
+                <span className="font-medium">
+                  <T>{option.label}</T>
+                </span>
                 {option.description && (
                   <span className="block text-xs text-muted">
-                    {option.description}
+                    <T>{option.description}</T>
                   </span>
                 )}
               </span>
@@ -311,10 +333,14 @@ export function SelectInput<T extends string>({
         }
         className="field-input"
       >
-        {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
+        {emptyLabel !== undefined && (
+          <option value="">
+            <T>{emptyLabel}</T>
+          </option>
+        )}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.label}
+            <T>{option.label}</T>
           </option>
         ))}
       </select>

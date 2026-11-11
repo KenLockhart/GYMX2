@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { T } from "@/i18n/t";
 
 type Month = { key: string; label: string; cents: number };
 
@@ -39,7 +40,9 @@ export function EarningsChart({ months }: { months: Month[] }) {
   return (
     <figure className="space-y-2">
       <figcaption className="flex items-baseline justify-between text-sm">
-        <span className="font-medium">Your earnings by month, after fees</span>
+        <span className="font-medium">
+          <T>Your earnings by month, after fees</T>
+        </span>
         <span className="tabular-nums text-muted" aria-live="polite">
           {months[shown].label}: {money(months[shown].cents)}
         </span>
@@ -114,7 +117,7 @@ export function EarningsChart({ months }: { months: Month[] }) {
                     : "var(--color-muted)"
                 }
               >
-                {month.label}
+                <T>{month.label}</T>
               </text>
             </g>
           );

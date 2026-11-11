@@ -6,8 +6,10 @@ import {
   decideCoachReport,
   decideReviewReport,
 } from "@/app/(app)/admin/reports/actions";
+import { T, useTr } from "@/i18n/t";
 
 export function ReviewReportDecision({ reportId }: { reportId: string }) {
+  const tr = useTr();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -26,7 +28,7 @@ export function ReviewReportDecision({ reportId }: { reportId: string }) {
         onClick={() => decide("hidden")}
         className="btn-primary px-3 py-1.5 text-sm"
       >
-        Hide review
+        <T>Hide review</T>
       </button>
       <button
         type="button"
@@ -34,11 +36,11 @@ export function ReviewReportDecision({ reportId }: { reportId: string }) {
         onClick={() => decide("dismissed")}
         className="btn-secondary px-3 py-1.5 text-sm"
       >
-        Looks fine
+        <T>Looks fine</T>
       </button>
       {error && (
         <span role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </span>
       )}
     </div>
@@ -46,6 +48,7 @@ export function ReviewReportDecision({ reportId }: { reportId: string }) {
 }
 
 export function CoachReportDecision({ reportId }: { reportId: string }) {
+  const tr = useTr();
   const router = useRouter();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,13 +63,17 @@ export function CoachReportDecision({ reportId }: { reportId: string }) {
   return (
     <div className="space-y-2">
       <label className="block space-y-1 text-sm">
-        <span className="font-medium">What you did (only admins see this)</span>
+        <span className="font-medium">
+          <T>What you did (only admins see this)</T>
+        </span>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           maxLength={1000}
-          placeholder="e.g. Asked the coach to remove the claim; checked their credentials."
+          placeholder={tr(
+            "e.g. Asked the coach to remove the claim; checked their credentials.",
+          )}
           className="field-input"
         />
       </label>
@@ -77,7 +84,7 @@ export function CoachReportDecision({ reportId }: { reportId: string }) {
           onClick={() => decide("actioned")}
           className="btn-primary px-3 py-1.5 text-sm"
         >
-          Handled
+          <T>Handled</T>
         </button>
         <button
           type="button"
@@ -85,11 +92,11 @@ export function CoachReportDecision({ reportId }: { reportId: string }) {
           onClick={() => decide("dismissed")}
           className="btn-secondary px-3 py-1.5 text-sm"
         >
-          No action needed
+          <T>No action needed</T>
         </button>
         {error && (
           <span role="alert" className="text-sm text-danger">
-            {error}
+            {tr(error)}
           </span>
         )}
       </div>

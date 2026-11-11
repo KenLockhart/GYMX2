@@ -9,6 +9,7 @@ import {
   removePost,
 } from "@/app/(app)/community/actions";
 import { timeAgo } from "@/lib/community";
+import { T, useTr } from "@/i18n/t";
 
 export type QueueItem = {
   key: string;
@@ -37,12 +38,19 @@ function Item({
   item: QueueItem;
   onDone: (key: string, outcome: string) => void;
 }) {
+  const tr = useTr();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function remove() {
     const reason = window.prompt(
-      `Remove this ${item.kind} for everyone? Add a short reason for the author (optional).`,
+      item.kind === "post"
+        ? tr(
+            "Remove this post for everyone? Add a short reason for the author (optional).",
+          )
+        : tr(
+            "Remove this comment for everyone? Add a short reason for the author (optional).",
+          ),
     );
     if (reason === null) return;
     setError(null);
@@ -77,19 +85,21 @@ function Item({
   return (
     <li className="space-y-3 rounded-lg border border-border bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="font-semibold text-danger">{item.summary}</p>
+        <p className="font-semibold text-danger">
+          <T>{item.summary}</T>
+        </p>
         <p className="text-xs text-muted">
           reported {timeAgo(item.reportedAt)}
         </p>
       </div>
       <div className="rounded border border-border bg-surface-raised p-3">
         <p className="text-xs text-muted">
-          {item.kind === "post" ? "Post" : "Comment"} by{" "}
+          {item.kind === "post" ? tr("Post") : tr("Comment")} by{" "}
           <span className="font-semibold text-foreground">
             {item.authorName}
           </span>{" "}
           · {item.where} · {timeAgo(item.createdAt)}
-          {item.alreadyRemoved && " · already removed"}
+          {item.alreadyRemoved && <T>{" · already removed"}</T>}
         </p>
         {item.body && (
           <p className="mt-2 whitespace-pre-line break-words">{item.body}</p>
@@ -101,7 +111,7 @@ function Item({
                 {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage link */}
                 <img
                   src={url}
-                  alt={`Photo ${index + 1}`}
+                  alt={tr("Photo {p0}", { p0: index + 1 })}
                   className="size-24 rounded object-cover"
                 />
               </a>
@@ -142,7 +152,7 @@ function Item({
             disabled={pending}
             className="btn-secondary px-3 py-1.5 text-sm"
           >
-            Looks fine
+            <T>Looks fine</T>
           </button>
         )}
         {item.reportIds.length > 0 && (
@@ -152,19 +162,21 @@ function Item({
             disabled={pending}
             className="btn-secondary px-3 py-1.5 text-sm"
           >
-            {item.alreadyRemoved ? "Close reports" : "Keep it (dismiss)"}
+            {item.alreadyRemoved
+              ? tr("Close reports")
+              : tr("Keep it (dismiss)")}
           </button>
         )}
         <Link
           href={`/community/post/${item.postId}`}
           className="text-link ml-auto text-sm"
         >
-          Open post
+          <T>Open post</T>
         </Link>
       </div>
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
     </li>
@@ -193,7 +205,7 @@ export function ModerationQueue({
       {hint && <p className="text-sm text-muted">{hint}</p>}
       {handled.length > 0 && (
         <p role="status" className="text-sm text-accent">
-          {handled[handled.length - 1].text}
+          <T>{handled[handled.length - 1].text}</T>
         </p>
       )}
       {items.length === 0 ? (
