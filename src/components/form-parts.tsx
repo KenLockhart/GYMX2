@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, startTransition, use, useActionState } from "react";
+import { useLocale } from "@/i18n/client";
+import { translateServerText } from "@/i18n/server-text";
 import type { ActionState } from "@/lib/types";
 
 const FormContext = createContext<{ state: ActionState; pending: boolean }>({
@@ -61,17 +63,18 @@ export function SubmitButton({
 
 export function FormStatus() {
   const { state } = use(FormContext);
+  const locale = useLocale();
   if (state.error) {
     return (
       <p role="alert" className="text-sm text-danger">
-        {state.error}
+        {translateServerText(state.error, locale)}
       </p>
     );
   }
   if (state.message) {
     return (
       <p role="status" className="text-sm text-success">
-        {state.message}
+        {translateServerText(state.message, locale)}
       </p>
     );
   }

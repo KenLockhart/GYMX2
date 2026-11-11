@@ -1,0 +1,50 @@
+import type { Messages } from "../messages";
+
+export const auth: Messages["auth"] = {
+  name: "Nombre",
+  email: "Correo electrónico",
+  password: "Contraseña",
+  passwordHint: "Al menos 8 caracteres.",
+  login: {
+    title: "Iniciar sesión",
+    submit: "Iniciar sesión",
+    pending: "Iniciando sesión...",
+    forgot: "¿Olvidaste tu contraseña?",
+    newHere: "¿Eres nuevo en GYMX2?",
+    createAccount: "Crea una cuenta",
+    linkExpired:
+      "Ese enlace venció o ya se usó. Si estabas confirmando tu correo, intenta iniciar sesión.",
+  },
+  signup: {
+    metaTitle: "Crea una cuenta",
+    title: "Únete a GYMX2",
+    language: "Idioma",
+    languageHint: "Puedes cambiarlo cuando quieras desde tu menú.",
+    coach: "Quiero ser coach en GYMX2.",
+    coachHint: "Un administrador revisa cada solicitud de coach.",
+    agreeBefore: "Al crear una cuenta, aceptas los",
+    terms: "Términos",
+    and: "y la",
+    privacy: "Política de privacidad",
+    agreeAfter: ", y confirmas que tienes 18 años o más.",
+    legalInEnglish: " (disponibles en inglés)",
+    submit: "Crear cuenta",
+    pending: "Creando cuenta...",
+    haveAccount: "¿Ya tienes una cuenta?",
+    login: "Inicia sesión",
+  },
+  forgot: {
+    metaTitle: "Restablece tu contraseña",
+    title: "Restablecer contraseña",
+    submit: "Enviar enlace",
+    pending: "Enviando...",
+    back: "Volver a iniciar sesión",
+  },
+  reset: {
+    metaTitle: "Elige una nueva contraseña",
+    title: "Nueva contraseña",
+    label: "Nueva contraseña",
+    submit: "Guardar contraseña",
+    pending: "Guardando...",
+  },
+};

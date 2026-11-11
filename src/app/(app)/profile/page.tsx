@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getLocale, getT } from "@/i18n/server";
+import { translateServerText } from "@/i18n/server-text";
 import { deletionBlocker } from "@/lib/account-deletion";
 import { requireAccount } from "@/lib/auth";
 import { GoalsForm, SpecialtiesForm } from "@/components/goals-form";
@@ -13,11 +15,16 @@ import { updateGoals, updateSpecialties } from "../welcome/actions";
 import { DeleteAccountForm } from "./delete-account-form";
 import { ProfileForm } from "./profile-form";
 
-export const metadata: Metadata = { title: "Your profile" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).profile.title };
+}
 
 export default async function ProfilePage() {
   const { profile, email } = await requireAccount();
   const blocker = await deletionBlocker(profile);
+  const t = await getT();
+  const locale = await getLocale();
+  const p = t.profile;
   const supabase = await createClient();
   const { data: savedSettings } = await supabase
     .from("notification_settings")
@@ -36,7 +43,7 @@ export default async function ProfilePage() {
   return (
     <div className="space-y-10">
       <div className="space-y-6">
-        <h1 className="text-5xl">Your profile</h1>
+        <h1 className="text-5xl">{p.title}</h1>
         {profile.role === "coach" && (
           <Link
             href="/profile/coach"
@@ -44,12 +51,9 @@ export default async function ProfilePage() {
           >
             <span>
               <span className="font-semibold text-accent">
-                Your coach profile
+                {p.coachProfileLink}
               </span>{" "}
-              <span className="text-muted">
-                Photo, story, coaching style, pricing and more: the page members
-                see when they find you.
-              </span>
+              <span className="text-muted">{p.coachProfileHint}</span>
             </span>
             <span aria-hidden className="text-accent">
               →
@@ -66,13 +70,12 @@ export default async function ProfilePage() {
           className="scroll-mt-6 space-y-4 border-t border-border pt-8"
         >
           <h2 id="goals-heading" className="text-2xl">
-            Your goals
+            {p.goals.title}
           </h2>
           <p className="max-w-xl text-sm text-muted">
-            Used to suggest coaches. Coaches you join see these so they can
-            tailor your training.{" "}
+            {p.goals.body}{" "}
             <Link href="/welcome/matches" className="text-link">
-              See your matches
+              {p.goals.matches}
             </Link>
           </p>
           <GoalsForm
@@ -82,7 +85,7 @@ export default async function ProfilePage() {
               experience: profile.experience,
               focus: profile.focus,
             }}
-            submitLabel="Save goals"
+            submitLabel={p.goals.save}
           />
         </section>
       )}
@@ -94,12 +97,9 @@ export default async function ProfilePage() {
           className="scroll-mt-6 space-y-3 border-t border-border pt-8"
         >
           <h2 id="specialties-heading" className="text-2xl">
-            Your specialties
+            {p.specialties.title}
           </h2>
-          <p className="max-w-xl text-sm text-muted">
-            New members pick their goals when they sign up. Pick what you coach
-            best and you&apos;ll be suggested to members who want it.
-          </p>
+          <p className="max-w-xl text-sm text-muted">{p.specialties.body}</p>
           <SpecialtiesForm
             action={updateSpecialties}
             initial={profile.specialties}
@@ -114,16 +114,15 @@ export default async function ProfilePage() {
           className="scroll-mt-6 space-y-3 border-t border-border pt-8"
         >
           <h2 id="public-page-heading" className="text-2xl">
-            Public page
+            {p.publicPage.title}
           </h2>
           <p className="max-w-xl text-sm text-muted">
-            A page you can share on social media and in your bio so new people
-            can find you and join on GYMX2.
+            {p.publicPage.body}
             {profile.public_page && profile.public_slug && (
               <>
                 {" "}
                 <Link href={`/c/${profile.public_slug}`} className="text-link">
-                  View your page
+                  {p.publicPage.view}
                 </Link>
               </>
             )}
@@ -141,26 +140,21 @@ export default async function ProfilePage() {
         className="scroll-mt-6 space-y-3 border-t border-border pt-8"
       >
         <h2 id="push" className="text-2xl">
-          Phone notifications
+          {p.push.title}
         </h2>
         <p className="max-w-xl text-sm text-muted">
           {profile.role === "admin"
-            ? "Get a notification on this device when a message needs review."
+            ? p.push.admin
             : profile.role === "coach"
-              ? "Get a notification on this device for new messages and group posts from your members."
-              : "Get a notification on this device for messages, group posts, your coach going live and new program days."}{" "}
-          Turn it on separately for each phone or computer you use.
+              ? p.push.coach
+              : p.push.member}{" "}
+          {p.push.eachDevice}
         </p>
         <PushToggle
           publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
         />
-        <h3 className="pt-4 text-xl">Community notifications</h3>
-        <p className="max-w-xl text-sm text-muted">
-          Choose what shows in your notifications (the bell in the menu), what
-          sends to your phone and what we email you. Phone notifications also
-          need to be turned on above, and emails need &ldquo;Email me about
-          messages, sessions and reminders&rdquo; on in your profile.
-        </p>
+        <h3 className="pt-4 text-xl">{p.community.title}</h3>
+        <p className="max-w-xl text-sm text-muted">{p.community.body}</p>
         <NotificationSettingsForm initial={notificationSettings} />
       </section>
 
@@ -170,14 +164,11 @@ export default async function ProfilePage() {
           className="space-y-2 border-t border-border pt-8"
         >
           <h2 id="affiliate" className="text-2xl">
-            Affiliate program
+            {p.affiliate.title}
           </h2>
-          <p className="max-w-xl text-sm text-muted">
-            Earn by bringing people to GYMX2: a share of what they buy for a
-            year, plus a bonus when they make their first purchase.
-          </p>
+          <p className="max-w-xl text-sm text-muted">{p.affiliate.body}</p>
           <Link href="/affiliate" className="btn-secondary">
-            Open the affiliate program
+            {p.affiliate.open}
           </Link>
         </section>
       )}
@@ -187,19 +178,15 @@ export default async function ProfilePage() {
         className="space-y-2 border-t border-border pt-8"
       >
         <h2 id="your-data" className="text-2xl">
-          Your data
+          {p.data.title}
         </h2>
-        <p className="max-w-xl text-sm text-muted">
-          Download a copy of everything GYMX2 keeps about you: your profile,
-          messages, tracking, check-ins, purchases and more, as a JSON file you
-          can open in any text editor.
-        </p>
+        <p className="max-w-xl text-sm text-muted">{p.data.body}</p>
         <a
           href="/api/me/export"
           download
           className="btn-secondary inline-block"
         >
-          Download my data
+          {p.data.download}
         </a>
       </section>
 
@@ -208,10 +195,12 @@ export default async function ProfilePage() {
         className="space-y-4 border-t border-border pt-8"
       >
         <h2 id="delete-account" className="text-2xl">
-          Delete your account
+          {p.delete.title}
         </h2>
         {blocker || profile.role === "admin" ? (
-          <p className="max-w-xl text-sm text-muted">{blocker}</p>
+          <p className="max-w-xl text-sm text-muted">
+            {blocker && translateServerText(blocker, locale)}
+          </p>
         ) : (
           <DeleteAccountForm
             role={profile.role === "coach" ? "coach" : "member"}

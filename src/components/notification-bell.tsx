@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { unreadNotificationCount } from "@/app/(app)/notifications/actions";
+import { useT } from "@/i18n/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 // The bell in the menu. The count updates live: row security means only the signed-in person's
@@ -15,6 +16,7 @@ export function NotificationBell({
   me: string;
   initialCount: number;
 }) {
+  const t = useT();
   const [count, setCount] = useState(initialCount);
   const pathname = usePathname();
 
@@ -72,7 +74,8 @@ export function NotificationBell({
         <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
       </svg>
       <span className="sr-only">
-        Notifications{count > 0 && `, ${count} unread`}
+        {t.nav.links["/notifications"]}
+        {count > 0 && t.nav.unread(count)}
       </span>
       {count > 0 && (
         <span

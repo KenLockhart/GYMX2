@@ -6,6 +6,8 @@ import {
   savePushSubscription,
   sendTestPush,
 } from "@/app/(app)/profile/push-actions";
+import { useLocale, useT } from "@/i18n/client";
+import { translateServerText } from "@/i18n/server-text";
 
 type Status =
   "checking" | "unsupported" | "install-first" | "blocked" | "off" | "on";
@@ -54,6 +56,8 @@ function isInstalled() {
 }
 
 export function PushToggle({ publicKey }: { publicKey: string | null }) {
+  const p = useT().profile.push;
+  const locale = useLocale();
   const [status, setStatus] = useState<Status>("checking");
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -110,11 +114,9 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
         });
         if (result.error) return setMessage(result.error);
         setStatus("on");
-        setMessage("Notifications are on for this device.");
+        setMessage(p.on);
       } catch {
-        setMessage(
-          "This browser wouldn't turn on notifications. Please try again.",
-        );
+        setMessage(p.failed);
       }
     });
   }
@@ -136,38 +138,29 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
     setMessage(null);
     start(async () => {
       const result = await sendTestPush();
-      setMessage(result.error ?? "Sent. It should appear in a few seconds.");
+      setMessage(result.error ?? p.sent);
     });
   }
 
   return (
     <div className="space-y-3">
       {status === "checking" && (
-        <p className="text-sm text-muted">Checking this device...</p>
+        <p className="text-sm text-muted">{p.checking}</p>
       )}
       {status === "unsupported" && (
-        <p className="text-sm text-muted">
-          This browser can&apos;t get notifications. Try Chrome, Edge, Firefox
-          or Safari.
-        </p>
+        <p className="text-sm text-muted">{p.unsupported}</p>
       )}
       {status === "install-first" && (
         <div className="space-y-1 text-sm">
-          <p className="font-medium">
-            On iPhone and iPad, add GYMX2 to your Home Screen first.
-          </p>
+          <p className="font-medium">{p.iosTitle}</p>
           <p className="text-muted">
-            In Safari, tap the Share button, then{" "}
-            <strong>Add to Home Screen</strong>. Open GYMX2 from the new icon
-            and come back here to turn notifications on.
+            {p.iosBefore} <strong>{p.iosAdd}</strong>
+            {p.iosAfter}
           </p>
         </div>
       )}
       {status === "blocked" && (
-        <p className="text-sm text-muted">
-          Notifications are blocked for GYMX2 in this browser&apos;s settings.
-          Allow them there, then reload this page.
-        </p>
+        <p className="text-sm text-muted">{p.blocked}</p>
       )}
       {status === "off" && (
         <button
@@ -176,7 +169,7 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
           disabled={pending}
           className="btn-primary"
         >
-          {pending ? "Turning on..." : "Turn on notifications"}
+          {pending ? p.turningOn : p.turnOn}
         </button>
       )}
       {status === "on" && (
@@ -187,7 +180,7 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
             disabled={pending}
             className="btn-secondary"
           >
-            Send a test
+            {p.test}
           </button>
           <button
             type="button"
@@ -195,13 +188,13 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
             disabled={pending}
             className="btn-secondary"
           >
-            Turn off on this device
+            {p.turnOff}
           </button>
         </div>
       )}
       {message && (
         <p role="status" className="text-sm text-muted">
-          {message}
+          {translateServerText(message, locale)}
         </p>
       )}
     </div>

@@ -6,6 +6,7 @@ import {
   FormStatus,
   SubmitButton,
 } from "@/components/form-parts";
+import { useT } from "@/i18n/client";
 import type { Profile } from "@/lib/types";
 import { updateProfile } from "./actions";
 
@@ -28,7 +29,7 @@ const socialFields = [
   { name: "x_url", label: "X", placeholder: "https://x.com/yourname" },
   {
     name: "website_url",
-    label: "Website",
+    label: "website",
     placeholder: "https://yourwebsite.com",
   },
 ] as const;
@@ -40,19 +41,21 @@ export function ProfileForm({
   profile: Profile;
   email: string;
 }) {
+  const t = useT();
+  const f = t.profile.form;
   return (
     <ActionForm action={updateProfile} className="max-w-xl space-y-6">
       <section className="space-y-4">
         <Field
-          label="Name"
+          label={t.auth.name}
           name="display_name"
           defaultValue={profile.display_name}
           maxLength={80}
           required
         />
-        <Field label="Email" value={email} disabled readOnly />
+        <Field label={t.auth.email} value={email} disabled readOnly />
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Bio</span>
+          <span className="text-sm font-medium">{f.bio}</span>
           <textarea
             name="bio"
             rows={4}
@@ -64,11 +67,11 @@ export function ProfileForm({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-2xl">Social links</h2>
+        <h2 className="text-2xl">{f.social}</h2>
         {socialFields.map((field) => (
           <Field
             key={field.name}
-            label={field.label}
+            label={field.label === "website" ? f.website : field.label}
             name={field.name}
             type="url"
             placeholder={field.placeholder}
@@ -78,7 +81,7 @@ export function ProfileForm({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-2xl">Emails</h2>
+        <h2 className="text-2xl">{f.emails}</h2>
         <label className="flex items-start gap-3 text-sm">
           <input
             type="checkbox"
@@ -87,11 +90,8 @@ export function ProfileForm({
             className="mt-0.5 size-4 accent-accent"
           />
           <span>
-            Email me about messages, sessions and reminders
-            <span className="block text-muted">
-              Includes session and Task-due reminders, streak nudges and a
-              Monday summary. We always email about your orders.
-            </span>
+            {f.emailUpdates}
+            <span className="block text-muted">{f.emailUpdatesHint}</span>
           </span>
         </label>
       </section>
@@ -105,17 +105,15 @@ export function ProfileForm({
             className="mt-0.5 size-4 accent-accent"
           />
           <span>
-            I want to coach on GYMX2.
-            <span className="block text-muted">
-              An admin reviews every coach request.
-            </span>
+            {t.auth.signup.coach}
+            <span className="block text-muted">{t.auth.signup.coachHint}</span>
           </span>
         </label>
       )}
 
       <FormStatus />
-      <SubmitButton pendingText="Saving..." className="btn-primary">
-        Save profile
+      <SubmitButton pendingText={t.common.saving} className="btn-primary">
+        {f.save}
       </SubmitButton>
     </ActionForm>
   );
