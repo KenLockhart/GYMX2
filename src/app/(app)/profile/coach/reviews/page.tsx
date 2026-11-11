@@ -11,8 +11,13 @@ import {
 } from "@/lib/reviews";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { T } from "@/i18n/t";
+import { getTr, getLocale } from "@/i18n/server";
+import { LOCALE_TAG } from "@/i18n/config";
 
-export const metadata: Metadata = { title: "Your reviews" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Your reviews") };
+}
 
 type Row = {
   id: string;
@@ -26,6 +31,8 @@ type Row = {
 
 // A coach reads their reviews, replies in public, and reports any that break the rules.
 export default async function CoachReviewsPage() {
+  const locale = await getLocale();
+  const tr = await getTr();
   const { profile } = await requireCoach();
   const supabase = await createClient();
   const { data } = await supabase
@@ -60,14 +67,18 @@ export default async function CoachReviewsPage() {
     <div className="space-y-6">
       <div>
         <Link href="/profile/coach" className="text-link text-sm">
-          Back to your profile
+          <T>Back to your profile</T>
         </Link>
-        <h1 className="mt-2 text-5xl">Your reviews</h1>
+        <h1 className="mt-2 text-5xl">
+          <T>Your reviews</T>
+        </h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Members who joined you can review you once. You can reply in public,
-          but you can&apos;t edit or remove reviews. If one breaks the rules
-          (fake, abusive or sharing private details), report it and an admin
-          will check it.
+          <T>
+            Members who joined you can review you once. You can reply in public,
+            but you can&apos;t edit or remove reviews. If one breaks the rules
+            (fake, abusive or sharing private details), report it and an admin
+            will check it.
+          </T>
         </p>
       </div>
 
@@ -77,7 +88,10 @@ export default async function CoachReviewsPage() {
             <p className="font-display text-6xl font-bold leading-none">
               {average}
             </p>
-            <Stars value={average} label={`Rated ${average} out of 5`} />
+            <Stars
+              value={average}
+              label={tr("Rated {average} out of 5", { average })}
+            />
             <p className="mt-1 text-sm text-muted">
               {visible.length} {visible.length === 1 ? "review" : "reviews"}
             </p>
@@ -89,7 +103,9 @@ export default async function CoachReviewsPage() {
                   key={c.label}
                   className="flex justify-between rounded-lg bg-surface-raised px-3 py-2 text-sm"
                 >
-                  <dt>{c.label}</dt>
+                  <dt>
+                    <T>{c.label}</T>
+                  </dt>
                   <dd className="font-semibold tabular-nums">
                     {c.score.toFixed(1)}
                   </dd>
@@ -98,8 +114,10 @@ export default async function CoachReviewsPage() {
             </dl>
           ) : (
             <p className="self-center text-sm text-muted">
-              Category scores (communication, knowledge and so on) show once
-              three members rate each one.
+              <T>
+                Category scores (communication, knowledge and so on) show once
+                three members rate each one.
+              </T>
             </p>
           )}
         </div>
@@ -107,7 +125,9 @@ export default async function CoachReviewsPage() {
 
       {rows.length === 0 ? (
         <p className="rounded-2xl border border-border bg-surface p-6 text-muted">
-          No reviews yet. Members can review you once they&apos;ve joined.
+          <T>
+            No reviews yet. Members can review you once they&apos;ve joined.
+          </T>
         </p>
       ) : (
         <ul className="space-y-3">
@@ -125,12 +145,15 @@ export default async function CoachReviewsPage() {
                   <Stars value={row.rating} label={`${row.rating} out of 5`} />
                 </div>
                 <p className="text-xs text-muted">
-                  {new Date(row.created_at).toLocaleDateString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                    timeZone: "America/New_York",
-                  })}
+                  {new Date(row.created_at).toLocaleDateString(
+                    LOCALE_TAG[locale],
+                    {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                      timeZone: "America/New_York",
+                    },
+                  )}
                   {row.hidden && " · Hidden by a GYMX2 admin"}
                 </p>
                 {row.body && <p className="whitespace-pre-line">{row.body}</p>}

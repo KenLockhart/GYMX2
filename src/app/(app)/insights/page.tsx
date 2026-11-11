@@ -16,8 +16,12 @@ import { loadCoachInsights } from "@/lib/coach-insights-data";
 import { MEMBERSHIP_FEE_PERCENT } from "@/lib/memberships";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { idSchema } from "@/lib/validation";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Insights" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Insights") };
+}
 
 const money = (cents: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -49,6 +53,7 @@ export default async function InsightsPage({
 }: {
   searchParams: Promise<{ coach?: string }>;
 }) {
+  const tr = await getTr();
   const { profile } = await requireCoachOrAdmin();
   const isAdmin = profile.role === "admin";
   const { coach } = await searchParams;
@@ -67,8 +72,12 @@ export default async function InsightsPage({
     if (!chosen) {
       return (
         <div className="space-y-4">
-          <h1 className="text-5xl">Coach insights</h1>
-          <p className="text-muted">No coaches yet.</p>
+          <h1 className="text-5xl">
+            <T>Coach insights</T>
+          </h1>
+          <p className="text-muted">
+            <T>No coaches yet.</T>
+          </p>
         </div>
       );
     }
@@ -102,12 +111,14 @@ export default async function InsightsPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-5xl">
-            {isAdmin ? "Coach insights" : "Insights"}
+            {isAdmin ? tr("Coach insights") : tr("Insights")}
           </h1>
           <p className="mt-2 max-w-2xl text-muted">
             {isAdmin
-              ? `How ${coachName}'s business is doing.`
-              : "How your coaching business is doing."}{" "}
+              ? tr("How {coachName}'s business is doing.", {
+                  coachName: coachName ?? "",
+                })
+              : tr("How your coaching business is doing.")}{" "}
             Earnings are after GYMX2&apos;s {MEMBERSHIP_FEE_PERCENT}% fee and
             refunds.
           </p>
@@ -115,7 +126,9 @@ export default async function InsightsPage({
         {isAdmin && (
           <form className="flex items-end gap-2">
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium">Coach</span>
+              <span className="text-sm font-medium">
+                <T>Coach</T>
+              </span>
               <select
                 name="coach"
                 defaultValue={coachId}
@@ -129,36 +142,47 @@ export default async function InsightsPage({
               </select>
             </label>
             <button type="submit" className="btn-secondary">
-              Show
+              <T>Show</T>
             </button>
           </form>
         )}
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-2xl">Earnings</h2>
+        <h2 className="text-2xl">
+          <T>Earnings</T>
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Tile
-            label="This month"
+            label={tr("This month")}
             value={money(money6.thisMonth)}
             note={
               change === null
                 ? undefined
-                : `${change >= 0 ? "+" : ""}${change}% vs last month`
+                : tr("{change}% vs last month", {
+                    change: `${change >= 0 ? "+" : ""}${change}`,
+                  })
             }
           />
           <Tile
-            label="Monthly memberships"
+            label={tr("Monthly memberships")}
             value={money(money6.monthlyRecurring)}
-            note={`${money6.payingMembers} paying${money6.trialingMembers ? ` · ${money6.trialingMembers} on trial` : ""}${
-              money6.cancelling ? ` · ${money6.cancelling} cancelling` : ""
+            note={`${tr("{n} paying", { n: money6.payingMembers })}${money6.trialingMembers ? tr(" · {trialingMembers} on trial", { trialingMembers: money6.trialingMembers }) : ""}${
+              money6.cancelling
+                ? tr(" · {n} cancelling", { n: money6.cancelling })
+                : ""
             }`}
           />
-          <Tile label="Armory, all time" value={money(money6.fromArmory)} />
           <Tile
-            label="All time"
+            label={tr("Armory, all time")}
+            value={money(money6.fromArmory)}
+          />
+          <Tile
+            label={tr("All time")}
             value={money(money6.allTime)}
-            note={`${money(money6.fromMemberships)} from memberships`}
+            note={tr("{amount} from memberships", {
+              amount: money(money6.fromMemberships),
+            })}
           />
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">
@@ -167,27 +191,36 @@ export default async function InsightsPage({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-2xl">Members</h2>
+        <h2 className="text-2xl">
+          <T>Members</T>
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Tile
-            label="Members"
+            label={tr("Members")}
             value={String(health.total)}
-            note={`${health.newThisMonth} joined in the last 30 days`}
+            note={tr("{n} joined in the last 30 days", {
+              n: health.newThisMonth,
+            })}
           />
           <Tile
-            label="Active this week"
+            label={tr("Active this week")}
             value={String(health.activeThisWeek)}
-            note="Did a task, replied, posted or showed up"
+            note={tr("Did a task, replied, posted or showed up")}
           />
           <Tile
-            label="Tasks done"
+            label={tr("Tasks done")}
             value={rate(tasks.rate)}
-            note={`${tasks.done} of ${tasks.given} given in the last 30 days`}
+            note={tr("{done} of {given} given in the last 30 days", {
+              done: tasks.done,
+              given: tasks.given,
+            })}
           />
           <Tile
-            label="Session turnout"
+            label={tr("Session turnout")}
             value={rate(turnout.goingRate)}
-            note={`Said going · ${rate(turnout.liveRate)} watched live, last 30 days`}
+            note={tr("Said going · {rate} watched live, last 30 days", {
+              rate: rate(turnout.liveRate),
+            })}
           />
         </div>
 
@@ -209,14 +242,16 @@ export default async function InsightsPage({
                   <span className="font-medium">{row.name}</span>
                   <span className="flex items-center gap-3 text-muted">
                     {row.daysQuiet === null
-                      ? "No activity yet"
-                      : `Quiet for ${row.daysQuiet} days`}
+                      ? tr("No activity yet")
+                      : tr("Quiet for {daysQuiet} days", {
+                          daysQuiet: row.daysQuiet,
+                        })}
                     {!isAdmin && (
                       <Link
                         href={`/messages/${row.member_id}`}
                         className="text-link"
                       >
-                        Check in
+                        <T>Check in</T>
                       </Link>
                     )}
                   </span>
@@ -234,18 +269,26 @@ export default async function InsightsPage({
 
       <div className="grid gap-8 lg:grid-cols-2">
         <section className="space-y-3">
-          <h2 className="text-2xl">Best sellers</h2>
+          <h2 className="text-2xl">
+            <T>Best sellers</T>
+          </h2>
           {top.length === 0 ? (
             <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-              No Armory sales yet.
+              <T>No Armory sales yet.</T>
             </p>
           ) : (
             <table className="w-full overflow-hidden rounded-lg border border-border bg-surface text-sm">
               <thead className="text-left text-muted">
                 <tr>
-                  <th className="p-3 font-medium">Item</th>
-                  <th className="p-3 text-right font-medium">Sold</th>
-                  <th className="p-3 text-right font-medium">Earned</th>
+                  <th className="p-3 font-medium">
+                    <T>Item</T>
+                  </th>
+                  <th className="p-3 text-right font-medium">
+                    <T>Sold</T>
+                  </th>
+                  <th className="p-3 text-right font-medium">
+                    <T>Earned</T>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -264,13 +307,15 @@ export default async function InsightsPage({
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-2xl">Programs</h2>
+          <h2 className="text-2xl">
+            <T>Programs</T>
+          </h2>
           {programs.length === 0 ? (
             <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-              No programs yet.{" "}
+              <T>No programs yet.</T>{" "}
               {!isAdmin && (
                 <Link href="/programs" className="text-link">
-                  Build one
+                  <T>Build one</T>
                 </Link>
               )}
             </p>
@@ -278,10 +323,18 @@ export default async function InsightsPage({
             <table className="w-full overflow-hidden rounded-lg border border-border bg-surface text-sm">
               <thead className="text-left text-muted">
                 <tr>
-                  <th className="p-3 font-medium">Program</th>
-                  <th className="p-3 text-right font-medium">Started</th>
-                  <th className="p-3 text-right font-medium">Finished</th>
-                  <th className="p-3 text-right font-medium">Avg. done</th>
+                  <th className="p-3 font-medium">
+                    <T>Program</T>
+                  </th>
+                  <th className="p-3 text-right font-medium">
+                    <T>Started</T>
+                  </th>
+                  <th className="p-3 text-right font-medium">
+                    <T>Finished</T>
+                  </th>
+                  <th className="p-3 text-right font-medium">
+                    <T>Avg. done</T>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

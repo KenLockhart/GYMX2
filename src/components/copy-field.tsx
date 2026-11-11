@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useTr } from "@/i18n/t";
 
 // A read-only value with a Copy button, for links people share.
 export function CopyField({ label, value }: { label: string; value: string }) {
+  const tr = useTr();
   const [copied, setCopied] = useState(false);
   return (
     <div className="space-y-1">
@@ -28,7 +30,7 @@ export function CopyField({ label, value }: { label: string; value: string }) {
             }
           }}
         >
-          {copied ? "Copied" : "Copy"}
+          {copied ? tr("Copied") : tr("Copy")}
         </button>
       </div>
     </div>

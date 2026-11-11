@@ -6,6 +6,7 @@ import {
   reviewCoachProfile,
   unpublishCoachProfile,
 } from "@/app/(app)/admin/coach-profiles/actions";
+import { T, useTr } from "@/i18n/t";
 
 export function CoachReviewForm({
   coachId,
@@ -16,6 +17,7 @@ export function CoachReviewForm({
   canReview: boolean;
   isLive: boolean;
 }) {
+  const tr = useTr();
   const router = useRouter();
   const [note, setNote] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -28,7 +30,9 @@ export function CoachReviewForm({
       const result = await reviewCoachProfile({ coachId, approve, note });
       if (result.error) return setError(result.error);
       setMessage(
-        approve ? "Approved and published." : "Sent back with your note.",
+        approve
+          ? tr("Approved and published.")
+          : tr("Sent back with your note."),
       );
       router.refresh();
     });
@@ -39,7 +43,7 @@ export function CoachReviewForm({
       {canReview ? (
         <>
           <label htmlFor="review-note" className="block text-sm font-semibold">
-            Note to the coach (required when asking for changes)
+            <T>Note to the coach (required when asking for changes)</T>
           </label>
           <textarea
             id="review-note"
@@ -48,7 +52,9 @@ export function CoachReviewForm({
             value={note}
             onChange={(event) => setNote(event.target.value)}
             className="field-input"
-            placeholder="Please remove the phone number from your About me."
+            placeholder={tr(
+              "Please remove the phone number from your About me.",
+            )}
           />
           <div className="flex flex-wrap gap-2">
             <button
@@ -57,7 +63,7 @@ export function CoachReviewForm({
               onClick={() => decide(true)}
               className="btn-primary"
             >
-              Approve and publish
+              <T>Approve and publish</T>
             </button>
             <button
               type="button"
@@ -65,13 +71,13 @@ export function CoachReviewForm({
               onClick={() => decide(false)}
               className="btn-secondary"
             >
-              Ask for changes
+              <T>Ask for changes</T>
             </button>
           </div>
         </>
       ) : (
         <p className="text-sm text-muted">
-          This profile isn&apos;t waiting for review.
+          <T>This profile isn&apos;t waiting for review.</T>
         </p>
       )}
       {isLive && (
@@ -88,23 +94,23 @@ export function CoachReviewForm({
             start(async () => {
               const result = await unpublishCoachProfile(coachId);
               if (result.error) return setError(result.error);
-              setMessage("Unpublished.");
+              setMessage(tr("Unpublished."));
               router.refresh();
             });
           }}
           className="text-sm text-muted underline hover:text-danger"
         >
-          Unpublish the live profile
+          <T>Unpublish the live profile</T>
         </button>
       )}
       {message && (
         <p role="status" className="text-sm text-accent">
-          {message}
+          {tr(message)}
         </p>
       )}
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
     </div>

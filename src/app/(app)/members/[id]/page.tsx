@@ -18,8 +18,12 @@ import {
 } from "@/lib/tracking";
 import { loadProgressPhotos } from "@/lib/photos";
 import { PhotoGallery } from "@/components/photo-gallery";
+import { T } from "@/i18n/t";
+import { getLocale, getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Member" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Member") };
+}
 
 type Assignment = {
   id: string;
@@ -33,6 +37,8 @@ export default async function MemberPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const tr = await getTr();
+  const locale = await getLocale();
   const { profile } = await requireCoach();
   const { id } = await params;
 
@@ -137,7 +143,7 @@ export default async function MemberPage({
   return (
     <div className="space-y-6">
       <Link href="/members" className="text-link text-sm">
-        Back to members
+        <T>Back to members</T>
       </Link>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -168,19 +174,23 @@ export default async function MemberPage({
           )}
         </div>
         <Link href={`/messages/${id}`} className="btn-primary shrink-0">
-          Message
+          <T>Message</T>
         </Link>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-2xl">Tasks from you</h2>
+        <h2 className="text-2xl">
+          <T>Tasks from you</T>
+        </h2>
         {assignmentResult.error ? (
           <p role="alert" className="text-danger">
-            We couldn&apos;t load these Tasks. Please refresh and try again.
+            <T>
+              We couldn&apos;t load these Tasks. Please refresh and try again.
+            </T>
           </p>
         ) : assignments.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-            You haven&apos;t given them a Task yet.
+            <T>You haven&apos;t given them a Task yet.</T>
           </p>
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
@@ -196,10 +206,14 @@ export default async function MemberPage({
                   }
                 >
                   {assignment.completed_at
-                    ? `Done ${formatDate(assignment.completed_at)}`
+                    ? tr("Done {p0}", {
+                        p0: formatDate(assignment.completed_at, locale),
+                      })
                     : assignment.due_on
-                      ? `Due ${formatDate(assignment.due_on)}`
-                      : "Not done yet"}
+                      ? tr("Due {p0}", {
+                          p0: formatDate(assignment.due_on, locale),
+                        })
+                      : tr("Not done yet")}
                 </span>
               </li>
             ))}
@@ -208,21 +222,25 @@ export default async function MemberPage({
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-2xl">Shared Memos</h2>
+        <h2 className="text-2xl">
+          <T>Shared Memos</T>
+        </h2>
         {memoResult.error ? (
           <p role="alert" className="text-danger">
-            We couldn&apos;t load these Memos. Please refresh and try again.
+            <T>
+              We couldn&apos;t load these Memos. Please refresh and try again.
+            </T>
           </p>
         ) : memos.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-            They haven&apos;t shared any Memos with their coaches.
+            <T>They haven&apos;t shared any Memos with their coaches.</T>
           </p>
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
             {memos.map((memo) => (
               <li key={memo.id} className="p-4">
                 <p className="text-sm text-muted">
-                  {formatDate(memo.memo_date)}
+                  {formatDate(memo.memo_date, locale)}
                 </p>
                 <p className="mt-1 whitespace-pre-line">{memo.body}</p>
               </li>
@@ -231,11 +249,16 @@ export default async function MemberPage({
         )}
       </section>
       <section className="space-y-3">
-        <h2 className="text-2xl">Tracking</h2>
+        <h2 className="text-2xl">
+          <T>Tracking</T>
+        </h2>
         {!shares ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-            {member.display_name} hasn&apos;t shared their habits, body
-            measurements or nutrition with coaches.
+            <T vars={{ name: member.display_name }}>
+              {
+                "{name} hasn't shared their habits, body measurements or nutrition with coaches."
+              }
+            </T>
           </p>
         ) : (
           <dl className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -258,27 +281,33 @@ export default async function MemberPage({
               );
             })}
             <div className="rounded-lg border border-border bg-surface p-3">
-              <dt className="text-sm text-muted">Weight</dt>
+              <dt className="text-sm text-muted">
+                <T>Weight</T>
+              </dt>
               <dd className="text-2xl font-semibold">
                 {latestWeight ? `${latestWeight.weight_lb} lb` : "–"}
               </dd>
               {monthChange !== null && (
                 <p className="text-xs text-muted">
                   {monthChange === 0
-                    ? "No change"
+                    ? tr("No change")
                     : `${monthChange > 0 ? "+" : ""}${monthChange} lb`}{" "}
-                  in 30 days
+                  <T>in 30 days</T>
                 </p>
               )}
             </div>
             <div className="rounded-lg border border-border bg-surface p-3">
-              <dt className="text-sm text-muted">Protein, 7-day average</dt>
+              <dt className="text-sm text-muted">
+                <T>Protein, 7-day average</T>
+              </dt>
               <dd className="text-2xl font-semibold">
                 {food.protein === null ? "–" : `${food.protein}g`}
               </dd>
               <p className="text-xs text-muted">
                 {sharing?.protein_target_g
-                  ? `Target ${sharing.protein_target_g}g · `
+                  ? tr("Target {protein_target_g}g · ", {
+                      protein_target_g: sharing.protein_target_g,
+                    })
                   : ""}
                 logged {food.logged} of 7 days
               </p>
@@ -287,8 +316,10 @@ export default async function MemberPage({
         )}
         {shares && photos.length > 0 && (
           <div className="space-y-2">
-            <h3 className="text-xl">Progress photos</h3>
-            <PhotoGallery photos={photos} />
+            <h3 className="text-xl">
+              <T>Progress photos</T>
+            </h3>
+            <PhotoGallery photos={photos} locale={locale} />
           </div>
         )}
       </section>

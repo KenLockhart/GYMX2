@@ -18,6 +18,7 @@ import {
 import type { OwnCredential } from "@/lib/credentials-server";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { Note, SelectInput, TextInput } from "./fields";
+import { T, useTr } from "@/i18n/t";
 
 const EMPTY = {
   kind: "certification" as CredentialKind,
@@ -42,6 +43,7 @@ export function CredentialsStep({
   credentials: OwnCredential[];
   onChange: (credentials: OwnCredential[]) => void;
 }) {
+  const tr = useTr();
   const [form, setForm] = useState(EMPTY);
   const [adding, setAdding] = useState(credentials.length === 0);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export function CredentialsStep({
         size: file.size,
       });
       if (!prepared.path || !prepared.token)
-        return { error: prepared.error ?? "Upload failed." };
+        return { error: prepared.error ?? tr("Upload failed.") };
       const { error: uploadError } = await createBrowserSupabase()
         .storage.from("credential-docs")
         .uploadToSignedUrl(prepared.path, prepared.token, file, {
@@ -86,11 +88,13 @@ export function CredentialsStep({
   return (
     <div className="space-y-5">
       <Note>
-        Add each certification, then upload the certificate and ask GYMX2 to
-        verify it. An admin checks it with the organization that issued it.
-        Members see only the name, organization and status: never your ID number
-        or documents. Only GYMX2 can mark a credential Verified, and expired
-        ones never show as verified.
+        <T>
+          Add each certification, then upload the certificate and ask GYMX2 to
+          verify it. An admin checks it with the organization that issued it.
+          Members see only the name, organization and status: never your ID
+          number or documents. Only GYMX2 can mark a credential Verified, and
+          expired ones never show as verified.
+        </T>
       </Note>
 
       {credentials.length > 0 && (
@@ -104,19 +108,28 @@ export function CredentialsStep({
                 <div>
                   <p className="font-semibold">{c.title}</p>
                   <p className="text-sm text-muted">
-                    {c.organization} · {kindLabel(c.kind)}
+                    {c.organization} ·{" "}
+                    <T>
+                      <T>{kindLabel(c.kind)}</T>
+                    </T>
                     {c.expiresOn && ` · expires ${c.expiresOn}`}
                   </p>
                 </div>
                 <span
                   className={`rounded-full border px-3 py-1 text-xs font-semibold ${c.shown ? TONE[c.shown] : "border-danger/60 text-danger"}`}
                 >
-                  {c.shown ? DISPLAY_LABEL[c.shown] : "Not verified: see note"}
+                  <T>
+                    {c.shown
+                      ? DISPLAY_LABEL[c.shown]
+                      : "Not verified: see note"}
+                  </T>
                 </span>
               </div>
               {c.status === "rejected" && c.adminNote && (
                 <p className="rounded-lg bg-surface-raised p-3 text-sm">
-                  <span className="font-semibold">GYMX2 note:</span>{" "}
+                  <span className="font-semibold">
+                    <T>GYMX2 note:</T>
+                  </span>{" "}
                   {c.adminNote}
                 </p>
               )}
@@ -130,37 +143,45 @@ export function CredentialsStep({
                   }}
                   className="btn-secondary px-3 py-1.5 text-sm"
                 >
-                  {c.hasDocument ? "Replace document" : "Upload certificate"}
+                  {c.hasDocument
+                    ? tr("Replace document")
+                    : tr("Upload certificate")}
                 </button>
                 {(c.status === "unverified" || c.status === "rejected") && (
                   <button
                     type="button"
                     disabled={pending || !c.hasDocument}
                     title={
-                      c.hasDocument ? undefined : "Upload the certificate first"
+                      c.hasDocument
+                        ? undefined
+                        : tr("Upload the certificate first")
                     }
                     onClick={() => run(() => requestVerification(c.id))}
                     className="btn-primary px-3 py-1.5 text-sm"
                   >
-                    Ask GYMX2 to verify
+                    <T>Ask GYMX2 to verify</T>
                   </button>
                 )}
                 <button
                   type="button"
                   disabled={pending}
                   onClick={() => {
-                    if (window.confirm(`Remove ${c.title}?`))
+                    if (
+                      window.confirm(tr("Remove {title}?", { title: c.title }))
+                    )
                       run(() => deleteCredential(c.id));
                   }}
                   className="cursor-pointer px-2 text-muted hover:text-danger"
                 >
-                  Remove
+                  <T>Remove</T>
                 </button>
               </div>
               {c.hasDocument && c.status !== "verified" && (
                 <p className="text-xs text-muted">
-                  Certificate uploaded. Changing any detail sends it back for
-                  checking.
+                  <T>
+                    Certificate uploaded. Changing any detail sends it back for
+                    checking.
+                  </T>
                 </p>
               )}
             </li>
@@ -180,22 +201,24 @@ export function CredentialsStep({
 
       {adding ? (
         <div className="space-y-4 rounded-xl border border-dashed border-border p-4">
-          <p className="font-semibold">Add a credential</p>
+          <p className="font-semibold">
+            <T>Add a credential</T>
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectInput
-              label="Type"
+              label={tr("Type")}
               value={form.kind}
               options={CREDENTIAL_KINDS}
               onChange={(v) => v && setForm({ ...form, kind: v })}
             />
             <div className="space-y-1.5">
               <TextInput
-                label="Organization"
+                label={tr("Organization")}
                 value={form.organization}
                 onChange={(v) => setForm({ ...form, organization: v })}
                 max={100}
-                placeholder="NASM"
-                hint="Who issued it"
+                placeholder={tr("NASM")}
+                hint={tr("Who issued it")}
               />
               <div className="flex flex-wrap gap-1">
                 {KNOWN_ORGANIZATIONS.slice(0, 6).map((org) => (
@@ -211,21 +234,23 @@ export function CredentialsStep({
               </div>
             </div>
             <TextInput
-              label="Credential name"
+              label={tr("Credential name")}
               value={form.title}
               onChange={(v) => setForm({ ...form, title: v })}
               max={120}
-              placeholder="Certified Personal Trainer"
+              placeholder={tr("Certified Personal Trainer")}
             />
             <TextInput
-              label="Certificate or license number (private)"
+              label={tr("Certificate or license number (private)")}
               value={form.credentialNumber}
               onChange={(v) => setForm({ ...form, credentialNumber: v })}
               max={80}
-              hint="Only GYMX2 admins see this, to look it up."
+              hint={tr("Only GYMX2 admins see this, to look it up.")}
             />
             <label className="block space-y-1.5">
-              <span className="block text-sm font-semibold">Issued</span>
+              <span className="block text-sm font-semibold">
+                <T>Issued</T>
+              </span>
               <input
                 type="date"
                 value={form.issuedOn}
@@ -234,7 +259,9 @@ export function CredentialsStep({
               />
             </label>
             <label className="block space-y-1.5">
-              <span className="block text-sm font-semibold">Expires</span>
+              <span className="block text-sm font-semibold">
+                <T>Expires</T>
+              </span>
               <input
                 type="date"
                 value={form.expiresOn}
@@ -260,7 +287,7 @@ export function CredentialsStep({
               }
               className="btn-primary"
             >
-              {pending ? "Adding..." : "Add credential"}
+              {pending ? tr("Adding...") : tr("Add credential")}
             </button>
             {credentials.length > 0 && (
               <button
@@ -268,7 +295,7 @@ export function CredentialsStep({
                 onClick={() => setAdding(false)}
                 className="btn-secondary"
               >
-                Cancel
+                <T>Cancel</T>
               </button>
             )}
           </div>
@@ -280,13 +307,13 @@ export function CredentialsStep({
             onClick={() => setAdding(true)}
             className="btn-secondary px-4 py-2 text-sm"
           >
-            Add another credential
+            <T>Add another credential</T>
           </button>
         )
       )}
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
     </div>

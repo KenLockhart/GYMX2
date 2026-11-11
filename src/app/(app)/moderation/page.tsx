@@ -5,8 +5,12 @@ import { loadAuthors } from "@/lib/community-server";
 import { summarizeReasons } from "@/lib/reports";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Reports" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Reports") };
+}
 
 type PostRow = {
   id: string;
@@ -38,6 +42,7 @@ type ReportRow = {
 // Everything here is read with the moderator's own permissions: moderators see reports on the
 // shared feed, admins see reports anywhere except "Only me" posts. Private messages are never here.
 export default async function ModerationPage() {
+  const tr = await getTr();
   const { profile } = await requireModerator();
   const isAdmin = profile.role === "admin";
   const isCoach = profile.role === "coach";
@@ -140,10 +145,10 @@ export default async function ModerationPage() {
     ...(isAdmin ? reports.map((r) => r.reporter_id) : []),
   ]);
   const nameOf = (id: string | null) =>
-    (id && people.get(id)?.name) || "Former member";
+    (id && people.get(id)?.name) || tr("Former member");
   const where = (post: PostRow) =>
     post.audience === "everyone"
-      ? "Everyone on GYMX2"
+      ? tr("Everyone on GYMX2")
       : `${nameOf(post.coach_id)}'s community`;
 
   // One queue item per reported post or comment, oldest report first.
@@ -214,26 +219,38 @@ export default async function ModerationPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div>
-        <h1 className="text-5xl">Reports</h1>
+        <h1 className="text-5xl">
+          <T>Reports</T>
+        </h1>
         <p className="mt-2 text-muted">
           {isAdmin
-            ? "Reported posts and comments from the shared feed and every coach community."
+            ? tr(
+                "Reported posts and comments from the shared feed and every coach community.",
+              )
             : isCoach
-              ? "Reported posts and comments in your community. Reports about your own posts go to GYMX2 admins."
-              : "Reported posts and comments from the shared feed. Coach communities are moderated by their coaches and GYMX2 admins."}{" "}
-          Removing something hides it from everyone and tells the author, with
-          your reason if you give one. Direct messages are never shown here.
+              ? tr(
+                  "Reported posts and comments in your community. Reports about your own posts go to GYMX2 admins.",
+                )
+              : tr(
+                  "Reported posts and comments from the shared feed. Coach communities are moderated by their coaches and GYMX2 admins.",
+                )}{" "}
+          <T>
+            Removing something hides it from everyone and tells the author, with
+            your reason if you give one. Direct messages are never shown here.
+          </T>
         </p>
       </div>
       <ModerationQueue
-        title="Open reports"
-        empty="No open reports. Nice."
+        title={tr("Open reports")}
+        empty={tr("No open reports. Nice.")}
         items={queue}
       />
       <ModerationQueue
-        title="Flagged automatically"
-        empty="Nothing flagged in the last 14 days."
-        hint="Posts mentioning phone numbers, emails or payment apps. Nobody reported these: choose Looks fine to clear the flag, or remove the post if it breaks the guidelines."
+        title={tr("Flagged automatically")}
+        empty={tr("Nothing flagged in the last 14 days.")}
+        hint={tr(
+          "Posts mentioning phone numbers, emails or payment apps. Nobody reported these: choose Looks fine to clear the flag, or remove the post if it breaks the guidelines.",
+        )}
         items={flaggedItems}
       />
     </div>

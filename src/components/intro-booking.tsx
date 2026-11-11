@@ -57,7 +57,9 @@ export function IntroBooking({
             <dt className="text-muted">
               <T>How</T>
             </dt>
-            <dd>{INTRO_FORMAT_LABEL[existing.format]}</dd>
+            <dd>
+              <T>{INTRO_FORMAT_LABEL[existing.format]}</T>
+            </dd>
           </div>
           {existing.location && (
             <div className="sm:col-span-2">
@@ -223,7 +225,7 @@ export function IntroBooking({
                   {timeLabel(slot.startsAt, zone, locale)}
                 </span>
                 <span className="block text-xs text-muted">
-                  {slot.minutes} min · {INTRO_FORMAT_LABEL[slot.format]}
+                  {slot.minutes} min · <T>{INTRO_FORMAT_LABEL[slot.format]}</T>
                 </span>
               </label>
             ))}

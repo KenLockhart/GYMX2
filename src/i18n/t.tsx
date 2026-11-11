@@ -8,10 +8,17 @@ export function T({
   children,
   vars,
 }: {
-  children: string;
+  children?: React.ReactNode;
   vars?: Record<string, string | number>;
 }) {
-  return <>{translate(children, useLocale(), vars)}</>;
+  const locale = useLocale();
+  return (
+    <>
+      {typeof children === "string"
+        ? translate(children, locale, vars)
+        : children}
+    </>
+  );
 }
 
 // For text in attributes (labels, placeholders) inside client components.

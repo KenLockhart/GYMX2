@@ -18,8 +18,12 @@ import {
 } from "@/lib/memberships";
 import { createClient } from "@/lib/supabase/server";
 import { saveJoinMode, savePlan } from "./actions";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Memberships" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Memberships") };
+}
 
 type Subscriber = {
   id: string;
@@ -33,35 +37,42 @@ type Subscriber = {
   member: { display_name: string } | null;
 };
 
-function PlanForm({ plan }: { plan?: Plan }) {
+async function PlanForm({ plan }: { plan?: Plan }) {
+  const tr = await getTr();
   return (
     <ActionForm action={savePlan} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="id" value={plan?.id ?? ""} />
       <Field
-        label="Plan name"
+        label={tr("Plan name")}
         name="name"
         maxLength={60}
-        placeholder="Monthly Coaching"
+        placeholder={tr("Monthly Coaching")}
         defaultValue={plan?.name}
         required
       />
       <Field
-        label="Price per month (USD)"
+        label={tr("Price per month (USD)")}
         name="price"
         inputMode="decimal"
         placeholder="29"
         defaultValue={plan ? (plan.price_cents / 100).toFixed(2) : ""}
-        hint={plan ? "Changing it only affects new subscribers." : undefined}
+        hint={
+          plan ? tr("Changing it only affects new subscribers.") : undefined
+        }
         required
       />
       <label className="block space-y-1.5 sm:col-span-2">
-        <span className="text-sm font-medium">What&apos;s included</span>
+        <span className="text-sm font-medium">
+          <T>What&apos;s included</T>
+        </span>
         <textarea
           name="description"
           rows={3}
           maxLength={1000}
           defaultValue={plan?.description}
-          placeholder="Weekly Tasks, two live sessions a month, direct messaging and a monthly check-in call."
+          placeholder={tr(
+            "Weekly Tasks, two live sessions a month, direct messaging and a monthly check-in call.",
+          )}
           className="field-input"
         />
       </label>
@@ -76,7 +87,7 @@ function PlanForm({ plan }: { plan?: Plan }) {
           {TRIAL_DAYS}-day free trial
           <span className="block text-muted">
             Members add a card, and the first charge comes after {TRIAL_DAYS}{" "}
-            days.
+            <T>days.</T>
           </span>
         </span>
       </label>
@@ -88,15 +99,18 @@ function PlanForm({ plan }: { plan?: Plan }) {
           className="mt-0.5 size-4 accent-accent"
         />
         <span>
-          Open to new subscribers
+          <T>Open to new subscribers</T>
           <span className="block text-muted">
-            Turn off to stop new sign-ups. Current subscribers keep their plan.
+            <T>
+              Turn off to stop new sign-ups. Current subscribers keep their
+              plan.
+            </T>
           </span>
         </span>
       </label>
       <div className="flex items-center gap-3 sm:col-span-2">
-        <SubmitButton pendingText="Saving..." className="btn-primary">
-          {plan ? "Save plan" : "Add plan"}
+        <SubmitButton pendingText={tr("Saving...")} className="btn-primary">
+          {plan ? tr("Save plan") : tr("Add plan")}
         </SubmitButton>
         <FormStatus />
       </div>
@@ -105,6 +119,7 @@ function PlanForm({ plan }: { plan?: Plan }) {
 }
 
 export default async function PlansPage() {
+  const tr = await getTr();
   const { profile } = await requireCoach();
   const supabase = await createClient();
   const [{ data: planData }, { data: subscriberData }, { data: payout }] =
@@ -137,7 +152,9 @@ export default async function PlansPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-5xl">Memberships</h1>
+        <h1 className="text-5xl">
+          <T>Memberships</T>
+        </h1>
         <p className="mt-2 max-w-2xl text-muted">
           Offer monthly plans. Members are charged automatically each month; you
           get the payment minus GYMX2&apos;s {MEMBERSHIP_FEE_PERCENT}% fee and
@@ -150,9 +167,9 @@ export default async function PlansPage() {
           role="status"
           className="max-w-2xl rounded-lg border border-accent bg-surface p-4 text-sm"
         >
-          Before members can subscribe, connect where your money goes.{" "}
+          <T>Before members can subscribe, connect where your money goes.</T>{" "}
           <Link href="/armory/payouts" className="text-link">
-            Set up payouts
+            <T>Set up payouts</T>
           </Link>
           . You can create plans now.
         </p>
@@ -171,14 +188,18 @@ export default async function PlansPage() {
             key={label}
             className="rounded-lg border border-border bg-surface p-4"
           >
-            <dt className="text-sm text-muted">{label}</dt>
+            <dt className="text-sm text-muted">
+              <T>{label}</T>
+            </dt>
             <dd className="mt-1 text-2xl font-semibold">{value}</dd>
           </div>
         ))}
       </dl>
 
       <section className="max-w-2xl space-y-3">
-        <h2 className="text-2xl">How members join you</h2>
+        <h2 className="text-2xl">
+          <T>How members join you</T>
+        </h2>
         <ActionForm action={saveJoinMode} className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-3">
             {JOIN_MODES.map((mode) => (
@@ -193,28 +214,37 @@ export default async function PlansPage() {
                   defaultChecked={profile.join_mode === mode.value}
                   className="sr-only"
                 />
-                <span className="block font-semibold">{mode.label}</span>
+                <span className="block font-semibold">
+                  <T>{mode.label}</T>
+                </span>
                 <span className="block text-sm text-muted">{mode.detail}</span>
               </label>
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <SubmitButton pendingText="Saving..." className="btn-secondary">
-              Save
+            <SubmitButton
+              pendingText={tr("Saving...")}
+              className="btn-secondary"
+            >
+              <T>Save</T>
             </SubmitButton>
             <FormStatus />
           </div>
         </ActionForm>
         {profile.join_mode === "free" && plans.length > 0 && (
           <p className="text-sm text-muted">
-            Your plans are hidden while joining is free only. Choose another
-            option to show them.
+            <T>
+              Your plans are hidden while joining is free only. Choose another
+              option to show them.
+            </T>
           </p>
         )}
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-2xl">Your plans</h2>
+        <h2 className="text-2xl">
+          <T>Your plans</T>
+        </h2>
         {plans.map((plan) => (
           <div
             key={plan.id}
@@ -224,7 +254,7 @@ export default async function PlansPage() {
               {plan.name} · {formatMoney(plan.price_cents)}/month
               {!plan.active && (
                 <span className="ml-2 text-sm font-normal text-muted">
-                  (closed to new subscribers)
+                  <T>(closed to new subscribers)</T>
                 </span>
               )}
             </p>
@@ -232,37 +262,49 @@ export default async function PlansPage() {
           </div>
         ))}
         <div className="max-w-3xl space-y-3 rounded-lg border border-dashed border-border p-4">
-          <p className="font-semibold">Add a plan</p>
+          <p className="font-semibold">
+            <T>Add a plan</T>
+          </p>
           <PlanForm />
         </div>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-2xl">Subscribers</h2>
+        <h2 className="text-2xl">
+          <T>Subscribers</T>
+        </h2>
         {subscribers.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-            No subscribers yet.
+            <T>No subscribers yet.</T>
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[34rem] text-left text-sm">
               <thead className="bg-surface text-muted">
                 <tr>
-                  <th className="p-3 font-medium">Member</th>
-                  <th className="p-3 font-medium">Plan</th>
-                  <th className="p-3 font-medium">Status</th>
-                  <th className="p-3 text-right font-medium">Per month</th>
+                  <th className="p-3 font-medium">
+                    <T>Member</T>
+                  </th>
+                  <th className="p-3 font-medium">
+                    <T>Plan</T>
+                  </th>
+                  <th className="p-3 font-medium">
+                    <T>Status</T>
+                  </th>
+                  <th className="p-3 text-right font-medium">
+                    <T>Per month</T>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {subscribers.map((row) => (
                   <tr key={row.id}>
                     <td className="p-3 font-medium">
-                      {row.member?.display_name ?? "Former member"}
+                      {row.member?.display_name ?? tr("Former member")}
                     </td>
                     <td className="p-3">{row.plan_name}</td>
                     <td className="p-3 text-muted">
-                      {membershipStatusLabel(row)}
+                      <T>{membershipStatusLabel(row)}</T>
                     </td>
                     <td className="p-3 text-right">
                       {formatMoney(row.price_cents)}

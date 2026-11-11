@@ -15,8 +15,12 @@ import {
 import { todayKey } from "@/lib/reminders";
 import { createClient } from "@/lib/supabase/server";
 import { deleteCheckinReply, replyToCheckin } from "../checkin/actions";
+import { T } from "@/i18n/t";
+import { getTr, getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Check-ins" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Check-ins") };
+}
 
 type Reply = {
   id: string;
@@ -37,6 +41,8 @@ export default async function CoachCheckinsPage({
 }: {
   searchParams: Promise<{ week?: string }>;
 }) {
+  const locale = await getLocale();
+  const tr = await getTr();
   const { profile } = await requireAccount();
   if (profile.role === "member") redirect("/checkin");
   if (profile.role !== "coach") redirect("/dashboard");
@@ -100,40 +106,48 @@ export default async function CoachCheckinsPage({
     <div className="space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-5xl">Check-ins</h1>
+          <h1 className="text-5xl">
+            <T>Check-ins</T>
+          </h1>
           <p className="mt-2 max-w-2xl text-muted">
-            Your members rate their energy, sleep, stress and motivation each
-            week and share wins and struggles. Low scores show first. Members
-            get a reminder on Sunday evening.
+            <T>
+              Your members rate their energy, sleep, stress and motivation each
+              week and share wins and struggles. Low scores show first. Members
+              get a reminder on Sunday evening.
+            </T>
           </p>
         </div>
         <form className="flex items-end gap-2">
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Week of</span>
+            <span className="text-sm font-medium">
+              <T>Week of</T>
+            </span>
             <select name="week" defaultValue={week} className="field-input">
               {[...weeks].reverse().map((key) => (
                 <option key={key} value={key}>
-                  {weekLabel(key)}
-                  {key === current ? " (this week)" : ""}
+                  {weekLabel(key, locale)}
+                  {key === current ? tr(" (this week)") : ""}
                 </option>
               ))}
             </select>
           </label>
           <button type="submit" className="btn-secondary">
-            Show
+            <T>Show</T>
           </button>
         </form>
       </div>
 
       {members.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-          No members yet. Check-ins appear here once members join you.
+          <T>No members yet. Check-ins appear here once members join you.</T>
         </p>
       ) : (
         <>
           <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <div className="rounded-lg border border-border bg-surface p-4 sm:col-span-1 lg:col-span-2">
-              <p className="text-sm text-muted">Checked in</p>
+              <p className="text-sm text-muted">
+                <T>Checked in</T>
+              </p>
               <p className="mt-1 text-3xl font-bold tabular-nums">
                 {summary.checkedIn}{" "}
                 <span className="text-lg text-muted">of {members.length}</span>
@@ -180,10 +194,12 @@ export default async function CoachCheckinsPage({
           )}
 
           <section className="space-y-3">
-            <h2 className="text-2xl">This week&apos;s check-ins</h2>
+            <h2 className="text-2xl">
+              <T>This week&apos;s check-ins</T>
+            </h2>
             {thisWeek.length === 0 ? (
               <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-                None yet for this week.
+                <T>None yet for this week.</T>
               </p>
             ) : (
               <ul className="space-y-3">
@@ -246,8 +262,8 @@ export default async function CoachCheckinsPage({
                             <p>
                               <span className="font-semibold">
                                 {reply.coach_id === profile.id
-                                  ? "You"
-                                  : (reply.coach?.display_name ?? "Coach")}
+                                  ? tr("You")
+                                  : (reply.coach?.display_name ?? tr("Coach"))}
                                 :
                               </span>{" "}
                               {reply.body}
@@ -263,7 +279,7 @@ export default async function CoachCheckinsPage({
                                   pendingText="..."
                                   className="text-xs text-muted hover:text-danger"
                                 >
-                                  Remove
+                                  <T>Remove</T>
                                 </SubmitButton>
                               </ActionForm>
                             )}
@@ -279,14 +295,16 @@ export default async function CoachCheckinsPage({
                             id={`reply-${row.id}`}
                             name="body"
                             maxLength={1000}
-                            placeholder="Reply with encouragement or advice"
+                            placeholder={tr(
+                              "Reply with encouragement or advice",
+                            )}
                             className="field-input min-w-0 flex-1"
                           />
                           <SubmitButton
-                            pendingText="Sending..."
+                            pendingText={tr("Sending...")}
                             className="btn-primary px-3"
                           >
-                            Reply
+                            <T>Reply</T>
                           </SubmitButton>
                         </div>
                         <FormStatus />
@@ -299,22 +317,28 @@ export default async function CoachCheckinsPage({
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-2xl">Last 8 weeks</h2>
+            <h2 className="text-2xl">
+              <T>Last 8 weeks</T>
+            </h2>
             <p className="text-sm text-muted">
-              Wellbeing score out of 5: energy, sleep, motivation and calm
-              averaged. A dash means they didn&apos;t check in.
+              <T>
+                Wellbeing score out of 5: energy, sleep, motivation and calm
+                averaged. A dash means they didn&apos;t check in.
+              </T>
             </p>
             <div className="overflow-x-auto rounded-lg border border-border bg-surface">
               <table className="w-full text-sm">
                 <thead className="text-left text-muted">
                   <tr>
-                    <th className="p-3 font-medium">Member</th>
+                    <th className="p-3 font-medium">
+                      <T>Member</T>
+                    </th>
                     {weeks.map((key) => (
                       <th
                         key={key}
                         className="p-3 text-right font-medium whitespace-nowrap"
                       >
-                        {weekLabel(key)}
+                        {weekLabel(key, locale)}
                       </th>
                     ))}
                   </tr>
