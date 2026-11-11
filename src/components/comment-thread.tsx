@@ -11,6 +11,7 @@ import {
 import { COMMENT_MAX, timeAgo, type CommentDTO } from "@/lib/community";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { T, useTr } from "@/i18n/t";
+import { useLocale } from "@/i18n/client";
 
 type Row = {
   id: string;
@@ -99,6 +100,7 @@ function CommentItem({
   onRemove: (id: string) => void;
   onReply?: () => void;
 }) {
+  const locale = useLocale();
   const tr = useTr();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(comment.body);
@@ -115,8 +117,8 @@ function CommentItem({
             </span>
           )}
           <span className="text-xs text-muted">
-            {timeAgo(comment.createdAt)}
-            {comment.editedAt && " · edited"}
+            {timeAgo(comment.createdAt, undefined, locale)}
+            {comment.editedAt && tr(" · edited")}
           </span>
         </p>
         {editing ? (

@@ -119,8 +119,9 @@ export default async function InsightsPage({
                   coachName: coachName ?? "",
                 })
               : tr("How your coaching business is doing.")}{" "}
-            Earnings are after GYMX2&apos;s {MEMBERSHIP_FEE_PERCENT}% fee and
-            refunds.
+            {tr("Earnings are after GYMX2's {fee}% fee and refunds.", {
+              fee: MEMBERSHIP_FEE_PERCENT,
+            })}
           </p>
         </div>
         {isAdmin && (
@@ -226,11 +227,13 @@ export default async function InsightsPage({
 
         <div className="space-y-2">
           <h3 className="text-lg font-semibold">
-            Falling off ({health.fallingOff.length})
+            {tr("Falling off ({n})", { n: health.fallingOff.length })}
           </h3>
           {health.fallingOff.length === 0 ? (
             <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-              Everyone has been active in the last {QUIET_DAYS} days.
+              {tr("Everyone has been active in the last {days} days.", {
+                days: QUIET_DAYS,
+              })}
             </p>
           ) : (
             <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
@@ -261,7 +264,7 @@ export default async function InsightsPage({
           )}
           {health.fallingOff.length > 15 && (
             <p className="text-xs text-muted">
-              And {health.fallingOff.length - 15} more.
+              {tr("And {n} more.", { n: health.fallingOff.length - 15 })}
             </p>
           )}
         </div>

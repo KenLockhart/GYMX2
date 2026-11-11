@@ -67,7 +67,10 @@ function UploadField({
   async function handleFile(file: File) {
     setUpload({
       status: "uploading",
-      message: `Uploading ${file.name} (${describeSize(file.size)})...`,
+      message: tr("Uploading {name} ({size})...", {
+        name: file.name,
+        size: describeSize(file.size),
+      }),
     });
     const prepared = await prepareArmoryUpload({
       bucket,
@@ -94,7 +97,10 @@ function UploadField({
       return;
     }
     onUploaded(prepared.path, file.name);
-    setUpload({ status: "done", message: `Uploaded ${file.name}.` });
+    setUpload({
+      status: "done",
+      message: tr("Uploaded {name}.", { name: file.name }),
+    });
   }
 
   return (
@@ -115,7 +121,11 @@ function UploadField({
       <p className="text-xs text-muted">{hint}</p>
       {current && upload.status === "idle" && (
         <p className="flex items-center gap-3 text-sm">
-          <span className="text-muted">Current: {current}</span>
+          <span className="text-muted">
+            {tr("Current: {name}", {
+              name: current === "cover image" ? tr("cover image") : current,
+            })}
+          </span>
           {onCleared && (
             <button
               type="button"
@@ -296,7 +306,7 @@ export function ArmoryForm({
               <Link href="/armory/payouts" className="text-link">
                 <T>Set up payouts</T>
               </Link>
-              . You can save the item now.
+              <T>. You can save the item now.</T>
             </p>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -366,7 +376,7 @@ export function ArmoryForm({
                   <Link href="/armory/payouts" className="text-link">
                     <T>Set up payouts</T>
                   </Link>
-                  . You can save the item now.
+                  <T>. You can save the item now.</T>
                 </p>
               )}
               <Field
