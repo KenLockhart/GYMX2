@@ -13,6 +13,7 @@ import {
   WEIGHT_STEPS,
   type FeedPreferences,
 } from "@/lib/feed-prefs";
+import { T, useTr } from "@/i18n/t";
 
 export function PreferencesForm({
   initial,
@@ -21,6 +22,7 @@ export function PreferencesForm({
   initial: FeedPreferences;
   coaches: { id: string; name: string }[];
 }) {
+  const tr = useTr();
   const router = useRouter();
   const [prefs, setPrefs] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function PreferencesForm({
     start(async () => {
       const result = await savePreferences(prefs);
       if (result.error) return setError(result.error);
-      setMessage("Saved. Your feed now uses these settings.");
+      setMessage(tr("Saved. Your feed now uses these settings."));
       router.refresh();
     });
   }
@@ -43,7 +45,9 @@ export function PreferencesForm({
   function reset() {
     if (
       !window.confirm(
-        "Go back to the standard GYMX2 feed? Your topic and coach choices are cleared. Follows and mutes stay.",
+        tr(
+          "Go back to the standard GYMX2 feed? Your topic and coach choices are cleared. Follows and mutes stay.",
+        ),
       )
     )
       return;
@@ -53,7 +57,7 @@ export function PreferencesForm({
       const result = await resetPreferences();
       if (result.error) return setError(result.error);
       setPrefs(STANDARD_PREFERENCES);
-      setMessage("Back to the standard GYMX2 feed.");
+      setMessage(tr("Back to the standard GYMX2 feed."));
       router.refresh();
     });
   }
@@ -73,18 +77,24 @@ export function PreferencesForm({
       className="space-y-6 rounded-lg border border-border bg-surface p-5"
     >
       <fieldset className="space-y-2">
-        <legend className="font-semibold">Feed</legend>
+        <legend className="font-semibold">
+          <T>Feed</T>
+        </legend>
         {(
           [
             {
               value: "standard",
-              label: "Standard GYMX2 feed",
-              hint: "Newest first, with your coaches' announcements on top. The same for everyone.",
+              label: tr("Standard GYMX2 feed"),
+              hint: tr(
+                "Newest first, with your coaches' announcements on top. The same for everyone.",
+              ),
             },
             {
               value: "personalized",
-              label: "Personalized feed",
-              hint: "Uses the people you follow, your favorite coaches and the topics below.",
+              label: tr("Personalized feed"),
+              hint: tr(
+                "Uses the people you follow, your favorite coaches and the topics below.",
+              ),
             },
           ] as const
         ).map((option) => (
@@ -98,8 +108,12 @@ export function PreferencesForm({
               className="mt-1"
             />
             <span>
-              <span className="font-medium">{option.label}</span>
-              <span className="block text-sm text-muted">{option.hint}</span>
+              <span className="font-medium">
+                <T>{option.label}</T>
+              </span>
+              <span className="block text-sm text-muted">
+                <T>{option.hint}</T>
+              </span>
             </span>
           </label>
         ))}
@@ -110,9 +124,11 @@ export function PreferencesForm({
         className={`space-y-5 ${personalized ? "" : "opacity-50"}`}
       >
         <div className="space-y-2">
-          <legend className="font-semibold">Order</legend>
+          <legend className="font-semibold">
+            <T>Order</T>
+          </legend>
           <select
-            aria-label="Order"
+            aria-label={tr("Order")}
             value={prefs.sort}
             onChange={(event) =>
               setPrefs({
@@ -122,18 +138,24 @@ export function PreferencesForm({
             }
             className="field-input w-auto"
           >
-            <option value="newest">Newest first</option>
+            <option value="newest">
+              <T>Newest first</T>
+            </option>
             <option value="personalized">
-              Most relevant (likes and comments count too)
+              <T>Most relevant (likes and comments count too)</T>
             </option>
           </select>
         </div>
 
         <div className="space-y-2">
-          <p className="font-semibold">Topics</p>
+          <p className="font-semibold">
+            <T>Topics</T>
+          </p>
           <p className="text-sm text-muted">
-            More moves a kind of post up your feed; Less moves it down. Nothing
-            is removed.
+            <T>
+              More moves a kind of post up your feed; Less moves it down.
+              Nothing is removed.
+            </T>
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
             {POST_KINDS.map((kind) => (
@@ -141,7 +163,9 @@ export function PreferencesForm({
                 key={kind.value}
                 className="flex items-center justify-between gap-3"
               >
-                <label htmlFor={`weight-${kind.value}`}>{kind.label}</label>
+                <label htmlFor={`weight-${kind.value}`}>
+                  <T>{kind.label}</T>
+                </label>
                 <select
                   id={`weight-${kind.value}`}
                   value={prefs.weights[kind.value] ?? 1}
@@ -158,7 +182,7 @@ export function PreferencesForm({
                 >
                   {WEIGHT_STEPS.map((step) => (
                     <option key={step.value} value={step.value}>
-                      {step.label}
+                      <T>{step.label}</T>
                     </option>
                   ))}
                 </select>
@@ -168,10 +192,12 @@ export function PreferencesForm({
         </div>
 
         <div className="space-y-2">
-          <p className="font-semibold">Favorite coaches</p>
+          <p className="font-semibold">
+            <T>Favorite coaches</T>
+          </p>
           {coaches.length === 0 ? (
             <p className="text-sm text-muted">
-              Join or follow a coach to favor their posts.
+              <T>Join or follow a coach to favor their posts.</T>
             </p>
           ) : (
             <ul className="space-y-1">
@@ -194,7 +220,7 @@ export function PreferencesForm({
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" disabled={pending} className="btn-primary">
-          {pending ? "Saving..." : "Save preferences"}
+          {pending ? tr("Saving...") : tr("Save preferences")}
         </button>
         <button
           type="button"
@@ -202,17 +228,17 @@ export function PreferencesForm({
           disabled={pending}
           className="btn-secondary"
         >
-          Reset to Standard GYMX2 Feed
+          <T>Reset to Standard GYMX2 Feed</T>
         </button>
       </div>
       {message && (
         <p role="status" className="text-sm text-accent">
-          {message}
+          {tr(message)}
         </p>
       )}
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {tr(error)}
         </p>
       )}
     </form>

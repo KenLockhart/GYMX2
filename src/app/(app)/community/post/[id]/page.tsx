@@ -6,8 +6,12 @@ import { PostCard } from "@/components/post-card";
 import { requireAccount } from "@/lib/auth";
 import { loadComments, loadPost } from "@/lib/community-server";
 import { idSchema } from "@/lib/validation";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Post" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Post") };
+}
 
 export default async function PostPage({
   params,
@@ -25,7 +29,7 @@ export default async function PostPage({
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <Link href="/community" className="text-link text-sm">
-        Back to Community
+        <T>Back to Community</T>
       </Link>
       <PostCard post={post} viewerRole={profile.role} linkToPost={false} />
       <CommentThread postId={post.id} initialComments={comments} />

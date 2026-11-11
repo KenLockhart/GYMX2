@@ -1,3 +1,4 @@
+import { LOCALE_TAG, type Locale } from "../i18n/config";
 import { z } from "zod";
 
 // Free intro sessions: coaches publish times, members book one. Shared by the server and browser.
@@ -67,14 +68,18 @@ export type OpenSlot = {
 };
 
 // Open times grouped by the viewer's local day, in order.
-export function slotsByDay(slots: OpenSlot[], timeZone?: string) {
+export function slotsByDay(
+  slots: OpenSlot[],
+  timeZone?: string,
+  locale: Locale = "en",
+) {
   const days: { key: string; label: string; slots: OpenSlot[] }[] = [];
   for (const slot of [...slots].sort((a, b) =>
     a.startsAt.localeCompare(b.startsAt),
   )) {
     const date = new Date(slot.startsAt);
     const key = date.toLocaleDateString("en-CA", { timeZone });
-    const label = date.toLocaleDateString("en-US", {
+    const label = date.toLocaleDateString(LOCALE_TAG[locale], {
       weekday: "short",
       month: "short",
       day: "numeric",

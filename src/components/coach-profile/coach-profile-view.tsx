@@ -24,6 +24,7 @@ import {
   VerificationBadge,
 } from "./profile-parts";
 import { LocalDateTime, SaveCoachButton } from "./profile-client";
+import { T } from "@/i18n/t";
 
 const SECTIONS = [
   { id: "about", label: "About" },
@@ -62,9 +63,9 @@ function ActionButtons({
   profile: CoachProfileView;
   layout: "hero" | "card" | "bar";
 }) {
-  const note = profile.sample
-    ? "This is a sample profile, so booking and saving are off."
-    : undefined;
+  const note = profile.sample ? (
+    <T>{"This is a sample profile, so booking and saving are off."}</T>
+  ) : undefined;
   const noteId = `actions-note-${layout}`;
   return (
     <div className={layout === "bar" ? "flex gap-2" : "space-y-2"}>
@@ -82,7 +83,7 @@ function ActionButtons({
             aria-describedby={note ? noteId : undefined}
             className={`btn-primary ${layout === "bar" ? "flex-1 px-3" : ""}`}
           >
-            Book intro session
+            <T>Book intro session</T>
           </button>
         ) : (
           profile.intro && (
@@ -90,7 +91,7 @@ function ActionButtons({
               href={`/coaches/${profile.id}/intro`}
               className={`btn-primary ${layout === "bar" ? "flex-1 px-3" : ""}`}
             >
-              Book intro session
+              <T>Book intro session</T>
             </Link>
           )
         )}
@@ -113,7 +114,7 @@ function ActionButtons({
             >
               <path d="M6 3h12v18l-6-4-6 4V3Z" />
             </svg>
-            Save coach
+            <T>Save coach</T>
           </button>
         )}
         {layout !== "bar" && !profile.sample && profile.saved !== undefined && (
@@ -147,7 +148,7 @@ function Hero({
             // eslint-disable-next-line @next/next/no-img-element -- coach photos come from storage
             <img
               src={profile.photoUrl}
-              alt={`Portrait of ${profile.name}`}
+              alt={`Portrait of ${name}`}
               className="size-full object-cover object-top"
             />
           ) : (
@@ -157,7 +158,7 @@ function Hero({
         <div className="min-w-0 space-y-2 self-center sm:self-end">
           <h1 className="text-4xl leading-none sm:text-5xl md:text-6xl">
             <span className="block text-sm tracking-widest text-accent sm:text-base">
-              Meet
+              <T>Meet</T>
             </span>
             {profile.name}
           </h1>
@@ -171,7 +172,7 @@ function Hero({
         </div>
         <div className="col-span-2 min-w-0 space-y-3 sm:col-span-1 sm:col-start-2 sm:self-start">
           <p className="text-muted">
-            {profile.location} • {formatsLabel(profile.formats)}
+            {profile.location} • <T>{formatsLabel(profile.formats)}</T>
           </p>
           <blockquote className="border-l-2 border-accent pl-4 text-lg leading-snug">
             &ldquo;{profile.headline}&rdquo;
@@ -185,11 +186,17 @@ function Hero({
               <span className="font-semibold">{profile.rating.average}/5</span>
               <a href="#reviews" className="text-sm text-muted hover:underline">
                 {profile.rating.count}{" "}
-                {profile.sample ? "sample reviews" : "verified reviews"}
+                {profile.sample ? (
+                  <T>{"sample reviews"}</T>
+                ) : (
+                  "verified reviews"
+                )}
               </a>
             </p>
           ) : (
-            <p className="text-sm text-muted">No reviews yet</p>
+            <p className="text-sm text-muted">
+              <T>No reviews yet</T>
+            </p>
           )}
           <div className="hidden pt-1 md:block">
             {actions ?? <ActionButtons profile={profile} layout="hero" />}
@@ -198,13 +205,17 @@ function Hero({
       </div>
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <SummaryCard
-          value={`${profile.experienceYears} ${profile.experienceYears === 1 ? "year" : "years"}`}
-          label="Experience"
+          value={
+            <T vars={{ n: profile.experienceYears }}>
+              {profile.experienceYears === 1 ? "{n} year" : "{n} years"}
+            </T>
+          }
+          label={<T>{"Experience"}</T>}
           sample={profile.sample}
         />
         <SummaryCard
           value={price === null ? "Ask" : `${formatPrice(price)}/mo`}
-          label="Starting price"
+          label={<T>{"Starting price"}</T>}
           sample={profile.sample}
         />
         <SummaryCard
@@ -213,7 +224,7 @@ function Hero({
               ? `${profile.match.total}%`
               : "—"
           }
-          label="Match score"
+          label={<T>{"Match score"}</T>}
           sample={profile.sample}
         />
       </div>
@@ -231,7 +242,7 @@ function SectionNav({
 }) {
   return (
     <nav
-      aria-label="Profile sections"
+      aria-label={"Profile sections"}
       className="sticky top-0 z-20 -mx-4 border-b border-border bg-background/95 px-4 backdrop-blur sm:-mx-6 sm:px-6"
     >
       <ul className="flex gap-1 overflow-x-auto py-2 [scrollbar-width:none]">
@@ -241,7 +252,7 @@ function SectionNav({
               href={`#${section.id}`}
               className="block rounded-full px-3 py-1.5 text-sm text-muted transition hover:bg-surface-raised hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
             >
-              {section.label}
+              <T>{section.label}</T>
             </a>
           </li>
         ))}
@@ -256,28 +267,36 @@ function BookingCard({ profile }: { profile: CoachProfileView }) {
     <Card className="space-y-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-accent">
-          Discovery session
+          <T>Discovery session</T>
         </p>
         <p className="mt-1 font-display text-2xl font-bold uppercase leading-tight">
-          {intro.title}
+          <T>{intro.title}</T>
         </p>
       </div>
       <dl className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <dt className="text-muted">Price</dt>
+          <dt className="text-muted">
+            <T>Price</T>
+          </dt>
           <dd className="font-semibold">{formatPrice(intro.priceCents)}</dd>
         </div>
         <div>
-          <dt className="text-muted">Length</dt>
+          <dt className="text-muted">
+            <T>Length</T>
+          </dt>
           <dd className="font-semibold">{intro.minutes} minutes</dd>
         </div>
         <div className="col-span-2">
-          <dt className="text-muted">Format</dt>
+          <dt className="text-muted">
+            <T>Format</T>
+          </dt>
           <dd>{intro.formats.join(" or ")}</dd>
         </div>
         {intro.nextSlot && (
           <div className="col-span-2">
-            <dt className="text-muted">Next opening</dt>
+            <dt className="text-muted">
+              <T>Next opening</T>
+            </dt>
             <dd className="font-semibold">
               <LocalDateTime iso={intro.nextSlot} />
             </dd>
@@ -362,11 +381,13 @@ export function CoachProfile({
           className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-dashed border-accent/60 bg-accent/5 px-4 py-3 text-sm"
         >
           <span className="font-semibold text-accent">
-            Sample profile, not a real coach.
+            <T>Sample profile, not a real coach.</T>
           </span>
           <span className="text-muted">
-            Coach Jasmine shows what GYMX2 coach profiles look like. Her
-            ratings, reviews, prices, credentials and match score are made up.
+            <T>
+              Coach Jasmine shows what GYMX2 coach profiles look like. Her
+              ratings, reviews, prices, credentials and match score are made up.
+            </T>
           </span>
         </div>
       )}
@@ -377,7 +398,7 @@ export function CoachProfile({
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-12">
           {has.about && (
-            <Section id="about" title="About me">
+            <Section id="about" title={<T>{"About me"}</T>}>
               <Card className="space-y-4">
                 {profile.about.intro.map((paragraph) => (
                   <p key={paragraph} className="leading-relaxed">
@@ -385,7 +406,9 @@ export function CoachProfile({
                   </p>
                 ))}
                 <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <span className="text-sm text-muted">In three words:</span>
+                  <span className="text-sm text-muted">
+                    <T>In three words:</T>
+                  </span>
                   {profile.about.threeWords.map((word) => (
                     <span
                       key={word}
@@ -408,17 +431,21 @@ export function CoachProfile({
               </div>
               <Card className="space-y-3">
                 <p className="text-sm font-semibold text-accent">
-                  My ideal client is someone who…
+                  <T>My ideal client is someone who…</T>
                 </p>
                 <p>{profile.idealClient}</p>
               </Card>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Card className="space-y-3">
-                  <p className="text-sm text-muted">Outside the gym</p>
+                  <p className="text-sm text-muted">
+                    <T>Outside the gym</T>
+                  </p>
                   <Chips items={profile.about.interests} />
                 </Card>
                 <Card className="space-y-2">
-                  <p className="text-sm text-muted">Favorite quote</p>
+                  <p className="text-sm text-muted">
+                    <T>Favorite quote</T>
+                  </p>
                   <p className="font-display text-xl font-semibold uppercase leading-snug">
                     &ldquo;{profile.about.quote}&rdquo;
                   </p>
@@ -428,7 +455,7 @@ export function CoachProfile({
           )}
 
           {has.match && (
-            <Section id="match" title="Our compatibility" sample={s}>
+            <Section id="match" title={<T>{"Our compatibility"}</T>} sample={s}>
               {profile.match?.blockers?.length ? (
                 <Card className="space-y-3">
                   <p className="font-semibold">
@@ -440,9 +467,9 @@ export function CoachProfile({
                     ))}
                   </ul>
                   <p className="text-xs text-muted">
-                    Based on your answers.{" "}
+                    <T>Based on your answers.</T>{" "}
                     <Link href="/coaches/match?edit=1" className="text-link">
-                      Change them
+                      <T>Change them</T>
                     </Link>{" "}
                     if something&apos;s changed.
                   </p>
@@ -455,22 +482,27 @@ export function CoachProfile({
                         <span className="font-display text-5xl font-bold text-accent">
                           {profile.match.total}%
                         </span>{" "}
-                        <span className="text-muted">match</span>
+                        <span className="text-muted">
+                          <T>match</T>
+                        </span>
                       </p>
                     ) : (
                       <p className="max-w-sm">
                         <span className="font-semibold">
-                          Not enough information yet.
+                          <T>Not enough information yet.</T>
                         </span>{" "}
                         <span className="text-sm text-muted">
-                          Answer more questions, or check back when{" "}
+                          <T>Answer more questions, or check back when</T>{" "}
                           {profile.firstName} fills in more of their profile.
                         </span>
                       </p>
                     )}
                     <p className="text-xs text-muted">
-                      A guide from your answers and {profile.firstName}&apos;s
-                      profile, not a prediction of results.
+                      <T vars={{ name: profile.firstName }}>
+                        {
+                          "A guide from your answers and {name}'s profile, not a prediction of results."
+                        }
+                      </T>
                     </p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -488,7 +520,9 @@ export function CoachProfile({
                       {profile.match.reasons.length > 0 && (
                         <div className="space-y-2">
                           <h3 className="font-semibold">
-                            Why {profile.firstName} may be a great match for you
+                            <T vars={{ name: profile.firstName }}>
+                              {"Why {name} may be a great match for you"}
+                            </T>
                           </h3>
                           <ul className="list-disc space-y-1.5 pl-5 text-sm">
                             {profile.match.reasons.map((reason) => (
@@ -500,7 +534,7 @@ export function CoachProfile({
                       {profile.match.discuss.length > 0 && (
                         <div className="space-y-2">
                           <h3 className="font-semibold">
-                            Things to discuss before committing
+                            <T>Things to discuss before committing</T>
                           </h3>
                           <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted">
                             {profile.match.discuss.map((item) => (
@@ -519,7 +553,7 @@ export function CoachProfile({
                     how well you and {profile.firstName} fit.
                   </p>
                   <Link href="/coaches/match" className="btn-primary">
-                    Find your match
+                    <T>Find your match</T>
                   </Link>
                 </Card>
               )}
@@ -527,7 +561,7 @@ export function CoachProfile({
           )}
 
           {has.style && (
-            <Section id="style" title="Coaching style">
+            <Section id="style" title={<T>{"Coaching style"}</T>}>
               <Chips items={profile.style.traits} />
               <Card>
                 <DetailList
@@ -542,10 +576,15 @@ export function CoachProfile({
               {loves.length > 0 && (
                 <Card className="space-y-4">
                   <div>
-                    <h3 className="font-semibold">My coaching love language</h3>
+                    <h3 className="font-semibold">
+                      <T>My coaching love language</T>
+                    </h3>
                     <p className="text-sm text-muted">
-                      How {profile.firstName} motivates people best. It&apos;s
-                      about coaching style, not a personality test.
+                      <T vars={{ name: profile.firstName }}>
+                        {
+                          "How {name} motivates people best. It's about coaching style, not a personality test."
+                        }
+                      </T>
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -555,11 +594,13 @@ export function CoachProfile({
                         className={`rounded-xl border p-4 ${tag === "Primary" ? "border-accent" : "border-border"}`}
                       >
                         <p className="text-xs uppercase tracking-widest text-muted">
-                          {tag}
+                          <T>{tag}</T>
                         </p>
-                        <p className="mt-1 font-semibold">{item.label}</p>
+                        <p className="mt-1 font-semibold">
+                          <T>{item.label}</T>
+                        </p>
                         <p className="mt-1 text-sm text-muted">
-                          {item.description}
+                          <T>{item.description}</T>
                         </p>
                       </div>
                     ))}
@@ -575,33 +616,37 @@ export function CoachProfile({
           )}
 
           {has.specialties && (
-            <Section id="specialties" title="Who I work best with">
+            <Section id="specialties" title={<T>{"Who I work best with"}</T>}>
               <ul className="grid gap-3 sm:grid-cols-2">
                 {profile.populations.map((item) => (
                   <li
                     key={item.label}
                     className="rounded-2xl border border-border bg-surface p-4"
                   >
-                    <p className="font-semibold">{item.label}</p>
+                    <p className="font-semibold">
+                      <T>{item.label}</T>
+                    </p>
                     <p className="mt-1 text-sm text-muted">{item.note}</p>
                   </li>
                 ))}
               </ul>
               <Card className="space-y-1">
                 <h3 className="font-semibold">
-                  Who might be better served by another specialist
+                  <T>Who might be better served by another specialist</T>
                 </h3>
                 <p className="text-sm text-muted">{profile.betterServedBy}</p>
               </Card>
               <p className="text-xs text-muted">
-                Specialties are the coach&apos;s own description, not a
-                qualification. Check Credentials for what GYMX2 has verified.
+                <T>
+                  Specialties are the coach&apos;s own description, not a
+                  qualification. Check Credentials for what GYMX2 has verified.
+                </T>
               </p>
             </Section>
           )}
 
           {has.credentials && (
-            <Section id="credentials" title="Credentials" sample={s}>
+            <Section id="credentials" title={<T>{"Credentials"}</T>} sample={s}>
               <ul className="space-y-3">
                 {profile.credentials.map((credential) => (
                   <li
@@ -609,7 +654,9 @@ export function CoachProfile({
                     className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
-                      <p className="font-semibold">{credential.title}</p>
+                      <p className="font-semibold">
+                        <T>{credential.title}</T>
+                      </p>
                       <p className="text-sm text-muted">
                         {credential.organization} · {credential.detail}
                       </p>
@@ -617,22 +664,24 @@ export function CoachProfile({
                     <span
                       className={`shrink-0 self-start rounded-full border px-3 py-1 text-xs font-semibold sm:self-auto ${STATUS_STYLE[credential.status]} ${s ? "border-dashed" : ""}`}
                     >
-                      {s ? "Sample: " : ""}
-                      {STATUS_LABEL[credential.status]}
+                      {s ? <T>{"Sample: "}</T> : ""}
+                      <T>{STATUS_LABEL[credential.status]}</T>
                     </span>
                   </li>
                 ))}
               </ul>
               <p className="text-xs text-muted">
-                Verified means a GYMX2 admin checked the certificate with the
-                organization that issued it. Expired certificates never show as
-                verified.
+                <T>
+                  Verified means a GYMX2 admin checked the certificate with the
+                  organization that issued it. Expired certificates never show
+                  as verified.
+                </T>
               </p>
             </Section>
           )}
 
           {has.coaching && (
-            <Section id="coaching" title="How online coaching works">
+            <Section id="coaching" title={<T>{"How online coaching works"}</T>}>
               <Card className="space-y-5">
                 <CheckList items={profile.coaching.included} />
                 <div className="border-t border-border pt-5">
@@ -643,17 +692,25 @@ export function CoachProfile({
           )}
 
           {has.results && (
-            <Section id="results" title="Experience & results" sample={s}>
+            <Section
+              id="results"
+              title={<T>{"Experience & results"}</T>}
+              sample={s}
+            >
               <Card className="space-y-4">
                 <div className="flex flex-wrap gap-6">
                   <div>
                     <p className="font-display text-4xl font-bold text-accent">
                       {profile.experienceYears}
                     </p>
-                    <p className="text-sm text-muted">years coaching</p>
+                    <p className="text-sm text-muted">
+                      <T>years coaching</T>
+                    </p>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-muted">Areas of expertise</p>
+                    <p className="text-sm text-muted">
+                      <T>Areas of expertise</T>
+                    </p>
                     <div className="mt-2">
                       <Chips items={profile.results.expertise} />
                     </div>
@@ -665,22 +722,26 @@ export function CoachProfile({
                 {profile.results.stories.map((story) => (
                   <Card key={story.title} className="space-y-2">
                     <p className="text-xs uppercase tracking-widest text-muted">
-                      {s ? "Sample story" : "Self-reported"}
+                      {s ? <T>{"Sample story"}</T> : "Self-reported"}
                     </p>
-                    <p className="font-semibold">{story.title}</p>
+                    <p className="font-semibold">
+                      <T>{story.title}</T>
+                    </p>
                     <p className="text-sm text-muted">{story.summary}</p>
                   </Card>
                 ))}
               </div>
               <p className="text-xs text-muted">
-                Results differ from person to person. A past client&apos;s
-                progress isn&apos;t a promise of yours.
+                <T>
+                  Results differ from person to person. A past client&apos;s
+                  progress isn&apos;t a promise of yours.
+                </T>
               </p>
             </Section>
           )}
 
           {has.nutrition && (
-            <Section id="nutrition" title="Nutrition & lifestyle">
+            <Section id="nutrition" title={<T>{"Nutrition & lifestyle"}</T>}>
               <Card className="space-y-4">
                 <CheckList items={profile.nutrition.offers} />
                 <p className="text-sm">
@@ -694,7 +755,7 @@ export function CoachProfile({
             </Section>
           )}
 
-          <Section id="availability" title="Availability">
+          <Section id="availability" title={<T>{"Availability"}</T>}>
             <Card className="space-y-5">
               <p className="flex flex-wrap items-center gap-2">
                 <span
@@ -702,9 +763,11 @@ export function CoachProfile({
                   aria-hidden
                 />
                 <span className="font-semibold">
-                  {profile.availability.acceptingClients
-                    ? "Accepting new clients"
-                    : "Waitlist only"}
+                  {profile.availability.acceptingClients ? (
+                    <T>{"Accepting new clients"}</T>
+                  ) : (
+                    <T>{"Waitlist only"}</T>
+                  )}
                 </span>
                 <span className="text-sm text-muted">
                   · Times in {profile.availability.timeZone}
@@ -726,7 +789,11 @@ export function CoachProfile({
           </Section>
 
           {has.pricing && (
-            <Section id="pricing" title="Pricing & packages" sample={s}>
+            <Section
+              id="pricing"
+              title={<T>{"Pricing & packages"}</T>}
+              sample={s}
+            >
               <ul className="grid gap-3 sm:grid-cols-2">
                 {profile.packages.map((item) => (
                   <li
@@ -735,7 +802,7 @@ export function CoachProfile({
                   >
                     {item.featured && (
                       <span className="absolute -top-3 left-5 rounded-full bg-accent px-2.5 py-0.5 text-xs font-bold uppercase text-accent-foreground">
-                        Coach&apos;s pick
+                        <T>Coach&apos;s pick</T>
                       </span>
                     )}
                     <p className="font-semibold">{item.name}</p>
@@ -746,7 +813,10 @@ export function CoachProfile({
                       {item.priceCents > 0 && (
                         <span className="text-muted">
                           {" "}
-                          / {item.billing === "Monthly" ? "month" : "one time"}
+                          /{" "}
+                          <T>
+                            {item.billing === "Monthly" ? "month" : "one time"}
+                          </T>
                         </span>
                       )}
                     </p>
@@ -767,25 +837,29 @@ export function CoachProfile({
                 ))}
               </ul>
               <Card>
-                <h3 className="mb-3 font-semibold">Commitment and policies</h3>
+                <h3 className="mb-3 font-semibold">
+                  <T>Commitment and policies</T>
+                </h3>
                 <DetailList items={profile.policies} />
               </Card>
               {pricingExtra}
               <p className="text-xs text-muted">
-                The starting price is the lowest monthly plan
-                {price !== null ? ` (${formatPrice(price)}/month)` : ""}, not
-                the intro call or a single session. Monthly plans are paid
-                through GYMX2 and{" "}
+                <T>The starting price is the lowest monthly plan</T>
+                {price !== null ? ` (${formatPrice(price)}/month)` : ""}
+                <T>
+                  , not the intro call or a single session. Monthly plans are
+                  paid through GYMX2 and
+                </T>{" "}
                 <Link href="/refunds" className="text-link">
-                  our refund policy
+                  <T>our refund policy</T>
                 </Link>{" "}
-                applies.
+                <T>applies.</T>
               </p>
             </Section>
           )}
 
           {has.reviews && (
-            <Section id="reviews" title="Reviews" sample={s}>
+            <Section id="reviews" title={<T>{"Reviews"}</T>} sample={s}>
               {profile.rating ? (
                 <Card className="grid gap-6 sm:grid-cols-[10rem_1fr]">
                   <div>
@@ -806,7 +880,9 @@ export function CoachProfile({
                         key={category.label}
                         className="flex items-center justify-between gap-3 rounded-lg bg-surface-raised px-3 py-2 text-sm"
                       >
-                        <dt>{category.label}</dt>
+                        <dt>
+                          <T>{category.label}</T>
+                        </dt>
                         <dd className="font-semibold tabular-nums">
                           {category.score.toFixed(1)}
                         </dd>
@@ -855,7 +931,7 @@ export function CoachProfile({
           )}
 
           {has.video && (
-            <Section id="video" title="Introduction video">
+            <Section id="video" title={<T>{"Introduction video"}</T>}>
               <Card className="space-y-4">
                 <div className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-xl bg-surface-raised text-center">
                   <span
@@ -870,9 +946,13 @@ export function CoachProfile({
                     </svg>
                   </span>
                   <p className="px-4 text-sm text-muted">
-                    {s
-                      ? "Sample: coaches add a 60 to 90 second video here."
-                      : "Video coming soon."}
+                    {s ? (
+                      <T>
+                        {"Sample: coaches add a 60 to 90 second video here."}
+                      </T>
+                    ) : (
+                      <T>{"Video coming soon."}</T>
+                    )}
                   </p>
                 </div>
                 <div>
@@ -895,7 +975,7 @@ export function CoachProfile({
           )}
 
           {has.book && (
-            <Section id="book" title="Book a session">
+            <Section id="book" title={<T>{"Book a session"}</T>}>
               <div className="lg:hidden">
                 <BookingCard profile={profile} />
               </div>
@@ -908,7 +988,7 @@ export function CoachProfile({
                     href={`/coaches/${profile.id}/intro`}
                     className="text-link"
                   >
-                    See open times
+                    <T>See open times</T>
                   </Link>
                 </p>
               )}
@@ -943,17 +1023,27 @@ export function CoachProfile({
             )}
             <Card className="space-y-2 text-sm">
               <p className="flex items-center justify-between">
-                <span className="text-muted">Plans from</span>
+                <span className="text-muted">
+                  <T>Plans from</T>
+                </span>
                 <span className="font-semibold">
-                  {price === null ? "Ask" : `${formatPrice(price)}/month`}
+                  {price === null ? (
+                    <T>{"Ask"}</T>
+                  ) : (
+                    `${formatPrice(price)}/month`
+                  )}
                 </span>
               </p>
               <p className="flex items-center justify-between">
-                <span className="text-muted">New clients</span>
+                <span className="text-muted">
+                  <T>New clients</T>
+                </span>
                 <span className="font-semibold">
-                  {profile.availability.acceptingClients
-                    ? "Accepting"
-                    : "Waitlist"}
+                  {profile.availability.acceptingClients ? (
+                    <T>{"Accepting"}</T>
+                  ) : (
+                    <T>{"Waitlist"}</T>
+                  )}
                 </span>
               </p>
               {s && <SampleTag className="mt-1" />}
@@ -969,7 +1059,9 @@ export function CoachProfile({
             <div className="shrink-0">
               {profile.intro ? (
                 <>
-                  <p className="text-xs text-muted">Intro call</p>
+                  <p className="text-xs text-muted">
+                    <T>Intro call</T>
+                  </p>
                   <p className="font-semibold">
                     {formatPrice(profile.intro.priceCents)} ·{" "}
                     {profile.intro.minutes} min
@@ -977,11 +1069,15 @@ export function CoachProfile({
                 </>
               ) : (
                 <>
-                  <p className="text-xs text-muted">Plans from</p>
+                  <p className="text-xs text-muted">
+                    <T>Plans from</T>
+                  </p>
                   <p className="font-semibold">
-                    {price === null
-                      ? "Free to join"
-                      : `${formatPrice(price)}/mo`}
+                    {price === null ? (
+                      <T>{"Free to join"}</T>
+                    ) : (
+                      `${formatPrice(price)}/mo`
+                    )}
                   </p>
                 </>
               )}

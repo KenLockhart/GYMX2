@@ -6,8 +6,12 @@ import { MatchSummary } from "@/components/match-summary";
 import { requireAccount } from "@/lib/auth";
 import { readAnswers } from "@/lib/match-questions";
 import { createClient } from "@/lib/supabase/server";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Find your coach match" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Find your coach match") };
+}
 
 export default async function MatchPage({
   searchParams,
@@ -29,7 +33,7 @@ export default async function MatchPage({
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <Link href="/coaches" className="text-link text-sm">
-        Back to coaches
+        <T>Back to coaches</T>
       </Link>
       {completed && !edit ? (
         <MatchSummary answers={answers} />

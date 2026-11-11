@@ -6,10 +6,15 @@ import { requireAccount } from "@/lib/auth";
 import { loadAuthors, postableCommunities } from "@/lib/community-server";
 import { readPreferences } from "@/lib/feed-prefs";
 import { createClient } from "@/lib/supabase/server";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Newsfeed preferences" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Newsfeed preferences") };
+}
 
 export default async function FeedPreferencesPage() {
+  const tr = await getTr();
   const { profile } = await requireAccount();
   const supabase = await createClient();
   const [{ data: row }, { data: follows }, { data: mutes }, joined] =
@@ -51,18 +56,25 @@ export default async function FeedPreferencesPage() {
   }
 
   const named = (ids: string[]) =>
-    ids.map((id) => ({ id, name: people.get(id)?.name ?? "Former member" }));
+    ids.map((id) => ({
+      id,
+      name: people.get(id)?.name ?? tr("Former member"),
+    }));
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
         <Link href="/community" className="text-link text-sm">
-          Back to Community
+          <T>Back to Community</T>
         </Link>
-        <h1 className="mt-2 text-5xl">Newsfeed preferences</h1>
+        <h1 className="mt-2 text-5xl">
+          <T>Newsfeed preferences</T>
+        </h1>
         <p className="mt-2 text-muted">
-          Choose what you see more of. These settings only change the order of
-          posts you can already see; they never show you anything private.
+          <T>
+            Choose what you see more of. These settings only change the order of
+            posts you can already see; they never show you anything private.
+          </T>
         </p>
       </div>
       <PreferencesForm
@@ -70,14 +82,16 @@ export default async function FeedPreferencesPage() {
         coaches={[...coachOptions].map(([id, name]) => ({ id, name }))}
       />
       <PeopleList
-        title="Following"
-        empty="You're not following anyone yet. Tap Follow on a post to see more from that person."
+        title={tr("Following")}
+        empty={tr(
+          "You're not following anyone yet. Tap Follow on a post to see more from that person.",
+        )}
         people={named(followedIds)}
         action="unfollow"
       />
       <PeopleList
-        title="Muted"
-        empty="You haven't muted anyone."
+        title={tr("Muted")}
+        empty={tr("You haven't muted anyone.")}
         people={named(mutedIds)}
         action="unmute"
       />

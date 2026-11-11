@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { setSaved } from "@/app/(app)/coaches/discovery-actions";
 import { useLocalZone } from "@/components/intro-times";
+import { LOCALE_TAG } from "@/i18n/config";
+import { useLocale } from "@/i18n/client";
+import { useTr } from "@/i18n/t";
 
 // The member's own Save button on a real coach profile.
 export function SaveCoachButton({
@@ -12,6 +15,7 @@ export function SaveCoachButton({
   coachId: string;
   initial: boolean;
 }) {
+  const tr = useTr();
   const [saved, setState] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -47,11 +51,11 @@ export function SaveCoachButton({
         >
           <path d="M6 3h12v18l-6-4-6 4V3Z" />
         </svg>
-        {saved ? "Saved" : "Save coach"}
+        {saved ? tr("Saved") : tr("Save coach")}
       </button>
       {error && (
         <span role="alert" className="text-xs text-danger">
-          {error}
+          {tr(error)}
         </span>
       )}
     </>
@@ -61,17 +65,18 @@ export function SaveCoachButton({
 // A date and time in the viewer's own time zone.
 export function LocalDateTime({ iso }: { iso: string }) {
   const timeZone = useLocalZone();
+  const locale = useLocale();
   const date = new Date(iso);
   return (
     <time dateTime={iso}>
-      {date.toLocaleDateString("en-US", {
+      {date.toLocaleDateString(LOCALE_TAG[locale], {
         weekday: "short",
         month: "short",
         day: "numeric",
         timeZone,
       })}
       ,{" "}
-      {date.toLocaleTimeString("en-US", {
+      {date.toLocaleTimeString(LOCALE_TAG[locale], {
         hour: "numeric",
         minute: "2-digit",
         timeZone,

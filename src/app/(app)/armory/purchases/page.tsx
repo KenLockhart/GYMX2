@@ -10,8 +10,14 @@ import {
   resumeMembership,
 } from "../../plans/actions";
 import { createClient } from "@/lib/supabase/server";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
+import { LOCALE_TAG, type Locale } from "@/i18n/config";
+import { getLocale } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "My purchases" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("My purchases") };
+}
 
 type Purchase = {
   id: string;
@@ -27,8 +33,8 @@ type Purchase = {
   item: { kind: string } | null;
 };
 
-function formatDay(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+function formatDay(iso: string, locale: Locale) {
+  return new Date(iso).toLocaleDateString(LOCALE_TAG[locale], {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -37,6 +43,8 @@ function formatDay(iso: string) {
 }
 
 export default async function MyPurchasesPage() {
+  const locale = await getLocale();
+  const tr = await getTr();
   const { profile } = await requireAccount();
 
   const supabase = await createClient();
@@ -71,15 +79,19 @@ export default async function MyPurchasesPage() {
   return (
     <div className="space-y-6">
       <Link href="/armory" className="text-link text-sm">
-        Back to the Armory
+        <T>Back to the Armory</T>
       </Link>
       <div>
-        <h1 className="text-5xl">My purchases</h1>
+        <h1 className="text-5xl">
+          <T>My purchases</T>
+        </h1>
         <p className="mt-2 max-w-xl text-muted">
-          Everything you&apos;ve bought on GYMX2. Questions about an order?
-          Message the seller, or see our{" "}
+          <T>
+            Everything you&apos;ve bought on GYMX2. Questions about an order?
+            Message the seller, or see our
+          </T>{" "}
           <Link href="/refunds" className="text-link">
-            refund policy
+            <T>refund policy</T>
           </Link>
           .
         </p>
@@ -87,7 +99,9 @@ export default async function MyPurchasesPage() {
 
       {memberships.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-2xl">Memberships</h2>
+          <h2 className="text-2xl">
+            <T>Memberships</T>
+          </h2>
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
             {memberships.map((membership) => {
               const live = hasAccess(membership.status);
@@ -110,7 +124,7 @@ export default async function MyPurchasesPage() {
                       className={`text-sm ${membership.status === "past_due" ? "text-danger" : "text-muted"}`}
                     >
                       {formatMoney(membership.price_cents)}/month ·{" "}
-                      {membershipStatusLabel(membership)}
+                      <T>{membershipStatusLabel(membership)}</T>
                     </p>
                   </div>
                   {live && (
@@ -122,10 +136,10 @@ export default async function MyPurchasesPage() {
                           value={membership.id}
                         />
                         <SubmitButton
-                          pendingText="Opening..."
+                          pendingText={tr("Opening...")}
                           className="btn-secondary px-3 py-2 text-sm"
                         >
-                          Update card
+                          <T>Update card</T>
                         </SubmitButton>
                         <FormStatus />
                       </ActionForm>
@@ -138,7 +152,10 @@ export default async function MyPurchasesPage() {
                         confirmMessage={
                           membership.cancel_at_period_end
                             ? undefined
-                            : `Cancel ${membership.plan_name}? You keep access until the end of the period you've paid for, and won't be charged again.`
+                            : tr(
+                                "Cancel {plan_name}? You keep access until the end of the period you've paid for, and won't be charged again.",
+                                { plan_name: membership.plan_name },
+                              )
                         }
                       >
                         <input
@@ -147,12 +164,12 @@ export default async function MyPurchasesPage() {
                           value={membership.id}
                         />
                         <SubmitButton
-                          pendingText="Saving..."
+                          pendingText={tr("Saving...")}
                           className="btn-secondary px-3 py-2 text-sm"
                         >
                           {membership.cancel_at_period_end
-                            ? "Keep my membership"
-                            : "Cancel membership"}
+                            ? tr("Keep my membership")
+                            : tr("Cancel membership")}
                         </SubmitButton>
                         <FormStatus />
                       </ActionForm>
@@ -167,13 +184,15 @@ export default async function MyPurchasesPage() {
 
       {error ? (
         <p role="alert" className="text-danger">
-          We couldn&apos;t load your purchases. Please refresh and try again.
+          <T>
+            We couldn&apos;t load your purchases. Please refresh and try again.
+          </T>
         </p>
       ) : purchases.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-          Nothing yet.{" "}
+          <T>Nothing yet.</T>{" "}
           <Link href="/armory" className="text-link">
-            Browse the Armory
+            <T>Browse the Armory</T>
           </Link>
           .
         </p>
@@ -210,15 +229,15 @@ export default async function MyPurchasesPage() {
                     )}
                   </p>
                   <p className="text-sm text-muted">
-                    {formatDay(purchase.created_at)} ·{" "}
+                    {formatDay(purchase.created_at, locale)} ·{" "}
                     {formatMoney(purchase.amount_cents)} ·{" "}
                     <span className={purchase.refunded_at ? "text-danger" : ""}>
                       {purchase.kind === "membership"
                         ? purchase.refunded_at
-                          ? "Membership payment · Refunded"
-                          : "Membership payment"
+                          ? tr("Membership payment · Refunded")
+                          : tr("Membership payment")
                         : digital && !purchase.refunded_at
-                          ? "Digital"
+                          ? tr("Digital")
                           : orderStatusLabel(purchase)}
                     </span>
                   </p>
@@ -228,7 +247,7 @@ export default async function MyPurchasesPage() {
                     href={`/armory/${purchase.item_id}/download`}
                     className="btn-secondary px-3 py-2 text-sm"
                   >
-                    Download
+                    <T>Download</T>
                   </a>
                 )}
               </li>

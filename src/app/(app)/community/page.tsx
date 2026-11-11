@@ -8,14 +8,19 @@ import { loadFeed, postableCommunities } from "@/lib/community-server";
 import { loadProgressPhotoById } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Community" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Community") };
+}
 
 export default async function CommunityPage({
   searchParams,
 }: {
   searchParams: Promise<{ photo?: string; badge?: string }>;
 }) {
+  const tr = await getTr();
   const { profile } = await requireAccount();
   const { photo, badge } = await searchParams;
   const supabase = await createClient();
@@ -37,7 +42,10 @@ export default async function CommunityPage({
       sharedBadge = allBadges().find((item) => item.key === badge) ?? null;
   }
   const initialBody = sharedBadge
-    ? `I just earned the ${sharedBadge.name} badge on GYMX2: ${sharedBadge.description}`
+    ? tr("I just earned the {name} badge on GYMX2: {description}", {
+        name: sharedBadge.name,
+        description: sharedBadge.description,
+      })
     : "";
 
   const [feed, communities, { data: prefs }] = await Promise.all([
@@ -54,16 +62,20 @@ export default async function CommunityPage({
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-5xl">Community</h1>
+        <h1 className="text-5xl">
+          <T>Community</T>
+        </h1>
         <p className="mt-2 text-muted">
-          Workouts, wins and motivation from GYMX2 members and coaches. Showing
-          the{" "}
+          <T>
+            Workouts, wins and motivation from GYMX2 members and coaches.
+            Showing the
+          </T>{" "}
           <span className="font-semibold text-foreground">
             {personalized ? "personalized" : "standard GYMX2"}
           </span>{" "}
-          feed.{" "}
+          <T>feed.</T>{" "}
           <Link href="/community/preferences" className="text-link">
-            Newsfeed preferences
+            <T>Newsfeed preferences</T>
           </Link>
         </p>
       </div>
@@ -82,14 +94,16 @@ export default async function CommunityPage({
           role="alert"
           className="rounded-lg border border-danger bg-surface p-4 text-sm"
         >
-          We couldn&apos;t load the feed. Refresh to try again.
+          <T>We couldn&apos;t load the feed. Refresh to try again.</T>
         </p>
       ) : (
         <FeedList
           initialPosts={feed.posts}
           initialMore={feed.more}
           viewerRole={profile.role}
-          emptyText="No posts yet. Be the first to share a workout or a win."
+          emptyText={tr(
+            "No posts yet. Be the first to share a workout or a win.",
+          )}
         />
       )}
     </div>

@@ -6,8 +6,12 @@ import { requireAccount } from "@/lib/auth";
 import { loadMyIntroWithCoach, loadOpenSlots } from "@/lib/intros-server";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
+import { T } from "@/i18n/t";
+import { getTr } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Book a free intro" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTr())("Book a free intro") };
+}
 
 export default async function BookIntroPage({
   params,
@@ -49,13 +53,15 @@ export default async function BookIntroPage({
           Back to {name}
         </Link>
         <p className="mt-3 text-xs font-semibold uppercase tracking-widest text-accent">
-          Free intro session
+          <T>Free intro session</T>
         </p>
         <h1 className="mt-1 text-5xl">Meet {firstName}</h1>
         <p className="mt-2 text-muted">
-          A short, free call or meeting to see if you&apos;re a good fit.
-          Booking doesn&apos;t start a membership, and you can cancel any time
-          before it starts.
+          <T>
+            A short, free call or meeting to see if you&apos;re a good fit.
+            Booking doesn&apos;t start a membership, and you can cancel any time
+            before it starts.
+          </T>
         </p>
       </div>
       <IntroBooking

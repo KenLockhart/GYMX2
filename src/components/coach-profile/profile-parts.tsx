@@ -1,13 +1,14 @@
 // Small building blocks for the coach profile. Server components: no browser code needed.
 import type { ReactNode } from "react";
 import type { CredentialStatus } from "@/lib/coach-profile";
+import { T } from "@/i18n/t";
 
 export function SampleTag({ className = "" }: { className?: string }) {
   return (
     <span
       className={`inline-flex items-center rounded-full border border-dashed border-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted ${className}`}
     >
-      Sample
+      <T>Sample</T>
     </span>
   );
 }
@@ -70,7 +71,7 @@ export function VerificationBadge({
       >
         {meta.icon}
       </svg>
-      {sample ? `Sample: ${meta.label.toLowerCase()}` : meta.label}
+      <T>{sample ? `Sample: ${meta.label.toLowerCase()}` : meta.label}</T>
     </span>
   );
 }
@@ -133,7 +134,7 @@ export function PortraitPlaceholder({ name }: { name: string }) {
         {initial}
       </span>
       <span className="relative m-2 hidden rounded-full bg-background/80 px-3 py-1 text-xs text-muted backdrop-blur @[10rem]:inline sm:m-3">
-        Portrait coming soon
+        <T>Portrait coming soon</T>
       </span>
     </div>
   );
@@ -144,8 +145,8 @@ export function SummaryCard({
   label,
   sample,
 }: {
-  value: string;
-  label: string;
+  value: ReactNode;
+  label: ReactNode;
   sample?: boolean;
 }) {
   return (
@@ -168,7 +169,7 @@ export function Section({
   sample,
 }: {
   id: string;
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   sample?: boolean;
 }) {
@@ -218,7 +219,9 @@ export function DetailList({
           key={item.label}
           className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[12rem_1fr] sm:gap-4"
         >
-          <dt className="text-sm text-muted">{item.label}</dt>
+          <dt className="text-sm text-muted">
+            <T>{item.label}</T>
+          </dt>
           <dd>{item.value}</dd>
         </div>
       ))}
@@ -277,8 +280,12 @@ export function ScoreBar({
     return (
       <div>
         <div className="flex items-baseline justify-between gap-3 text-sm">
-          <span>{label}</span>
-          <span className="text-xs text-muted">Not enough info</span>
+          <span>
+            <T>{label}</T>
+          </span>
+          <span className="text-xs text-muted">
+            <T>Not enough info</T>
+          </span>
         </div>
         <div className="mt-1.5 h-2 rounded-full border border-dashed border-border" />
       </div>

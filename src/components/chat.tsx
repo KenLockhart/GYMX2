@@ -16,6 +16,9 @@ import {
 import { MAX_PHOTO_BYTES, PHOTO_TYPES } from "@/lib/community";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Message } from "@/lib/types";
+import { T, useTr } from "@/i18n/t";
+import { LOCALE_TAG, type Locale } from "@/i18n/config";
+import { useLocale } from "@/i18n/client";
 
 const subscribe = () => () => {};
 const MAX_PHOTOS = 4;
@@ -30,11 +33,11 @@ function useIsClient() {
   );
 }
 
-function formatTime(iso: string, isClient: boolean) {
+function formatTime(iso: string, isClient: boolean, locale: Locale) {
   const timeZone = isClient ? undefined : "UTC";
   const date = new Date(iso);
   const sameDay = date.toDateString() === new Date().toDateString();
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString(LOCALE_TAG[locale], {
     ...(sameDay ? {} : { month: "short", day: "numeric" }),
     hour: "numeric",
     minute: "2-digit",
@@ -55,6 +58,8 @@ export function Chat({
   initialMessages: Message[];
   canSend: boolean;
 }) {
+  const locale = useLocale();
+  const tr = useTr();
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
@@ -130,12 +135,14 @@ export function Chat({
     setError(null);
     const files = [...(list ?? [])];
     if (photos.length + files.length > MAX_PHOTOS)
-      return setError(`Up to ${MAX_PHOTOS} photos per message.`);
+      return setError(
+        tr("Up to {MAX_PHOTOS} photos per message.", { MAX_PHOTOS }),
+      );
     for (const file of files) {
       if (!(extensionOf(file.name) in PHOTO_TYPES))
-        return setError("Use JPG, PNG or WebP photos.");
+        return setError(tr("Use JPG, PNG or WebP photos."));
       if (file.size > MAX_PHOTO_BYTES)
-        return setError("Each photo can be up to 10 MB.");
+        return setError(tr("Each photo can be up to 10 MB."));
     }
     setPhotos([
       ...photos,
@@ -154,7 +161,9 @@ export function Chat({
           photos.map(({ file }) => ({ name: file.name, size: file.size })),
         );
         if (!prepared.uploads)
-          return setError(prepared.error ?? "We couldn't start the upload.");
+          return setError(
+            prepared.error ?? tr("We couldn't start the upload."),
+          );
         const storage = createBrowserSupabase().storage.from("community-media");
         for (const [index, { file }] of photos.entries()) {
           const target = prepared.uploads[index];
@@ -217,7 +226,10 @@ export function Chat({
                         {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage link */}
                         <img
                           src={url}
-                          alt={`Photo ${index + 1} from ${mine ? "you" : other.display_name}`}
+                          alt={tr("Photo {p0} from {p1}", {
+                            p0: index + 1,
+                            p1: mine ? "you" : other.display_name,
+                          })}
                           className="max-h-60 rounded-xl object-cover"
                         />
                       </a>
@@ -236,7 +248,7 @@ export function Chat({
                   </p>
                 )}
                 <span className="mt-1 text-xs text-muted">
-                  {formatTime(message.created_at, isClient)}
+                  {formatTime(message.created_at, isClient, locale)}
                   {mine && message.read_at && " · Seen"}
                 </span>
               </div>
@@ -264,7 +276,7 @@ export function Chat({
                   {/* eslint-disable-next-line @next/next/no-img-element -- a local preview */}
                   <img
                     src={photo.preview}
-                    alt={`Photo ${index + 1} to send`}
+                    alt={tr("Photo {p0} to send", { p0: index + 1 })}
                     className="size-16 rounded object-cover"
                   />
                   <button
@@ -274,7 +286,7 @@ export function Chat({
                       setPhotos(photos.filter((item) => item !== photo));
                     }}
                     disabled={sending}
-                    aria-label={`Remove photo ${index + 1}`}
+                    aria-label={tr("Remove photo {p0}", { p0: index + 1 })}
                     className="absolute -right-1 -top-1 grid size-6 cursor-pointer place-items-center rounded-full bg-background text-xs shadow"
                   >
                     ×
@@ -299,10 +311,10 @@ export function Chat({
               type="button"
               onClick={() => photoInput.current?.click()}
               disabled={sending || photos.length >= MAX_PHOTOS}
-              aria-label="Add photos"
+              aria-label={tr("Add photos")}
               className="btn-secondary px-3"
             >
-              Photo
+              <T>Photo</T>
             </button>
             <textarea
               id="message-body"
@@ -317,7 +329,9 @@ export function Chat({
                   send();
                 }
               }}
-              placeholder={`Message ${other.display_name}`}
+              placeholder={tr("Message {display_name}", {
+                display_name: other.display_name,
+              })}
               className="field-input flex-1 resize-none"
             />
             <button
@@ -325,22 +339,25 @@ export function Chat({
               disabled={sending || (!draft.trim() && photos.length === 0)}
               className="btn-primary"
             >
-              {sending ? "Sending..." : "Send"}
+              {sending ? tr("Sending...") : tr("Send")}
             </button>
           </div>
           {error && (
             <p role="alert" className="text-sm text-danger">
-              {error}
+              {tr(error)}
             </p>
           )}
           <p className="text-xs text-muted">
-            GYMX2 admins may review conversations to keep everyone safe.
+            <T>GYMX2 admins may review conversations to keep everyone safe.</T>
           </p>
         </form>
       ) : (
         <p className="border-t border-border p-4 text-sm text-muted">
-          You&apos;re no longer connected with {other.display_name}, so you can
-          read past messages but not send new ones.
+          <T vars={{ name: other.display_name }}>
+            {
+              "You're no longer connected with {name}, so you can read past messages but not send new ones."
+            }
+          </T>
         </p>
       )}
     </div>

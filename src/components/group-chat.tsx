@@ -14,6 +14,9 @@ import {
 } from "@/app/(app)/groups/actions";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { GroupPost } from "@/lib/groups";
+import { T, useTr } from "@/i18n/t";
+import { LOCALE_TAG, type Locale } from "@/i18n/config";
+import { useLocale } from "@/i18n/client";
 
 const subscribe = () => () => {};
 const useIsClient = () =>
@@ -23,10 +26,10 @@ const useIsClient = () =>
     () => false,
   );
 
-function formatTime(iso: string, isClient: boolean) {
+function formatTime(iso: string, isClient: boolean, locale: Locale) {
   const date = new Date(iso);
   const sameDay = date.toDateString() === new Date().toDateString();
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString(LOCALE_TAG[locale], {
     ...(sameDay ? {} : { month: "short", day: "numeric" }),
     hour: "numeric",
     minute: "2-digit",
@@ -49,6 +52,8 @@ export function GroupChat({
   canPost: boolean;
   flagged?: Record<string, string>;
 }) {
+  const locale = useLocale();
+  const tr = useTr();
   const [posts, setPosts] = useState(initialPosts);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +123,7 @@ export function GroupChat({
   }
 
   function remove(id: string) {
-    if (!window.confirm("Remove this post for everyone?")) return;
+    if (!window.confirm(tr("Remove this post for everyone?"))) return;
     startTransition(async () => {
       const result = await deleteGroupMessage(id);
       if (result.error) return setError(result.error);
@@ -134,7 +139,7 @@ export function GroupChat({
       >
         {posts.length === 0 ? (
           <p className="m-auto text-sm text-muted">
-            No posts yet. Start the conversation.
+            <T>No posts yet. Start the conversation.</T>
           </p>
         ) : (
           posts.map((post) => {
@@ -146,10 +151,12 @@ export function GroupChat({
                 className={`flex flex-col ${mine ? "items-end" : "items-start"}`}
               >
                 <span className="mb-1 text-xs font-semibold">
-                  {mine ? "You" : (names[post.sender_id] ?? "A former member")}
+                  {mine
+                    ? tr("You")
+                    : (names[post.sender_id] ?? tr("A former member"))}
                   {fromCoach && (
                     <span className="ml-1.5 rounded bg-accent px-1 text-[10px] uppercase text-accent-foreground">
-                      Coach
+                      <T>Coach</T>
                     </span>
                   )}
                 </span>
@@ -163,7 +170,7 @@ export function GroupChat({
                   {post.body}
                 </p>
                 <span className="mt-1 flex gap-2 text-xs text-muted">
-                  {formatTime(post.created_at, isClient)}
+                  {formatTime(post.created_at, isClient, locale)}
                   {flagged[post.id] && (
                     <span className="text-danger">
                       Flagged: {flagged[post.id]}
@@ -175,7 +182,7 @@ export function GroupChat({
                       onClick={() => remove(post.id)}
                       className="cursor-pointer hover:text-danger"
                     >
-                      Remove
+                      <T>Remove</T>
                     </button>
                   )}
                 </span>
@@ -195,7 +202,7 @@ export function GroupChat({
           }}
         >
           <label className="sr-only" htmlFor="group-body">
-            Post to the group
+            <T>Post to the group</T>
           </label>
           <div className="flex items-end gap-2">
             <textarea
@@ -210,7 +217,7 @@ export function GroupChat({
                   send();
                 }
               }}
-              placeholder="Post to the group"
+              placeholder={tr("Post to the group")}
               className="field-input flex-1 resize-none"
             />
             <button
@@ -218,22 +225,24 @@ export function GroupChat({
               disabled={pending || !draft.trim()}
               className="btn-primary"
             >
-              {pending ? "Posting..." : "Post"}
+              {pending ? tr("Posting...") : tr("Post")}
             </button>
           </div>
           {error && (
             <p role="alert" className="text-sm text-danger">
-              {error}
+              {tr(error)}
             </p>
           )}
           <p className="text-xs text-muted">
-            Everyone in this group can read posts. GYMX2 admins may review
-            groups to keep everyone safe.
+            <T>
+              Everyone in this group can read posts. GYMX2 admins may review
+              groups to keep everyone safe.
+            </T>
           </p>
         </form>
       ) : (
         <p className="border-t border-border p-4 text-sm text-muted">
-          Admins can read groups but not post in them.
+          <T>Admins can read groups but not post in them.</T>
         </p>
       )}
     </div>

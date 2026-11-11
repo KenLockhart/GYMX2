@@ -5,6 +5,7 @@ import { COACH_STYLE } from "@/lib/coach-options";
 import { formatPrice } from "@/lib/coach-profile";
 import type { CoachCard } from "@/lib/discovery";
 import type { OpenSlot } from "@/lib/intros";
+import { T } from "@/i18n/t";
 
 function styleLabel(
   group: "motivation" | "accountability",
@@ -16,11 +17,14 @@ function styleLabel(
 }
 
 function formats(card: CoachCard) {
-  return card.formats.includes("online") && card.formats.includes("in_person")
-    ? "Online & in-person"
-    : card.formats.includes("in_person")
-      ? "In-person"
-      : "Online";
+  return card.formats.includes("online") &&
+    card.formats.includes("in_person") ? (
+    <T>{"Online & in-person"}</T>
+  ) : card.formats.includes("in_person") ? (
+    <T>{"In-person"}</T>
+  ) : (
+    <T>{"Online"}</T>
+  );
 }
 
 // Two or three coaches side by side. The first column stays put while the table scrolls on phones.
@@ -48,13 +52,15 @@ export function CompareTable({
           {
             label: "Your match",
             cells: cards.map((c) =>
-              c.match?.eligible && c.match.total !== null
-                ? `${c.match.total}%`
-                : c.match && !c.match.eligible
-                  ? "Not a match now"
-                  : c.hasProfile
-                    ? "Take the quiz"
-                    : "—",
+              c.match?.eligible && c.match.total !== null ? (
+                `${c.match.total}%`
+              ) : c.match && !c.match.eligible ? (
+                <T>{"Not a match now"}</T>
+              ) : c.hasProfile ? (
+                <T>{"Take the quiz"}</T>
+              ) : (
+                "—"
+              ),
             ),
             highlight: best(
               cards.map((c) => (c.match?.eligible ? c.match.total : null)),
@@ -134,7 +140,9 @@ export function CompareTable({
   return (
     <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <table className="w-full min-w-[36rem] table-fixed border-separate border-spacing-0 text-sm">
-        <caption className="sr-only">Coaches side by side</caption>
+        <caption className="sr-only">
+          <T>Coaches side by side</T>
+        </caption>
         <colgroup>
           <col className="w-32 sm:w-44" />
           {cards.map((c) => (
@@ -184,14 +192,14 @@ export function CompareTable({
                         href={`/coaches/${c.id}`}
                         className="btn-primary px-3 py-1.5 text-sm"
                       >
-                        View profile
+                        <T>View profile</T>
                       </Link>
                       {isMember && nextIntro[cards.indexOf(c)] && (
                         <Link
                           href={`/coaches/${c.id}/intro`}
                           className="btn-secondary px-3 py-1.5 text-sm"
                         >
-                          Book free intro
+                          <T>Book free intro</T>
                         </Link>
                       )}
                     </div>
@@ -208,14 +216,14 @@ export function CompareTable({
                 scope="row"
                 className="sticky left-0 z-10 border-t border-border bg-background py-3 pr-3 text-left align-top font-medium text-muted"
               >
-                {row.label}
+                <T>{row.label}</T>
               </th>
               {row.cells.map((cell, i) => (
                 <td
                   key={cards[i].id}
                   className={`border-t border-border px-2 py-3 align-top [overflow-wrap:anywhere] ${row.highlight === i ? "font-semibold text-accent" : ""}`}
                 >
-                  {cell}
+                  {typeof cell === "string" ? <T>{cell}</T> : cell}
                 </td>
               ))}
             </tr>

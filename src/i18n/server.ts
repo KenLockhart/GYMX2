@@ -9,6 +9,7 @@ import {
   type Locale,
 } from "./config";
 import { messages, type Messages } from "./messages";
+import { translate, type Tr } from "./phrases";
 
 // The language chosen on this browser, or the browser's own preference. No account lookup, so it's
 // cheap enough for every page.
@@ -28,4 +29,10 @@ export const getLocale = cache(async (): Promise<Locale> => {
 
 export async function getT(): Promise<Messages> {
   return messages[await getLocale()];
+}
+
+// For text in attributes (labels, placeholders) inside server components.
+export async function getTr(): Promise<Tr> {
+  const locale = await getLocale();
+  return (text, vars) => translate(text, locale, vars);
 }

@@ -15,6 +15,7 @@ import {
   slotsByDay,
 } from "@/lib/intros";
 import type { CoachIntroSlot } from "@/lib/intros-server";
+import { LOCALE_TAG, type Locale } from "@/i18n/config";
 
 const subscribe = () => () => {};
 // The server renders UTC; the browser redraws in the viewer's own time zone.
@@ -27,8 +28,12 @@ export function useLocalZone() {
   return client ? undefined : "UTC";
 }
 
-export function timeLabel(iso: string, timeZone?: string) {
-  return new Date(iso).toLocaleTimeString("en-US", {
+export function timeLabel(
+  iso: string,
+  timeZone?: string,
+  locale: Locale = "en",
+) {
+  return new Date(iso).toLocaleTimeString(LOCALE_TAG[locale], {
     hour: "numeric",
     minute: "2-digit",
     timeZone,
