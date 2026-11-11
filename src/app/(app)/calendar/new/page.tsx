@@ -1,36 +1,40 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SessionForm } from "@/components/calendar-parts";
+import { getT } from "@/i18n/server";
 import { requireCoach } from "@/lib/auth";
 import { loadCoachMembers } from "../members";
 import { saveSession } from "../actions";
 
-export const metadata: Metadata = { title: "Schedule a session" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).calendar.schedule };
+}
 
 export default async function NewSessionPage() {
   const { profile } = await requireCoach();
   const { members, error } = await loadCoachMembers(profile.id);
+  const t = (await getT()).calendar;
 
   return (
     <div className="space-y-6">
       <Link href="/calendar" className="text-link text-sm">
-        Back to the calendar
+        {t.new.back}
       </Link>
-      <h1 className="text-5xl">Schedule a session</h1>
+      <h1 className="text-5xl">{t.schedule}</h1>
 
       {error ? (
         <p role="alert" className="text-danger">
-          We couldn&apos;t load your members. Please refresh and try again.
+          {t.new.membersError}
         </p>
       ) : members.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-          No members have joined you yet. They can join from their Coaches page.
+          {t.new.noMembers}
         </p>
       ) : (
         <SessionForm
           action={saveSession}
           members={members}
-          submitLabel="Schedule session"
+          submitLabel={t.new.submit}
           initial={{
             id: "",
             title: "",

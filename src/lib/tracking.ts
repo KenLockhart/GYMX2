@@ -1,3 +1,4 @@
+import { LOCALE_TAG, type Locale } from "../i18n/config";
 // Mind, Body and Spirit tracking: habit suggestions, weeks, and summaries. Days follow Eastern time.
 import { dayKey, type Pillar } from "./achievements";
 
@@ -45,8 +46,8 @@ export function isEditableDay(day: string, now = new Date()) {
   return lastDays(EDITABLE_DAYS, now).includes(day);
 }
 
-export function weekdayLabel(day: string) {
-  return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", {
+export function weekdayLabel(day: string, locale: Locale = "en") {
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString(LOCALE_TAG[locale], {
     weekday: "short",
     timeZone: "UTC",
   });

@@ -1,5 +1,7 @@
 // GYMX2 Community: post kinds, audiences and the shape the screens use. Safe for the browser.
 
+import { LOCALE_TAG, type Locale } from "../i18n/config";
+
 export const POST_KINDS = [
   { value: "general", label: "Update", coachOnly: false },
   { value: "workout", label: "Workout", coachOnly: false },
@@ -87,16 +89,18 @@ export type CommentDTO = {
 export const COMMENT_MAX = 2000;
 
 // "3m", "5h", "2d", then a date.
-export function timeAgo(iso: string, now = new Date()) {
+export function timeAgo(iso: string, now = new Date(), locale: Locale = "en") {
+  const es = locale === "es";
   const seconds = Math.max(
     0,
     Math.round((now.getTime() - new Date(iso).getTime()) / 1000),
   );
-  if (seconds < 60) return "now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  if (seconds < 7 * 86400) return `${Math.floor(seconds / 86400)}d`;
-  return new Date(iso).toLocaleDateString("en-US", {
+  if (seconds < 60) return es ? "ahora" : "now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}${es ? " min" : "m"}`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}${es ? " h" : "h"}`;
+  if (seconds < 7 * 86400)
+    return `${Math.floor(seconds / 86400)}${es ? " d" : "d"}`;
+  return new Date(iso).toLocaleDateString(LOCALE_TAG[locale], {
     month: "short",
     day: "numeric",
     timeZone: "America/New_York",

@@ -3,14 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ResponseButtons, SessionTime } from "@/components/calendar-parts";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
+import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
-import { responseLabel, type SessionResponse } from "@/lib/calendar";
+import type { SessionResponse } from "@/lib/calendar";
 import { liveState } from "@/lib/live";
 import { createClient } from "@/lib/supabase/server";
 import type { CalendarSession } from "@/lib/types";
 import { cancelSession } from "../actions";
 
-export const metadata: Metadata = { title: "Session" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).calendar.session.title };
+}
 
 type SessionDetail = CalendarSession & {
   coach: { display_name: string } | null;
@@ -30,6 +33,9 @@ export default async function SessionPage({
 }) {
   const { profile } = await requireAccount();
   const { id } = await params;
+  const all = (await getT()).calendar;
+  const t = all.session;
+  const { formerMember } = (await getT()).tasks;
 
   // Row security decides who can open a session: its coach, its invited members and admins.
   const supabase = await createClient();
@@ -79,7 +85,7 @@ export default async function SessionPage({
   return (
     <div className="space-y-6">
       <Link href="/calendar" className="text-link text-sm">
-        Back to the calendar
+        {all.new.back}
       </Link>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -92,13 +98,11 @@ export default async function SessionPage({
             />
           </p>
           {!isOwner && session.coach && (
-            <p className="mt-1 text-muted">with {session.coach.display_name}</p>
-          )}
-          {isPast && (
-            <p className="mt-1 text-sm text-muted">
-              This session has finished.
+            <p className="mt-1 text-muted">
+              {t.with(session.coach.display_name)}
             </p>
           )}
+          {isPast && <p className="mt-1 text-sm text-muted">{t.finished}</p>}
         </div>
         {isOwner && !isPast && (
           <div className="flex shrink-0 flex-wrap items-start gap-2">
@@ -106,19 +110,19 @@ export default async function SessionPage({
               href={`/calendar/${session.id}/edit`}
               className="btn-secondary px-3 py-2 text-sm"
             >
-              Edit
+              {t.edit}
             </Link>
             <ActionForm
               action={cancelSession}
-              confirmMessage={`Cancel "${session.title}"? It will disappear from your members' calendars.`}
+              confirmMessage={t.confirmCancel(session.title)}
               className="space-y-2"
             >
               <input type="hidden" name="session_id" value={session.id} />
               <SubmitButton
-                pendingText="Cancelling..."
+                pendingText={t.cancelling}
                 className="btn-secondary px-3 py-2 text-sm"
               >
-                Cancel session
+                {t.cancel}
               </SubmitButton>
               <FormStatus />
             </ActionForm>
@@ -137,17 +141,17 @@ export default async function SessionPage({
           <p className="text-sm">
             {live === "live"
               ? isOwner
-                ? "You're live right now."
-                : "Your coach is live right now."
+                ? t.youreLive
+                : t.coachLive
               : isOwner
-                ? "Teach this session live on GYMX2. Members watch and chat here; showing up live earns them points."
-                : "The live room is open. Your coach will start soon, and you can watch and chat here."}
+                ? t.teachLive
+                : t.roomOpen}
           </p>
           <Link
             href={`/calendar/${session.id}/live`}
             className={live === "live" ? "btn-primary" : "btn-secondary"}
           >
-            {live === "live" && !isOwner ? "Watch live" : "Open live room"}
+            {live === "live" && !isOwner ? t.watchLive : t.openRoom}
           </Link>
         </div>
       )}
@@ -156,13 +160,13 @@ export default async function SessionPage({
         <dl className="max-w-2xl space-y-3 rounded-lg border border-border bg-surface p-4">
           {session.location && (
             <div>
-              <dt className="text-sm text-muted">Where</dt>
+              <dt className="text-sm text-muted">{t.where}</dt>
               <dd>{session.location}</dd>
             </div>
           )}
           {session.meeting_url && (
             <div>
-              <dt className="text-sm text-muted">Video call</dt>
+              <dt className="text-sm text-muted">{t.videoCall}</dt>
               <dd>
                 <a
                   href={session.meeting_url}
@@ -170,14 +174,14 @@ export default async function SessionPage({
                   rel="noopener noreferrer"
                   className="text-link break-all"
                 >
-                  Join the call
+                  {t.joinCall}
                 </a>
               </dd>
             </div>
           )}
           {session.notes && (
             <div>
-              <dt className="text-sm text-muted">Notes</dt>
+              <dt className="text-sm text-muted">{t.notes}</dt>
               <dd className="whitespace-pre-line">{session.notes}</dd>
             </div>
           )}
@@ -186,22 +190,20 @@ export default async function SessionPage({
 
       {myInvite && !isPast && (
         <section className="space-y-3">
-          <h2 className="text-2xl">Are you coming?</h2>
+          <h2 className="text-2xl">{t.coming}</h2>
           <ResponseButtons
             sessionId={session.id}
             response={myInvite.response}
           />
           {myInvite.response === "pending" && (
-            <p className="text-sm text-muted">Let your coach know.</p>
+            <p className="text-sm text-muted">{t.letCoachKnow}</p>
           )}
         </section>
       )}
 
       {(isOwner || profile.role === "admin") && (
         <section className="space-y-3">
-          <h2 className="text-2xl">
-            Invited ({going} of {guests.length} going)
-          </h2>
+          <h2 className="text-2xl">{t.invited(going, guests.length)}</h2>
           <ul className="max-w-2xl divide-y divide-border rounded-lg border border-border bg-surface text-sm">
             {guests.map((invite) => (
               <li
@@ -209,10 +211,10 @@ export default async function SessionPage({
                 className="flex justify-between gap-4 p-3"
               >
                 <span>
-                  {invite.member?.display_name ?? "Former member"}
+                  {invite.member?.display_name ?? formerMember}
                   {attended.has(invite.member_id) && (
                     <span className="ml-2 text-xs text-success">
-                      Watched live
+                      {t.watchedLive}
                     </span>
                   )}
                 </span>
@@ -225,7 +227,7 @@ export default async function SessionPage({
                         : "text-muted"
                   }
                 >
-                  {responseLabel[invite.response]}
+                  {all.responses[invite.response]}
                 </span>
               </li>
             ))}

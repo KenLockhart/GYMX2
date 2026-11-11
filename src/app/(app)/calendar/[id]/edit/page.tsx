@@ -2,13 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SessionForm } from "@/components/calendar-parts";
+import { getT } from "@/i18n/server";
 import { requireCoach } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { CalendarSession } from "@/lib/types";
 import { saveSession } from "../../actions";
 import { loadCoachMembers } from "../../members";
 
-export const metadata: Metadata = { title: "Edit session" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).calendar.edit.title };
+}
 
 export default async function EditSessionPage({
   params,
@@ -32,27 +35,25 @@ export default async function EditSessionPage({
   if (!session) notFound();
 
   const { members, error } = await loadCoachMembers(profile.id);
+  const t = (await getT()).calendar;
 
   return (
     <div className="space-y-6">
       <Link href={`/calendar/${session.id}`} className="text-link text-sm">
-        Back to the session
+        {t.edit.back}
       </Link>
-      <h1 className="text-5xl">Edit session</h1>
-      <p className="max-w-xl text-sm text-muted">
-        If you change the date or time, everyone invited is asked to reply
-        again.
-      </p>
+      <h1 className="text-5xl">{t.edit.title}</h1>
+      <p className="max-w-xl text-sm text-muted">{t.edit.note}</p>
 
       {error ? (
         <p role="alert" className="text-danger">
-          We couldn&apos;t load your members. Please refresh and try again.
+          {t.new.membersError}
         </p>
       ) : (
         <SessionForm
           action={saveSession}
           members={members}
-          submitLabel="Save changes"
+          submitLabel={t.edit.submit}
           initial={{
             id: session.id,
             title: session.title,

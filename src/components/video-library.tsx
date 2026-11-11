@@ -8,6 +8,9 @@ import {
   setVideoVisibility,
   updateVideoDetails,
 } from "@/app/(app)/library/actions";
+import { useLocale, useT } from "@/i18n/client";
+import type { Messages } from "@/i18n/messages";
+import { translateServerText } from "@/i18n/server-text";
 import { formatDuration } from "@/lib/format";
 import {
   type LibraryCard,
@@ -17,12 +20,13 @@ import {
   VIDEO_VISIBILITY,
 } from "@/lib/video-library";
 
-const STATUS_LABEL = {
-  uploading: "Waiting for upload",
-  processing: "Processing",
-  failed: "Upload failed",
-  ready: "",
-} as const;
+// Row titles come from the library's English list; these put them in the viewer's language.
+function rowTitle(title: string, t: Messages["library"]) {
+  if (title === "Recently added") return t.recentlyAdded;
+  if (title === "More videos") return t.moreVideos;
+  if (title === "Videos") return t.videos;
+  return t.categories[title] ?? title;
+}
 
 type Viewer = { id: string; role: string };
 
@@ -33,6 +37,7 @@ export function VideoLibrary({
   videos: LibraryCard[];
   viewer: Viewer;
 }) {
+  const t = useT().library;
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<LibraryCard | null>(null);
   const isCoach = viewer.role === "coach";
@@ -51,36 +56,32 @@ export function VideoLibrary({
       {videos.length > 4 && (
         <div className="max-w-md">
           <label htmlFor="video-search" className="sr-only">
-            Search videos
+            {t.search}
           </label>
           <input
             id="video-search"
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={
-              showCoach
-                ? "Search by title, category or coach"
-                : "Search by title or category"
-            }
+            placeholder={showCoach ? t.searchWithCoach : t.searchPlain}
             className="field-input"
           />
         </div>
       )}
       {query && (
         <p className="text-sm text-muted" aria-live="polite">
-          {found} {found === 1 ? "video" : "videos"}
+          {t.found(found)}
         </p>
       )}
       {rows.length === 0 && query ? (
         <p className="rounded-2xl border border-border bg-surface p-6 text-center text-muted">
-          No videos match &ldquo;{query}&rdquo;.
+          {t.noMatch(query)}
         </p>
       ) : (
         rows.map((row) => (
           <Row
             key={row.key}
-            title={row.title}
+            title={rowTitle(row.title, t)}
             videos={row.videos}
             viewer={viewer}
             showCoach={showCoach}
@@ -108,6 +109,7 @@ function Row({
   showCoach: boolean;
   onEdit: (video: LibraryCard) => void;
 }) {
+  const t = useT().library;
   const track = useRef<HTMLUListElement>(null);
   const scroll = (direction: 1 | -1) =>
     track.current?.scrollBy({
@@ -133,7 +135,7 @@ function Row({
                 type="button"
                 onClick={() => scroll(d)}
                 aria-label={
-                  d < 0 ? `Scroll ${title} back` : `Scroll ${title} forward`
+                  d < 0 ? t.scrollBack(title) : t.scrollForward(title)
                 }
                 className="grid size-9 place-items-center rounded-full border border-border text-muted hover:border-accent hover:text-accent"
               >
@@ -166,6 +168,7 @@ function Row({
 }
 
 function Thumbnail({ video }: { video: LibraryCard }) {
+  const t = useT().library;
   const [failed, setFailed] = useState(false);
   const duration = formatDuration(video.durationSeconds);
   const ready = video.status === "ready";
@@ -204,7 +207,7 @@ function Thumbnail({ video }: { video: LibraryCard }) {
       )}
       {!ready && (
         <span className="absolute inset-x-0 bottom-0 bg-background/85 px-3 py-1.5 text-xs text-muted">
-          {STATUS_LABEL[video.status]}
+          {t.status[video.status]}
         </span>
       )}
       {ready && duration && (
@@ -225,7 +228,7 @@ function Thumbnail({ video }: { video: LibraryCard }) {
             <rect x="5" y="11" width="14" height="9" rx="2" />
             <path d="M8 11V8a4 4 0 0 1 8 0v3" />
           </svg>
-          Private
+          {t.private}
         </span>
       )}
     </div>
@@ -243,18 +246,23 @@ function VideoCard({
   showCoach: boolean;
   onEdit: (video: LibraryCard) => void;
 }) {
+  const t = useT().library;
   const ready = video.status === "ready";
   const isOwner = video.coachId === viewer.id;
   const canManage = isOwner || viewer.role === "admin";
   const duration = formatDuration(video.durationSeconds);
-  const meta = [showCoach && video.coachName, video.category, duration]
+  const meta = [
+    showCoach && video.coachName,
+    t.categories[video.category] ?? video.category,
+    duration,
+  ]
     .filter(Boolean)
     .join(" • ");
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface transition-colors hover:border-accent/60">
       {ready ? (
-        <Link href={`/library/${video.id}`} aria-label={`Watch ${video.title}`}>
+        <Link href={`/library/${video.id}`} aria-label={t.watch(video.title)}>
           <Thumbnail video={video} />
         </Link>
       ) : (
@@ -274,9 +282,7 @@ function VideoCard({
           <p className="mt-0.5 truncate text-sm text-muted">{meta}</p>
           {isOwner && (
             <p className="mt-1 text-xs text-muted">
-              {video.visibility === "private"
-                ? "Only you"
-                : "Members who join you"}
+              {video.visibility === "private" ? t.onlyYou : t.membersWhoJoinYou}
             </p>
           )}
         </div>
@@ -297,6 +303,8 @@ function CardMenu({
   isOwner: boolean;
   onEdit: (video: LibraryCard) => void;
 }) {
+  const t = useT().library;
+  const locale = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -342,7 +350,7 @@ function CardMenu({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Options for ${video.title}`}
+        aria-label={t.options(video.title)}
         disabled={pending}
         onClick={() => setOpen((v) => !v)}
         className="-mr-1 grid size-8 place-items-center rounded-full text-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
@@ -374,7 +382,7 @@ function CardMenu({
                   onEdit(video);
                 }}
               >
-                Edit details
+                {t.editDetails}
               </button>
               <button
                 type="button"
@@ -390,8 +398,8 @@ function CardMenu({
                 }
               >
                 {video.visibility === "private"
-                  ? "Show to members"
-                  : "Make private"}
+                  ? t.showToMembers
+                  : t.makePrivate}
               </button>
             </>
           )}
@@ -400,18 +408,13 @@ function CardMenu({
             role="menuitem"
             className={`${item} text-danger`}
             onClick={() => {
-              if (
-                !window.confirm(
-                  `Delete "${video.title}"? This can't be undone.`,
-                )
-              )
-                return;
+              if (!window.confirm(t.confirmDelete(video.title))) return;
               const form = new FormData();
               form.set("video_id", video.id);
               run(() => deleteVideo({}, form));
             }}
           >
-            Delete
+            {t.delete}
           </button>
         </div>
       )}
@@ -420,7 +423,7 @@ function CardMenu({
           role="alert"
           className="absolute right-0 top-full z-10 mt-1 w-56 rounded-lg border border-danger bg-surface p-2 text-xs text-danger"
         >
-          {error}
+          {translateServerText(error, locale)}
         </p>
       )}
     </div>
@@ -434,6 +437,8 @@ function EditDialog({
   video: LibraryCard;
   onClose: () => void;
 }) {
+  const t = useT().library;
+  const locale = useLocale();
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -470,10 +475,10 @@ function EditDialog({
         }}
       >
         <h2 id="edit-video-title" className="text-3xl">
-          Edit video
+          {t.editTitle}
         </h2>
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Title</span>
+          <span className="text-sm font-medium">{t.videoTitle}</span>
           <input
             name="title"
             defaultValue={video.title}
@@ -483,7 +488,7 @@ function EditDialog({
           />
         </label>
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Description</span>
+          <span className="text-sm font-medium">{t.description}</span>
           <textarea
             name="description"
             defaultValue={video.description}
@@ -494,7 +499,7 @@ function EditDialog({
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Category</span>
+            <span className="text-sm font-medium">{t.category}</span>
             <select
               name="category"
               defaultValue={video.category}
@@ -502,35 +507,30 @@ function EditDialog({
             >
               {VIDEO_CATEGORIES.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t.categories[c] ?? c}
                 </option>
               ))}
             </select>
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Who can watch</span>
+            <span className="text-sm font-medium">{t.whoCanWatch}</span>
             <select
               name="visibility"
               defaultValue={video.visibility}
               className="field-input"
             >
-              {Object.entries(VIDEO_VISIBILITY).map(([value, label]) => (
+              {Object.keys(VIDEO_VISIBILITY).map((value) => (
                 <option key={value} value={value}>
-                  {value === "members"
-                    ? "Members who join me"
-                    : `Only me (${label.toLowerCase()})`}
+                  {value === "members" ? t.membersWhoJoinMe : t.onlyMe}
                 </option>
               ))}
             </select>
           </label>
         </div>
-        <p className="text-xs text-muted">
-          Private videos stay out of your members&apos; library. Members you
-          assign one to in a Task can still watch it.
-        </p>
+        <p className="text-xs text-muted">{t.privateHint}</p>
         {error && (
           <p role="alert" className="text-sm text-danger">
-            {error}
+            {translateServerText(error, locale)}
           </p>
         )}
         <div className="flex justify-end gap-2">
@@ -539,10 +539,10 @@ function EditDialog({
             onClick={() => dialog.current?.close()}
             className="btn-secondary"
           >
-            Cancel
+            {t.cancel}
           </button>
           <button type="submit" disabled={pending} className="btn-primary">
-            {pending ? "Saving..." : "Save"}
+            {pending ? t.saving : t.save}
           </button>
         </div>
       </form>

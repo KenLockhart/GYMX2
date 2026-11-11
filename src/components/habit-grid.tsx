@@ -2,6 +2,8 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import { setHabitDone } from "@/app/(app)/track/actions";
+import { useLocale, useT } from "@/i18n/client";
+import { translateServerText } from "@/i18n/server-text";
 
 type Habit = { id: string; name: string };
 
@@ -19,6 +21,8 @@ export function HabitGrid({
   today: string;
   done: string[]; // "habitId:day" for every check-in shown
 }) {
+  const t = useT().track.grid;
+  const locale = useLocale();
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [checked, toggleChecked] = useOptimistic(
@@ -48,13 +52,15 @@ export function HabitGrid({
         <table className="w-full min-w-[30rem] text-sm">
           <thead>
             <tr>
-              <th className="p-2 text-left font-medium text-muted">Habit</th>
+              <th className="p-2 text-left font-medium text-muted">
+                {t.habit}
+              </th>
               {days.map((day, index) => (
                 <th
                   key={day}
                   className={`w-11 p-1 text-center text-xs font-medium ${day === today ? "text-accent" : "text-muted"}`}
                 >
-                  {day === today ? "Today" : dayLabels[index]}
+                  {day === today ? t.today : dayLabels[index]}
                 </th>
               ))}
             </tr>
@@ -73,7 +79,7 @@ export function HabitGrid({
                         type="button"
                         onClick={() => toggle(habit.id, day)}
                         aria-pressed={isChecked}
-                        aria-label={`${habit.name}, ${day === today ? "today" : dayLabels[index]}: ${isChecked ? "done" : "not done"}`}
+                        aria-label={`${habit.name}, ${day === today ? t.todayLower : dayLabels[index]}: ${isChecked ? t.done : t.notDone}`}
                         className={`inline-flex size-9 items-center justify-center rounded-md border text-base font-bold transition ${
                           isChecked
                             ? "border-accent bg-accent text-accent-foreground"
@@ -92,7 +98,7 @@ export function HabitGrid({
       </div>
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {translateServerText(error, locale)}
         </p>
       )}
     </div>

@@ -1,3 +1,5 @@
+import { LOCALE_TAG, type Locale } from "../i18n/config";
+
 // Calendar helpers. Calendar days are handled as plain "YYYY-MM-DD" strings, worked out in UTC,
 // so a day never shifts. Session times are real moments (ISO strings) shown in the viewer's time zone.
 
@@ -20,12 +22,15 @@ export function shiftMonth({ year, month }: MonthKey, delta: number): MonthKey {
   return { year: Math.floor(index / 12), month: (index % 12) + 1 };
 }
 
-export function monthTitle({ year, month }: MonthKey) {
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+export function monthTitle({ year, month }: MonthKey, locale: Locale = "en") {
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(
+    LOCALE_TAG[locale],
+    {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    },
+  );
 }
 
 function dayKey(date: Date) {
@@ -43,7 +48,11 @@ export function monthGrid({ year, month }: MonthKey): string[][] {
   end.setUTCDate(last.getUTCDate() + (6 - last.getUTCDay()));
 
   const weeks: string[][] = [];
-  for (const day = new Date(start); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
+  for (
+    const day = new Date(start);
+    day <= end;
+    day.setUTCDate(day.getUTCDate() + 1)
+  ) {
     if (day.getUTCDay() === 0) weeks.push([]);
     weeks[weeks.length - 1].push(dayKey(day));
   }
@@ -57,7 +66,12 @@ export function monthRange(key: MonthKey) {
   const to = new Date(`${weeks[weeks.length - 1][6]}T00:00:00Z`);
   from.setUTCDate(from.getUTCDate() - 1);
   to.setUTCDate(to.getUTCDate() + 2);
-  return { from: from.toISOString(), to: to.toISOString(), firstDay: weeks[0][0], lastDay: weeks[weeks.length - 1][6] };
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+    firstDay: weeks[0][0],
+    lastDay: weeks[weeks.length - 1][6],
+  };
 }
 
 // The calendar day a moment falls on, for someone in the given time zone.
@@ -70,21 +84,32 @@ export function localDayKey(iso: string, timeZone?: string) {
   }).format(new Date(iso));
 }
 
-export function formatSessionTime(startsAt: string, endsAt: string, timeZone?: string) {
+export function formatSessionTime(
+  startsAt: string,
+  endsAt: string,
+  timeZone?: string,
+  locale: Locale = "en",
+) {
+  const tag = LOCALE_TAG[locale];
   const start = new Date(startsAt);
   const end = new Date(endsAt);
-  const day = start.toLocaleDateString("en-US", {
+  const day = start.toLocaleDateString(tag, {
     weekday: "short",
     month: "short",
     day: "numeric",
     timeZone,
   });
   const time = (date: Date) =>
-    date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone });
-  const sameDay = localDayKey(startsAt, timeZone) === localDayKey(endsAt, timeZone);
+    date.toLocaleTimeString(tag, {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone,
+    });
+  const sameDay =
+    localDayKey(startsAt, timeZone) === localDayKey(endsAt, timeZone);
   return sameDay
     ? `${day}, ${time(start)} – ${time(end)}`
-    : `${day}, ${time(start)} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone })}, ${time(end)}`;
+    : `${day}, ${time(start)} – ${end.toLocaleDateString(tag, { month: "short", day: "numeric", timeZone })}, ${time(end)}`;
 }
 
 export type SessionResponse = "pending" | "going" | "not_going";
@@ -109,16 +134,21 @@ export function planSessionEmails(
   after: { details: SessionDetails; memberIds: string[] },
   now = new Date(),
 ) {
-  if (new Date(after.details.ends_at) <= now) return { invited: [], updated: [] };
+  if (new Date(after.details.ends_at) <= now)
+    return { invited: [], updated: [] };
   const previous = new Set(before?.memberIds ?? []);
   const invited = after.memberIds.filter((id) => !previous.has(id));
   const changed =
     before !== null &&
-    (new Date(before.details.starts_at).getTime() !== new Date(after.details.starts_at).getTime() ||
-      new Date(before.details.ends_at).getTime() !== new Date(after.details.ends_at).getTime() ||
+    (new Date(before.details.starts_at).getTime() !==
+      new Date(after.details.starts_at).getTime() ||
+      new Date(before.details.ends_at).getTime() !==
+        new Date(after.details.ends_at).getTime() ||
       before.details.location.trim() !== after.details.location.trim() ||
       (before.details.meeting_url ?? "") !== (after.details.meeting_url ?? ""));
-  const updated = changed ? after.memberIds.filter((id) => previous.has(id)) : [];
+  const updated = changed
+    ? after.memberIds.filter((id) => previous.has(id))
+    : [];
   return { invited, updated };
 }
 
@@ -127,7 +157,10 @@ export const EMAIL_TIME_ZONE = "America/New_York";
 
 export function formatEmailSessionTime(startsAt: string, endsAt: string) {
   const zone =
-    new Intl.DateTimeFormat("en-US", { timeZone: EMAIL_TIME_ZONE, timeZoneName: "short" })
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: EMAIL_TIME_ZONE,
+      timeZoneName: "short",
+    })
       .formatToParts(new Date(startsAt))
       .find((part) => part.type === "timeZoneName")?.value ?? "ET";
   return `${formatSessionTime(startsAt, endsAt, EMAIL_TIME_ZONE)} ${zone}`;

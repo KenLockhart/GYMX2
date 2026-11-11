@@ -2,10 +2,18 @@
 
 import { useEffect, useRef } from "react";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
+import { useT } from "@/i18n/client";
 import type { Memo } from "@/lib/types";
 import { saveMemo } from "./actions";
 
-export function MemoForm({ memo, canShare }: { memo?: Memo; canShare: boolean }) {
+export function MemoForm({
+  memo,
+  canShare,
+}: {
+  memo?: Memo;
+  canShare: boolean;
+}) {
+  const t = useT().memos;
   const dateInput = useRef<HTMLInputElement>(null);
 
   // "Today" depends on where the person is, which only their browser knows.
@@ -13,7 +21,9 @@ export function MemoForm({ memo, canShare }: { memo?: Memo; canShare: boolean })
     if (memo || !dateInput.current) return;
     const now = new Date();
     const offsetMs = now.getTimezoneOffset() * 60 * 1000;
-    dateInput.current.value = new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+    dateInput.current.value = new Date(now.getTime() - offsetMs)
+      .toISOString()
+      .slice(0, 10);
   }, [memo]);
 
   return (
@@ -24,7 +34,7 @@ export function MemoForm({ memo, canShare }: { memo?: Memo; canShare: boolean })
     >
       <input type="hidden" name="id" value={memo?.id ?? ""} />
       <label className="block space-y-1.5 sm:max-w-48">
-        <span className="text-sm font-medium">Date</span>
+        <span className="text-sm font-medium">{t.date}</span>
         <input
           ref={dateInput}
           type="date"
@@ -35,7 +45,9 @@ export function MemoForm({ memo, canShare }: { memo?: Memo; canShare: boolean })
         />
       </label>
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium">{memo ? "Edit your note" : "How did today go?"}</span>
+        <span className="text-sm font-medium">
+          {memo ? t.editNote : t.howToday}
+        </span>
         <textarea
           name="body"
           rows={4}
@@ -54,14 +66,14 @@ export function MemoForm({ memo, canShare }: { memo?: Memo; canShare: boolean })
             className="mt-0.5 size-4 accent-accent"
           />
           <span>
-            Share with my coaches
-            <span className="block text-muted">Otherwise only you can read this Memo.</span>
+            {t.share}
+            <span className="block text-muted">{t.shareHint}</span>
           </span>
         </label>
       )}
       <FormStatus />
-      <SubmitButton pendingText="Saving..." className="btn-primary">
-        {memo ? "Save changes" : "Save Memo"}
+      <SubmitButton pendingText={t.saving} className="btn-primary">
+        {memo ? t.saveChanges : t.save}
       </SubmitButton>
     </ActionForm>
   );

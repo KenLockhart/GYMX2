@@ -1,0 +1,28 @@
+export const welcome = {
+  title: "Welcome",
+  eyebrow: "Welcome to GYMX2",
+  heading: "Let's find your coach",
+  intro:
+    "Three quick questions so we can suggest coaches and programs that fit. Only coaches you join see your answers, and you can change them any time on your profile.",
+  submit: "Show my matches",
+  skip: "Skip for now",
+  matches: {
+    title: "Your matches",
+    forYou: "Coaches for you",
+    find: "Find your coach",
+    youWant: (goals: string) => `You want to: ${goals}.`,
+    startingWith: "Starting with",
+    none: "No coach lists those specialties yet. Browse everyone and pick who feels right. You can message a coach once you join them.",
+    best: "Best match",
+    helpsWith: "Helps with: ",
+    startWith: "Start with: ",
+    subscribersOnly: "Subscribers only · ",
+    plansFrom: (price: string) => `Plans from ${price}/month`,
+    meet: (name: string) => `Meet ${name}`,
+    seeAll: "See all coaches",
+    dashboard: "Go to my dashboard",
+    onceJoinedBefore: "Once you join a coach, their programs show up under",
+    programs: "Programs",
+    onceJoinedAfter: ", where you can start one today.",
+  },
+};

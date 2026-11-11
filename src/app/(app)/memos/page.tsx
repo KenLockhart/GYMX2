@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
+import { getLocale, getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +9,9 @@ import type { Memo } from "@/lib/types";
 import { deleteMemo } from "./actions";
 import { MemoForm } from "./memo-form";
 
-export const metadata: Metadata = { title: "Memos" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).memos.title };
+}
 
 export default async function MemosPage({
   searchParams,
@@ -17,6 +20,8 @@ export default async function MemosPage({
 }) {
   const { profile } = await requireAccount();
   const { edit } = await searchParams;
+  const t = (await getT()).memos;
+  const locale = await getLocale();
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -32,50 +37,49 @@ export default async function MemosPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-5xl">Memos</h1>
+        <h1 className="text-5xl">{t.title}</h1>
         <p className="mt-2 max-w-xl text-muted">
-          Keep short notes on your days.{" "}
-          {canShare ? "They're private unless you choose to share one with your coaches." : "They're private to you."}
+          {t.intro} {canShare ? t.introShare : t.introPrivate}
         </p>
       </div>
 
       <MemoForm memo={editing} canShare={canShare} />
       {editing && (
         <Link href="/memos" className="text-link inline-block text-sm">
-          Cancel editing
+          {t.cancelEditing}
         </Link>
       )}
 
       {error ? (
         <p role="alert" className="text-danger">
-          We couldn&apos;t load your Memos. Please refresh and try again.
+          {t.loadError}
         </p>
       ) : memos.length === 0 ? (
-        <p className="text-muted">You haven&apos;t written a Memo yet.</p>
+        <p className="text-muted">{t.none}</p>
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
           {memos.map((memo) => (
             <li key={memo.id} className="space-y-2 p-4">
               <p className="text-sm text-muted">
-                {formatDate(memo.memo_date)}
-                {memo.shared_with_coaches && " · Shared with your coaches"}
+                {formatDate(memo.memo_date, locale)}
+                {memo.shared_with_coaches && t.shared}
               </p>
               <p className="whitespace-pre-line">{memo.body}</p>
               <div className="flex flex-wrap items-center gap-4 text-sm">
                 <Link href={`/memos?edit=${memo.id}`} className="text-link">
-                  Edit
+                  {t.edit}
                 </Link>
                 <ActionForm
                   action={deleteMemo}
-                  confirmMessage="Delete this Memo? This can't be undone."
+                  confirmMessage={t.confirmDelete}
                   className="flex flex-wrap items-center gap-3"
                 >
                   <input type="hidden" name="id" value={memo.id} />
                   <SubmitButton
-                    pendingText="Deleting..."
+                    pendingText={t.deleting}
                     className="cursor-pointer font-medium text-muted hover:text-foreground"
                   >
-                    Delete
+                    {t.delete}
                   </SubmitButton>
                   <FormStatus />
                 </ActionForm>

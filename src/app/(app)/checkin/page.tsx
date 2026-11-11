@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
+import { getLocale, getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import {
   CHECKIN_QUESTION_MAX,
@@ -15,7 +16,9 @@ import { todayKey } from "@/lib/reminders";
 import { createClient } from "@/lib/supabase/server";
 import { saveCheckin } from "./actions";
 
-export const metadata: Metadata = { title: "Weekly check-in" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).checkin.title };
+}
 
 type Reply = {
   id: string;
@@ -28,6 +31,8 @@ type Reply = {
 export default async function CheckinPage() {
   const { profile } = await requireAccount();
   if (profile.role !== "member") redirect("/checkins");
+  const t = (await getT()).checkin;
+  const locale = await getLocale();
 
   const supabase = await createClient();
   const week = weekStart(todayKey());
@@ -62,33 +67,31 @@ export default async function CheckinPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-5xl">Weekly check-in</h1>
+        <h1 className="text-5xl">{t.title}</h1>
         <p className="mt-2 max-w-xl text-muted">
-          A minute to tell your coaches how your week went. Only you and the
-          coaches you&apos;ve joined see it. Week of {weekLabel(week)}.
+          {t.intro(weekLabel(week, locale))}
         </p>
       </div>
 
       {!coachCount ? (
         <p className="max-w-xl rounded-lg border border-border bg-surface p-4 text-muted">
-          Join a coach first and your check-ins will go to them.{" "}
+          {t.joinFirst}{" "}
           <Link href="/coaches" className="text-link">
-            Find a coach
+            {t.findCoach}
           </Link>
         </p>
       ) : (
         <ActionForm action={saveCheckin} className="max-w-2xl space-y-6">
-          {current && (
-            <p className="text-sm text-success">
-              You&apos;ve checked in this week. You can still change it until
-              Sunday.
-            </p>
-          )}
+          {current && <p className="text-sm text-success">{t.alreadyDone}</p>}
           {CHECKIN_SCALES.map((scale) => (
             <fieldset key={scale.key} className="space-y-2">
-              <legend className="font-semibold">{scale.label}</legend>
+              <legend className="font-semibold">
+                {t.scales[scale.key]?.label ?? scale.label}
+              </legend>
               <div className="flex items-center gap-2 text-xs text-muted">
-                <span className="w-20 text-right">{scale.low}</span>
+                <span className="w-20 text-right">
+                  {t.scales[scale.key]?.low ?? scale.low}
+                </span>
                 <div className="flex gap-1.5">
                   {[1, 2, 3, 4, 5].map((value) => (
                     <label key={value} className="cursor-pointer">
@@ -106,12 +109,14 @@ export default async function CheckinPage() {
                     </label>
                   ))}
                 </div>
-                <span className="w-20">{scale.high}</span>
+                <span className="w-20">
+                  {t.scales[scale.key]?.high ?? scale.high}
+                </span>
               </div>
             </fieldset>
           ))}
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Wins this week</span>
+            <span className="text-sm font-medium">{t.wins}</span>
             <textarea
               name="wins"
               rows={3}
@@ -121,7 +126,7 @@ export default async function CheckinPage() {
             />
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium">What was hard</span>
+            <span className="text-sm font-medium">{t.hard}</span>
             <textarea
               name="struggles"
               rows={3}
@@ -131,9 +136,7 @@ export default async function CheckinPage() {
             />
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium">
-              A question for your coach (optional)
-            </span>
+            <span className="text-sm font-medium">{t.question}</span>
             <textarea
               name="question"
               rows={2}
@@ -143,8 +146,8 @@ export default async function CheckinPage() {
             />
           </label>
           <div className="flex items-center gap-3">
-            <SubmitButton pendingText="Saving..." className="btn-primary">
-              {current ? "Update check-in" : "Check in"}
+            <SubmitButton pendingText={t.saving} className="btn-primary">
+              {current ? t.update : t.submit}
             </SubmitButton>
             <FormStatus />
           </div>
@@ -153,7 +156,7 @@ export default async function CheckinPage() {
 
       {checkins.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-2xl">Past check-ins</h2>
+          <h2 className="text-2xl">{t.past}</h2>
           <ul className="space-y-3">
             {checkins.map((row) => (
               <li
@@ -162,11 +165,11 @@ export default async function CheckinPage() {
               >
                 <p className="flex flex-wrap gap-x-4 gap-y-1">
                   <span className="font-semibold">
-                    Week of {weekLabel(row.week_start)}
+                    {t.weekOf(weekLabel(row.week_start, locale))}
                   </span>
                   {CHECKIN_SCALES.map((scale) => (
                     <span key={scale.key} className="text-muted">
-                      {scale.label}{" "}
+                      {t.scales[scale.key]?.label ?? scale.label}{" "}
                       <span className="font-semibold text-foreground">
                         {row[scale.key]}
                       </span>
@@ -174,9 +177,9 @@ export default async function CheckinPage() {
                     </span>
                   ))}
                 </p>
-                {row.wins && <p>Wins: {row.wins}</p>}
-                {row.struggles && <p>Hard: {row.struggles}</p>}
-                {row.question && <p>You asked: {row.question}</p>}
+                {row.wins && <p>{t.winsLine(row.wins)}</p>}
+                {row.struggles && <p>{t.hardLine(row.struggles)}</p>}
+                {row.question && <p>{t.askedLine(row.question)}</p>}
                 {replies
                   .filter((reply) => reply.checkin_id === row.id)
                   .map((reply) => (
@@ -185,7 +188,7 @@ export default async function CheckinPage() {
                       className="rounded-lg bg-surface-raised p-3"
                     >
                       <span className="font-semibold">
-                        {reply.coach?.display_name ?? "Your coach"}:
+                        {reply.coach?.display_name ?? t.yourCoach}:
                       </span>{" "}
                       {reply.body}
                     </p>

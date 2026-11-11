@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VideoLibrary } from "@/components/video-library";
+import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { getVideoState, isStreamConfigured } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -8,7 +9,9 @@ import { createClient } from "@/lib/supabase/server";
 import type { Video } from "@/lib/types";
 import { type LibraryCard, readCategory } from "@/lib/video-library";
 
-export const metadata: Metadata = { title: "Library" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).library.title };
+}
 
 type LibraryVideo = Video & {
   category: string;
@@ -61,6 +64,7 @@ async function loadVideos() {
 export default async function LibraryPage() {
   const { profile } = await requireAccount();
   const isCoach = profile.role === "coach";
+  const t = (await getT()).library;
 
   let { videos, error } = await loadVideos();
   if (isCoach && (await refreshUnfinishedVideos(videos))) {
@@ -83,40 +87,40 @@ export default async function LibraryPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-5xl">Library</h1>
+          <h1 className="text-5xl">{t.title}</h1>
           <p className="mt-2 max-w-xl text-muted">
             {isCoach
-              ? "Your videos, by category. Members who join you can watch anything that's ready and not private."
+              ? t.introCoach
               : profile.role === "admin"
-                ? "Every video on GYMX2."
-                : "Videos from the coaches you've joined, plus anything assigned to you."}
+                ? t.introAdmin
+                : t.introMember}
           </p>
         </div>
         {isCoach && (
           <Link href="/library/upload" className="btn-primary">
-            Upload a video
+            {t.upload}
           </Link>
         )}
       </div>
 
       {error ? (
         <p role="alert" className="text-danger">
-          We couldn&apos;t load the library. Please refresh and try again.
+          {t.loadError}
         </p>
       ) : cards.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface p-4 text-muted">
           {isCoach ? (
-            "You haven't uploaded any videos yet."
+            t.noneCoach
           ) : profile.role === "member" ? (
             <>
-              Nothing here yet.{" "}
+              {t.noneMemberBefore}{" "}
               <Link href="/coaches" className="text-link">
-                Join a coach
+                {t.joinCoach}
               </Link>{" "}
-              to see their videos.
+              {t.noneMemberAfter}
             </>
           ) : (
-            "No videos have been uploaded yet."
+            t.noneOther
           )}
         </p>
       ) : (
