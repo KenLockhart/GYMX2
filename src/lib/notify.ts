@@ -1,6 +1,8 @@
 import "server-only";
 import { addressLines, type ShippingAddress } from "@/lib/armory";
 import { formatEmailSessionTime } from "@/lib/calendar";
+import type { Locale } from "@/i18n/config";
+import { translate } from "@/i18n/phrases";
 import { loadRecipient, sendEmail } from "@/lib/email";
 import { describeFlags, detectFlags } from "@/lib/message-flags";
 import {
@@ -72,21 +74,23 @@ export function notifyNewSale(purchaseId: string) {
     const buyer = purchase.member_id
       ? await loadRecipient(purchase.member_id)
       : null;
-    const email = newSaleEmail({
-      siteUrl: getSiteUrl(),
-      itemTitle: purchase.item_title,
-      buyerName: buyer?.name ?? "A member",
-      amountCents: purchase.amount_cents,
-      feeCents: purchase.seller_id ? purchase.fee_cents : 0,
-      size: purchase.size,
-      shippingName: purchase.shipping_name,
-      addressLines: addressLines(purchase.shipping_address),
-      needsShipping: purchase.fulfillment_status === "to_ship",
-    });
+    const email = (locale: Locale) =>
+      newSaleEmail({
+        locale,
+        siteUrl: getSiteUrl(),
+        itemTitle: purchase.item_title,
+        buyerName: buyer?.name ?? translate("A member", locale),
+        amountCents: purchase.amount_cents,
+        feeCents: purchase.seller_id ? purchase.fee_cents : 0,
+        size: purchase.size,
+        shippingName: purchase.shipping_name,
+        addressLines: addressLines(purchase.shipping_address),
+        needsShipping: purchase.fulfillment_status === "to_ship",
+      });
 
     for (const sellerId of sellerIds) {
       const seller = await loadRecipient(sellerId);
-      if (seller) await sendEmail(seller.email, email);
+      if (seller) await sendEmail(seller.email, email(seller.locale));
     }
   });
 }
@@ -108,6 +112,7 @@ export function notifyOrderShipped(purchaseId: string) {
     await sendEmail(
       buyer.email,
       orderShippedEmail({
+        locale: buyer.locale,
         siteUrl: getSiteUrl(),
         itemTitle: purchase.item_title,
         sellerName: seller?.name ?? "GYMX2",
@@ -157,7 +162,7 @@ function pushNewMessage(message: MessageRow) {
     if (setting && !setting.push) return;
     const sender = await loadRecipient(message.sender_id);
     await sendPush([recipientId], {
-      title: sender?.name ?? "New message",
+      title: sender?.name ?? { text: "New message" },
       body: message.body,
       url: `/messages/${message.sender_id}`,
       tag: `message-${message.coach_id}-${message.member_id}`,
@@ -201,8 +206,10 @@ function notifyRecipient(message: MessageRow) {
     await sendEmail(
       recipient.email,
       newMessageEmail({
+        locale: recipient.locale,
         siteUrl: getSiteUrl(),
-        senderName: sender?.name ?? "Someone on GYMX2",
+        senderName:
+          sender?.name ?? translate("Someone on GYMX2", recipient.locale),
         body: message.body,
         conversationPath: `/messages/${message.sender_id}`,
       }),
@@ -253,7 +260,7 @@ function alertAdminsIfFlagged(message: MessageRow) {
     await sendPush(
       (admins ?? []).map((row) => row.id as string),
       {
-        title: "A message needs review",
+        title: { text: "A message needs review" },
         body: `${coach?.name ?? "A coach"} and ${member?.name ?? "a member"}: ${describeFlags(flags).toLowerCase()}`,
         url: `/admin/messages/${message.coach_id}/${message.member_id}`,
         tag: `flag-${message.coach_id}-${message.member_id}`,
@@ -280,29 +287,39 @@ export function notifySession(
   return safely(`session ${change}`, async () => {
     if (memberIds.length === 0) return;
     const coach = await loadRecipient(session.coach_id);
-    const email = sessionEmail({
-      siteUrl: getSiteUrl(),
-      change,
-      coachName: coach?.name ?? "Your coach",
-      title: session.title,
-      when: formatEmailSessionTime(session.starts_at, session.ends_at),
-      location: session.location,
-      meetingUrl: session.meeting_url,
-      sessionId: session.id,
-    });
+    const email = (locale: Locale) =>
+      sessionEmail({
+        locale,
+        siteUrl: getSiteUrl(),
+        change,
+        coachName: coach?.name ?? translate("Your coach", locale),
+        title: session.title,
+        when: formatEmailSessionTime(
+          session.starts_at,
+          session.ends_at,
+          locale,
+        ),
+        location: session.location,
+        meetingUrl: session.meeting_url,
+        sessionId: session.id,
+      });
 
     for (const memberId of memberIds) {
       const member = await loadRecipient(memberId);
-      if (member?.wantsUpdates) await sendEmail(member.email, email);
+      if (member?.wantsUpdates)
+        await sendEmail(member.email, email(member.locale));
     }
     await sendPush(memberIds, {
-      title:
-        change === "invited"
-          ? `New session: ${session.title}`
-          : change === "updated"
-            ? `Session changed: ${session.title}`
-            : `Cancelled: ${session.title}`,
-      body: `${coach?.name ?? "Your coach"} · ${formatEmailSessionTime(session.starts_at, session.ends_at)}`,
+      title: {
+        text:
+          change === "invited"
+            ? "New session: {title}"
+            : change === "updated"
+              ? "Session changed: {title}"
+              : "Cancelled: {title}",
+        vars: { title: session.title },
+      },
+      body: `${coach?.name ?? "GYMX2"} · ${formatEmailSessionTime(session.starts_at, session.ends_at)}`,
       url: change === "cancelled" ? "/calendar" : `/calendar/${session.id}`,
       tag: `session-${session.id}`,
     });
@@ -329,8 +346,14 @@ export function notifyLiveNow(sessionId: string) {
         .filter((invite) => invite.response !== "not_going")
         .map((invite) => invite.member_id),
       {
-        title: `${coach?.name ?? "Your coach"} is live`,
-        body: `${session.title as string}: tap to watch and chat.`,
+        title: {
+          text: "{name} is live",
+          vars: { name: coach?.name ?? "GYMX2" },
+        },
+        body: {
+          text: "{title}: tap to watch and chat.",
+          vars: { title: session.title as string },
+        },
         url: `/calendar/${session.id as string}/live`,
         tag: `live-${session.id as string}`,
       },
@@ -342,9 +365,10 @@ export function notifyLiveNow(sessionId: string) {
       await sendEmail(
         member.email,
         liveNowEmail({
+          locale: member.locale,
           siteUrl: getSiteUrl(),
           name: member.name,
-          coachName: coach?.name ?? "Your coach",
+          coachName: coach?.name ?? translate("Your coach", member.locale),
           title: session.title as string,
           sessionId: session.id as string,
         }),
@@ -376,7 +400,10 @@ export function notifyGroupPost(post: {
     await sendPush(
       everyone.filter((id) => id !== post.sender_id),
       {
-        title: `${coach?.name ?? "Your coach"}'s community chat`,
+        title: {
+          text: "{name}'s community chat",
+          vars: { name: coach?.name ?? "GYMX2" },
+        },
         body: `${sender?.name ?? "Someone"}: ${post.body}`,
         url: `/groups/${post.coach_id}?tab=chat`,
         tag: `group-${post.coach_id}`,
@@ -419,15 +446,19 @@ export function notifyIntro(bookingId: string, change: "booked" | "cancelled") {
       new Date(booking.slot.starts_at).getTime() +
         booking.slot.minutes * 60_000,
     ).toISOString();
-    const base = {
+    const base = (locale: Locale) => ({
+      locale,
       siteUrl: getSiteUrl(),
-      when: formatEmailSessionTime(booking.slot.starts_at, ends),
-      format: booking.slot.format === "online" ? "Video call" : "In person",
-      location: booking.slot.location,
-      meetingUrl: booking.slot.meeting_url,
+      when: formatEmailSessionTime(booking.slot!.starts_at, ends, locale),
+      format: translate(
+        booking.slot!.format === "online" ? "Video call" : "In person",
+        locale,
+      ),
+      location: booking.slot!.location,
+      meetingUrl: booking.slot!.meeting_url,
       message: booking.message,
       sessionId: booking.session_id,
-    };
+    });
     const coachName = coach?.name ?? "Your coach";
     const memberName = member?.name ?? "A member";
 
@@ -436,7 +467,7 @@ export function notifyIntro(bookingId: string, change: "booked" | "cancelled") {
         await sendEmail(
           coach.email,
           introEmail({
-            ...base,
+            ...base(coach.locale),
             change: "booked_coach",
             otherName: memberName,
           }),
@@ -445,14 +476,14 @@ export function notifyIntro(bookingId: string, change: "booked" | "cancelled") {
         await sendEmail(
           member.email,
           introEmail({
-            ...base,
+            ...base(member.locale),
             change: "booked_member",
             otherName: coachName,
           }),
         );
       await sendPush([booking.coach_id], {
-        title: `New intro: ${memberName}`,
-        body: base.when,
+        title: { text: "New intro: {name}", vars: { name: memberName } },
+        body: formatEmailSessionTime(booking.slot.starts_at, ends),
         url: "/calendar/intros",
         tag: `intro-${bookingId}`,
       });
@@ -466,11 +497,15 @@ export function notifyIntro(bookingId: string, change: "booked" | "cancelled") {
     if (recipient?.wantsUpdates)
       await sendEmail(
         recipient.email,
-        introEmail({ ...base, change: "cancelled", otherName }),
+        introEmail({
+          ...base(recipient.locale),
+          change: "cancelled",
+          otherName,
+        }),
       );
     await sendPush([recipientId], {
-      title: `Intro cancelled: ${otherName}`,
-      body: base.when,
+      title: { text: "Intro cancelled: {name}", vars: { name: otherName } },
+      body: formatEmailSessionTime(booking.slot.starts_at, ends),
       url: toCoach ? "/calendar/intros" : "/calendar",
       tag: `intro-${bookingId}`,
     });

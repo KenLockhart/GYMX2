@@ -33,5 +33,10 @@ export function scanPhrases(source: string): string[] {
     /(?:\btr|getTr\(\)\))\(\s*("(?:[^"\\]|\\.)*")/g,
   ))
     found.push(unquote(m[1]));
+  // translate("text", locale) and push text objects: { text: "..." }
+  for (const m of source.matchAll(/\btranslate\(\s*("(?:[^"\\]|\\.)*")/g))
+    found.push(unquote(m[1]));
+  for (const m of source.matchAll(/\{\s*text:\s*("(?:[^"\\]|\\.)*")/g))
+    found.push(unquote(m[1]));
   return found;
 }

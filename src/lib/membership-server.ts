@@ -2,6 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import type Stripe from "stripe";
 import { recordAffiliateCommissions } from "@/lib/affiliate-server";
+import { translate } from "@/i18n/phrases";
 import { loadRecipient, sendEmail } from "@/lib/email";
 import { membershipChangeEmail } from "@/lib/email-templates";
 import {
@@ -243,10 +244,13 @@ export async function syncSubscription(subscription: Stripe.Subscription) {
         await sendEmail(
           coach.email,
           membershipChangeEmail({
+            locale: coach.locale,
             siteUrl: getSiteUrl(),
             change,
-            memberName: member?.name ?? "A member",
-            planName: (plan?.name as string | undefined) ?? "your plan",
+            memberName: member?.name ?? translate("A member", coach.locale),
+            planName:
+              (plan?.name as string | undefined) ??
+              translate("your plan", coach.locale),
             priceCents: price,
             trial: subscription.status === "trialing",
           }),

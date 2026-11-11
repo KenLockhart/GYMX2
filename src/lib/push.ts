@@ -1,10 +1,17 @@
 import "server-only";
 import webpush from "web-push";
+import { isLocale, type Locale } from "@/i18n/config";
+import { translate } from "@/i18n/phrases";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// Text for a push. A plain string is sent as it is (someone's own words). { text, vars } is
+// GYMX2's English wording, sent in each person's own language with {placeholders} filled in.
+export type PushText =
+  string | { text: string; vars?: Record<string, string | number> };
+
 export type PushMessage = {
-  title: string;
-  body: string;
+  title: PushText;
+  body: PushText;
   url: string; // a path on GYMX2 to open when tapped
   tag?: string; // a newer push with the same tag replaces the older one
 };
@@ -37,16 +44,35 @@ export async function sendPush(userIds: string[], message: PushMessage) {
   if (ids.length === 0 || !isPushConfigured()) return 0;
   const db = createAdminClient();
   try {
-    const { data } = await db
-      .from("push_subscriptions")
-      .select("id, endpoint, p256dh, auth")
-      .in("user_id", ids);
-    const payload = JSON.stringify({
-      title: trim(message.title, 80),
-      body: trim(message.body, 160),
-      url: message.url.startsWith("/") ? message.url : "/dashboard",
-      tag: message.tag,
-    });
+    const [{ data }, { data: people }] = await Promise.all([
+      db
+        .from("push_subscriptions")
+        .select("id, user_id, endpoint, p256dh, auth")
+        .in("user_id", ids),
+      db.from("profiles").select("id, locale").in("id", ids),
+    ]);
+    const localeOf = new Map(
+      (people ?? []).map((person) => [
+        person.id as string,
+        (isLocale(person.locale) ? person.locale : "en") as Locale,
+      ]),
+    );
+    const say = (text: PushText, locale: Locale) =>
+      typeof text === "string" ? text : translate(text.text, locale, text.vars);
+    const payloads = new Map<Locale, string>();
+    const payloadFor = (locale: Locale) => {
+      if (!payloads.has(locale))
+        payloads.set(
+          locale,
+          JSON.stringify({
+            title: trim(say(message.title, locale), 80),
+            body: trim(say(message.body, locale), 160),
+            url: message.url.startsWith("/") ? message.url : "/dashboard",
+            tag: message.tag,
+          }),
+        );
+      return payloads.get(locale)!;
+    };
     let sent = 0;
     const gone: string[] = [];
     await Promise.all(
@@ -57,7 +83,7 @@ export async function sendPush(userIds: string[], message: PushMessage) {
               endpoint: row.endpoint as string,
               keys: { p256dh: row.p256dh as string, auth: row.auth as string },
             },
-            payload,
+            payloadFor(localeOf.get(row.user_id as string) ?? "en"),
             { TTL: 60 * 60 * 12, urgency: "normal" },
           );
           sent += 1;

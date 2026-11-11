@@ -70,6 +70,7 @@ export async function deleteMyAccount(
     id: profile.id,
     email,
     name: profile.display_name,
+    locale: profile.locale,
   });
   if (!deleted) {
     return {

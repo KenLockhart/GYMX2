@@ -1,5 +1,6 @@
 import { coachTools } from "./coach-tools";
 import { coachToolsB } from "./coach-tools-b";
+import { emails } from "./emails";
 import { lists } from "./lists";
 import { sharedA } from "./shared-a";
 import { sharedB } from "./shared-b";
@@ -9,6 +10,7 @@ import { sharedC } from "./shared-c";
 const parts: Record<string, string>[] = [
   coachTools,
   coachToolsB,
+  emails,
   lists,
   sharedA,
   sharedB,

@@ -69,8 +69,10 @@ export async function removePushSubscription(endpoint: string): Promise<void> {
 export async function sendTestPush(): Promise<{ error?: string }> {
   const { profile } = await requireAccount();
   const sent = await sendPush([profile.id], {
-    title: "GYMX2 notifications are on",
-    body: "You'll hear about messages, group posts, live sessions and new program days here.",
+    title: { text: "GYMX2 notifications are on" },
+    body: {
+      text: "You'll hear about messages, group posts, live sessions and new program days here.",
+    },
     url: "/dashboard",
     tag: "test",
   });

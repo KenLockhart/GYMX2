@@ -240,8 +240,11 @@ export async function createPost(
         postId: created.id,
         link: `/community/post/${created.id}`,
         groupKey: `announcement:${created.id}`,
-        title: `${profile.display_name} posted an announcement`,
-        body: post.body.slice(0, 120) || "Tap to read it.",
+        title: {
+          text: "{name} posted an announcement",
+          vars: { name: profile.display_name },
+        },
+        body: post.body.slice(0, 120) || { text: "Tap to read it." },
         snippet: post.body,
       });
     });
@@ -398,8 +401,11 @@ export async function toggleLike(
         postId: id.data,
         link: `/community/post/${id.data}`,
         groupKey: `like:${id.data}`,
-        title: "New like",
-        body: `${profile.display_name} liked your post.`,
+        title: { text: "New like" },
+        body: {
+          text: "{name} liked your post.",
+          vars: { name: profile.display_name },
+        },
       }),
     );
   return {
@@ -498,7 +504,10 @@ export async function addComment(
         commentId: row.id as string,
         link,
         groupKey: `comment:${postId}`,
-        title: `${profile.display_name} commented on your post`,
+        title: {
+          text: "{name} commented on your post",
+          vars: { name: profile.display_name },
+        },
         body: preview,
         snippet: body,
       });
@@ -512,7 +521,10 @@ export async function addComment(
         commentId: row.id as string,
         link,
         groupKey: `reply:${parentId}`,
-        title: `${profile.display_name} replied to you`,
+        title: {
+          text: "{name} replied to you",
+          vars: { name: profile.display_name },
+        },
         body: preview,
         snippet: body,
       });
@@ -624,10 +636,10 @@ export async function removePost(
       postId: id.data,
       link: "/community",
       groupKey: `removed:${id.data}`,
-      title: "A post of yours was removed",
+      title: { text: "A post of yours was removed" },
       body: why.data
-        ? `Reason: ${why.data}`
-        : "It broke the community guidelines.",
+        ? { text: "Reason: {reason}", vars: { reason: why.data } }
+        : { text: "It broke the community guidelines." },
       snippet: why.data,
     }),
   );
@@ -730,10 +742,10 @@ export async function removeComment(
       commentId: id.data,
       link: `/community/post/${comment.post_id}`,
       groupKey: `removed:${id.data}`,
-      title: "A comment of yours was removed",
+      title: { text: "A comment of yours was removed" },
       body: why.data
-        ? `Reason: ${why.data}`
-        : "It broke the community guidelines.",
+        ? { text: "Reason: {reason}", vars: { reason: why.data } }
+        : { text: "It broke the community guidelines." },
       snippet: why.data,
     }),
   );

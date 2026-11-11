@@ -155,7 +155,11 @@ export function planSessionEmails(
 // Emails can't know the reader's time zone, so they show Eastern time and say so.
 export const EMAIL_TIME_ZONE = "America/New_York";
 
-export function formatEmailSessionTime(startsAt: string, endsAt: string) {
+export function formatEmailSessionTime(
+  startsAt: string,
+  endsAt: string,
+  locale: Locale = "en",
+) {
   const zone =
     new Intl.DateTimeFormat("en-US", {
       timeZone: EMAIL_TIME_ZONE,
@@ -163,5 +167,5 @@ export function formatEmailSessionTime(startsAt: string, endsAt: string) {
     })
       .formatToParts(new Date(startsAt))
       .find((part) => part.type === "timeZoneName")?.value ?? "ET";
-  return `${formatSessionTime(startsAt, endsAt, EMAIL_TIME_ZONE)} ${zone}`;
+  return `${formatSessionTime(startsAt, endsAt, EMAIL_TIME_ZONE, locale)} ${zone}`;
 }
