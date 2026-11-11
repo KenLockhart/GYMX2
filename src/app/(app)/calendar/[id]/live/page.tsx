@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SessionTime } from "@/components/calendar-parts";
 import { LiveRoom } from "@/components/live-room";
+import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { canGoLive } from "@/lib/live";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -10,7 +11,9 @@ import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
 import type { LiveChatMessage } from "./actions";
 
-export const metadata: Metadata = { title: "Live session" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).calendar.live.title };
+}
 
 export default async function LivePage({
   params,
@@ -62,19 +65,19 @@ export default async function LivePage({
   );
 
   const isCoach = session.coach_id === profile.id;
+  const all = (await getT()).calendar;
+  const t = all.live;
+  const coachName = names[session.coach_id as string];
   const invited = inviteeIds.includes(profile.id);
 
   return (
     <div className="space-y-6">
       <Link href={`/calendar/${session.id}`} className="text-link text-sm">
-        Back to the session
+        {all.edit.back}
       </Link>
       <div>
         <p className="text-sm font-semibold uppercase tracking-widest text-accent">
-          Live
-          {!isCoach && names[session.coach_id as string]
-            ? ` with ${names[session.coach_id as string]}`
-            : ""}
+          {!isCoach && coachName ? t.liveWith(coachName) : t.live}
         </p>
         <h1 className="mt-1 text-4xl sm:text-5xl">{session.title}</h1>
         <p className="mt-2 text-muted">
@@ -109,10 +112,7 @@ export default async function LivePage({
         names={names}
         initialChat={((chat ?? []) as LiveChatMessage[]).reverse()}
       />
-      <p className="text-xs text-muted">
-        Live sessions aren&apos;t recorded. Only the coach is on camera. GYMX2
-        admins may review live chat to keep everyone safe.
-      </p>
+      <p className="text-xs text-muted">{t.notRecorded}</p>
     </div>
   );
 }

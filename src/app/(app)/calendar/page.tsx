@@ -6,20 +6,22 @@ import {
   SessionTime,
   type CalendarItem,
 } from "@/components/calendar-parts";
+import { getLocale, getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import {
   monthParam,
   monthRange,
   monthTitle,
   parseMonth,
-  responseLabel,
   shiftMonth,
   type SessionResponse,
 } from "@/lib/calendar";
 import { createClient } from "@/lib/supabase/server";
 import type { CalendarSession } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Calendar" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).calendar.title };
+}
 
 type SessionRow = Pick<
   CalendarSession,
@@ -43,6 +45,8 @@ export default async function CalendarPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { profile } = await requireAccount();
+  const t = (await getT()).calendar;
+  const locale = await getLocale();
   const month = parseMonth((await searchParams).month);
   const range = monthRange(month);
   const isCoach = profile.role === "coach";
@@ -96,13 +100,13 @@ export default async function CalendarPage({
       starts_at: session.starts_at,
       ends_at: session.ends_at,
       note: isMember
-        ? responseLabel[myResponse(session)]
-        : `${goingCount(session)} of ${session.session_invites.length} going`,
+        ? t.responses[myResponse(session)]
+        : t.going(goingCount(session), session.session_invites.length),
     })),
     ...tasks.map((row) => ({
       kind: "task" as const,
       id: row.id,
-      title: row.task?.title ?? "Task",
+      title: row.task?.title ?? t.task,
       due_on: row.due_on,
       done: row.completed_at !== null,
     })),
@@ -112,22 +116,18 @@ export default async function CalendarPage({
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-5xl">Calendar</h1>
+          <h1 className="text-5xl">{t.title}</h1>
           <p className="mt-2 max-w-xl text-muted">
-            {isCoach
-              ? "Schedule sessions and see who's coming."
-              : isMember
-                ? "Sessions from your coaches and your Task due dates, all in one place."
-                : "Every session on GYMX2."}
+            {isCoach ? t.introCoach : isMember ? t.introMember : t.introOther}
           </p>
         </div>
         {isCoach && (
           <div className="flex flex-wrap gap-2">
             <Link href="/calendar/intros" className="btn-secondary">
-              Intro times
+              {t.introTimes}
             </Link>
             <Link href="/calendar/new" className="btn-primary">
-              Schedule a session
+              {t.schedule}
             </Link>
           </div>
         )}
@@ -135,19 +135,15 @@ export default async function CalendarPage({
 
       {loadFailed ? (
         <p role="alert" className="text-danger">
-          We couldn&apos;t load your calendar. Please refresh and try again.
+          {t.loadError}
         </p>
       ) : (
         <>
           <section className="space-y-3">
-            <h2 className="text-2xl">Coming up</h2>
+            <h2 className="text-2xl">{t.comingUp}</h2>
             {upcoming.length === 0 ? (
               <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-                {isCoach
-                  ? "No sessions scheduled yet."
-                  : isMember
-                    ? "No sessions yet. When a coach you've joined schedules one, it shows up here."
-                    : "No sessions scheduled yet."}
+                {isMember ? t.noSessionsMember : t.noSessions}
               </p>
             ) : (
               <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
@@ -172,7 +168,10 @@ export default async function CalendarPage({
                           !isCoach && session.coach?.display_name,
                           session.location,
                           !isMember &&
-                            `${goingCount(session)} of ${session.session_invites.length} going`,
+                            t.going(
+                              goingCount(session),
+                              session.session_invites.length,
+                            ),
                         ]
                           .filter(Boolean)
                           .map((part) => ` · ${part}`)
@@ -193,25 +192,25 @@ export default async function CalendarPage({
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl">{monthTitle(month)}</h2>
-              <nav className="flex gap-2 text-sm" aria-label="Change month">
+              <h2 className="text-2xl">{monthTitle(month, locale)}</h2>
+              <nav className="flex gap-2 text-sm" aria-label={t.changeMonth}>
                 <Link
                   href={`/calendar?month=${monthParam(shiftMonth(month, -1))}`}
                   className="btn-secondary px-3 py-2 text-sm"
                 >
-                  Previous
+                  {t.previous}
                 </Link>
                 <Link
                   href="/calendar"
                   className="btn-secondary px-3 py-2 text-sm"
                 >
-                  Today
+                  {t.today}
                 </Link>
                 <Link
                   href={`/calendar?month=${monthParam(shiftMonth(month, 1))}`}
                   className="btn-secondary px-3 py-2 text-sm"
                 >
-                  Next
+                  {t.next}
                 </Link>
               </nav>
             </div>

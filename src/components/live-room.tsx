@@ -10,6 +10,8 @@ import {
   prepareBroadcast,
   type LiveChatMessage,
 } from "@/app/(app)/calendar/[id]/live/actions";
+import { useLocale, useT } from "@/i18n/client";
+import { translateServerText } from "@/i18n/server-text";
 import { LIVE_CHAT_MAX, type LiveRoom as Room } from "@/lib/live";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { NotLiveYet, play, publish, type Connection } from "@/lib/webrtc";
@@ -107,9 +109,10 @@ function Stage({
 }
 
 function LiveBadge() {
+  const t = useT().calendar.live;
   return (
     <span className="absolute left-3 top-3 rounded bg-danger px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white">
-      Live
+      {t.live}
     </span>
   );
 }
@@ -125,6 +128,8 @@ function Broadcaster({
   canStart: boolean;
   onRoom: (room: Room) => void;
 }) {
+  const t = useT().calendar.live;
+  const locale = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [media, setMedia] = useState<MediaStream | null>(null);
   const [connection, setConnection] = useState<Connection | null>(null);
@@ -162,9 +167,7 @@ function Broadcaster({
         }),
       );
     } catch {
-      setError(
-        "We couldn't use your camera and microphone. Allow access in your browser and try again.",
-      );
+      setError(t.cameraError);
     }
   }
 
@@ -174,12 +177,11 @@ function Broadcaster({
     startBusy(async () => {
       const prepared = await prepareBroadcast(sessionId);
       if (!prepared.ingestUrl)
-        return setError(prepared.error ?? "We couldn't go live.");
+        return setError(prepared.error ?? t.couldntGoLive);
       try {
         const next = await publish(prepared.ingestUrl, media);
         next.pc.addEventListener("connectionstatechange", () => {
-          if (next.pc.connectionState === "failed")
-            setError("Your connection dropped. Press Go live to reconnect.");
+          if (next.pc.connectionState === "failed") setError(t.dropped);
         });
         setConnection(next);
         const marked = await markLive(sessionId);
@@ -189,15 +191,13 @@ function Broadcaster({
           live_ended_at: null,
         });
       } catch {
-        setError(
-          "We couldn't connect to the live video service. Check your internet and try again.",
-        );
+        setError(t.serviceError);
       }
     });
   }
 
   function end() {
-    if (!window.confirm("End the live session for everyone?")) return;
+    if (!window.confirm(t.confirmEnd)) return;
     startBusy(async () => {
       connection?.stop();
       setConnection(null);
@@ -223,7 +223,7 @@ function Broadcaster({
                 disabled={!canStart}
                 className="btn-secondary"
               >
-                Turn on camera
+                {t.turnOnCamera}
               </button>
             ) : broadcasting ? (
               <button
@@ -232,7 +232,7 @@ function Broadcaster({
                 disabled={busy}
                 className="btn-secondary"
               >
-                {busy ? "Ending..." : "End live session"}
+                {busy ? t.ending : t.end}
               </button>
             ) : (
               <button
@@ -241,22 +241,22 @@ function Broadcaster({
                 disabled={busy || !canStart}
                 className="btn-primary"
               >
-                {busy ? "Connecting..." : live ? "Reconnect" : "Go live"}
+                {busy ? t.connecting : live ? t.reconnect : t.goLive}
               </button>
             )}
             <span className="text-sm text-muted">
               {broadcasting
-                ? "You're live. Invited members are watching here."
+                ? t.broadcasting
                 : !canStart
-                  ? "You can go live from 30 minutes before the start until an hour after the end."
+                  ? t.window
                   : media
-                    ? "Check your framing, then go live. Members get an email when you start."
-                    : "Members see and hear you; they don't go on camera."}
+                    ? t.framing
+                    : t.membersSee}
             </span>
           </div>
           {error && (
             <p role="alert" className="text-sm text-danger">
-              {error}
+              {translateServerText(error, locale)}
             </p>
           )}
         </div>
@@ -271,7 +271,7 @@ function Broadcaster({
       />
       {!media && (
         <p className="absolute inset-0 grid place-items-center text-sm text-white/70">
-          Camera is off
+          {t.cameraOff}
         </p>
       )}
       {broadcasting && <LiveBadge />}
@@ -290,6 +290,7 @@ function Viewer({
   ended: boolean;
   playbackUrl: string | null;
 }) {
+  const t = useT().calendar.live;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -346,7 +347,7 @@ function Viewer({
             onClick={() => setMuted((value) => !value)}
             className="btn-secondary px-3 py-2 text-sm"
           >
-            {muted ? "Turn sound on" : "Mute"}
+            {muted ? t.soundOn : t.mute}
           </button>
         )
       }
@@ -361,11 +362,7 @@ function Viewer({
       {live && playing && <LiveBadge />}
       {!(live && playing) && (
         <p className="absolute inset-0 grid place-items-center p-4 text-center text-sm text-white/80">
-          {live
-            ? "Connecting to the live video..."
-            : ended
-              ? "This live session has ended."
-              : "Waiting for your coach to go live. This page updates on its own."}
+          {live ? t.connectingVideo : ended ? t.ended : t.waiting}
         </p>
       )}
     </Stage>
@@ -381,6 +378,8 @@ function LiveChat({
   initialChat,
   live,
 }: Props & { live: boolean }) {
+  const t = useT().calendar.live;
+  const locale = useLocale();
   const [messages, setMessages] = useState(initialChat);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -455,28 +454,22 @@ function LiveChat({
 
   return (
     <div className="flex max-h-[32rem] flex-col rounded-lg border border-border bg-surface lg:max-h-none">
-      <p className="border-b border-border px-4 py-3 font-semibold">
-        Live chat
-      </p>
+      <p className="border-b border-border px-4 py-3 font-semibold">{t.chat}</p>
       <div
         ref={listRef}
         className="flex min-h-48 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm"
         aria-live="polite"
       >
         {messages.length === 0 ? (
-          <p className="m-auto text-muted">
-            {live
-              ? "Say hi to the group."
-              : "Chat opens when the session goes live."}
-          </p>
+          <p className="m-auto text-muted">{live ? t.sayHi : t.chatOpens}</p>
         ) : (
           messages.map((message) => (
             <p key={message.id} className="group break-words">
               <span className="font-semibold">
                 {message.sender_id === me
-                  ? "You"
-                  : (names[message.sender_id] ?? "A member")}
-                {message.sender_id === coachId && " (coach)"}:
+                  ? t.you
+                  : (names[message.sender_id] ?? t.aMember)}
+                {message.sender_id === coachId && t.coachTag}:
               </span>{" "}
               {message.body}
               {(message.sender_id === me || me === coachId) && (
@@ -485,7 +478,7 @@ function LiveChat({
                   onClick={() => remove(message.id)}
                   className="ml-2 cursor-pointer text-xs text-muted opacity-0 hover:text-danger focus:opacity-100 group-hover:opacity-100"
                 >
-                  Remove
+                  {t.remove}
                 </button>
               )}
             </p>
@@ -501,7 +494,7 @@ function LiveChat({
           }}
         >
           <label htmlFor="live-chat" className="sr-only">
-            Chat message
+            {t.chatMessage}
           </label>
           <div className="flex gap-2">
             <input
@@ -510,7 +503,7 @@ function LiveChat({
               maxLength={LIVE_CHAT_MAX}
               disabled={!live}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder={live ? "Send a message" : "Chat opens when live"}
+              placeholder={live ? t.sendPlaceholder : t.chatOpensShort}
               className="field-input min-w-0 flex-1"
             />
             <button
@@ -518,12 +511,12 @@ function LiveChat({
               disabled={!live || pending || !draft.trim()}
               className="btn-primary px-3"
             >
-              Send
+              {t.send}
             </button>
           </div>
           {error && (
             <p role="alert" className="text-xs text-danger">
-              {error}
+              {translateServerText(error, locale)}
             </p>
           )}
         </form>

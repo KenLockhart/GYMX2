@@ -2,6 +2,16 @@ import { describe, expect, it } from "vitest";
 import { allDestinations, menuGroups, type Role } from "../lib/nav";
 import { GOALS, EXPERIENCE } from "../lib/onboarding";
 import { NOTIFICATION_SETTINGS } from "../lib/notifications";
+import {
+  COACH_BADGES,
+  LEVELS,
+  MEMBER_BADGES,
+  coachChallenges,
+  memberChallenges,
+} from "../lib/achievements";
+import { CHECKIN_SCALES } from "../lib/checkins";
+import { HABIT_SUGGESTIONS } from "../lib/tracking";
+import { VIDEO_CATEGORIES } from "../lib/video-library";
 import { isLocale, localeFromHeader } from "./config";
 import { messages } from "./messages";
 import { translateServerText } from "./server-text";
@@ -79,5 +89,33 @@ describe("Spanish coverage", () => {
       expect(messages.en.options.notificationTypes[meta.type]?.label).toBe(
         meta.label,
       );
+  });
+  it("names every badge, level, challenge, habit idea, video category and check-in scale", () => {
+    const es = messages.es;
+    for (const badge of [...MEMBER_BADGES, ...COACH_BADGES])
+      expect(es.options.badges[badge.name]?.name, badge.name).toBeTruthy();
+    for (const level of LEVELS)
+      expect(es.options.levels[level.name]).toBeTruthy();
+    const empty = {
+      completions: [],
+      memoDays: [],
+      going: [],
+      given: [],
+      sessions: [],
+      videos: [],
+      messages: [],
+    };
+    for (const c of [
+      ...memberChallenges(empty as never),
+      ...coachChallenges(empty as never),
+    ])
+      expect(es.options.challenges[c.title], c.title).toBeTruthy();
+    for (const list of Object.values(HABIT_SUGGESTIONS))
+      for (const name of list)
+        expect(es.track.suggestions[name], name).toBeTruthy();
+    for (const category of VIDEO_CATEGORIES)
+      expect(es.library.categories[category]).toBeTruthy();
+    for (const scale of CHECKIN_SCALES)
+      expect(es.checkin.scales[scale.key]?.label).toBeTruthy();
   });
 });

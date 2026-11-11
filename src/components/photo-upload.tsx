@@ -1,53 +1,75 @@
 "use client";
 
 import { useState } from "react";
-import { prepareProgressPhoto, saveProgressPhoto } from "@/app/(app)/track/actions";
+import {
+  prepareProgressPhoto,
+  saveProgressPhoto,
+} from "@/app/(app)/track/actions";
+import { useLocale, useT } from "@/i18n/client";
+import { translateServerText } from "@/i18n/server-text";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
-const POSES = [
-  { value: "front", label: "Front" },
-  { value: "side", label: "Side" },
-  { value: "back", label: "Back" },
-  { value: "other", label: "Other" },
-];
+const POSES = ["front", "side", "back", "other"];
 
 // Pick a pose and a photo; it uploads privately and appears in the gallery.
 export function PhotoUpload({ today }: { today: string }) {
+  const t = useT().track;
+  const locale = useLocale();
   const [pose, setPose] = useState("front");
-  const [status, setStatus] = useState<{ kind: "idle" | "busy" | "done" | "error"; text?: string }>({ kind: "idle" });
+  const [status, setStatus] = useState<{
+    kind: "idle" | "busy" | "done" | "error";
+    text?: string;
+  }>({ kind: "idle" });
 
   async function upload(file: File) {
-    setStatus({ kind: "busy", text: "Uploading..." });
-    const prepared = await prepareProgressPhoto({ fileName: file.name, size: file.size });
+    setStatus({ kind: "busy", text: t.uploading });
+    const prepared = await prepareProgressPhoto({
+      fileName: file.name,
+      size: file.size,
+    });
     if (prepared.error || !prepared.path || !prepared.token) {
-      setStatus({ kind: "error", text: prepared.error ?? "We couldn't start the upload." });
+      setStatus({ kind: "error", text: prepared.error ?? t.couldntStart });
       return;
     }
     const { error } = await createBrowserSupabase()
       .storage.from("progress-photos")
-      .uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: file.type || undefined });
+      .uploadToSignedUrl(prepared.path, prepared.token, file, {
+        contentType: file.type || undefined,
+      });
     if (error) {
-      setStatus({ kind: "error", text: "The upload stopped. Check your connection and try again." });
+      setStatus({ kind: "error", text: t.uploadStopped });
       return;
     }
-    const saved = await saveProgressPhoto({ path: prepared.path, pose, day: today });
-    setStatus(saved.error ? { kind: "error", text: saved.error } : { kind: "done", text: "Added." });
+    const saved = await saveProgressPhoto({
+      path: prepared.path,
+      pose,
+      day: today,
+    });
+    setStatus(
+      saved.error
+        ? { kind: "error", text: saved.error }
+        : { kind: "done", text: t.added },
+    );
   }
 
   return (
     <div className="flex flex-wrap items-end gap-3">
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium">Pose</span>
-        <select value={pose} onChange={(event) => setPose(event.target.value)} className="field-input">
+        <span className="text-sm font-medium">{t.pose}</span>
+        <select
+          value={pose}
+          onChange={(event) => setPose(event.target.value)}
+          className="field-input"
+        >
           {POSES.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
+            <option key={option} value={option}>
+              {t.poses[option]}
             </option>
           ))}
         </select>
       </label>
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium">Photo</span>
+        <span className="text-sm font-medium">{t.photo}</span>
         <input
           type="file"
           accept=".jpg,.jpeg,.png,.webp"
@@ -65,7 +87,7 @@ export function PhotoUpload({ today }: { today: string }) {
           role={status.kind === "error" ? "alert" : "status"}
           className={`w-full text-sm ${status.kind === "error" ? "text-danger" : status.kind === "done" ? "text-success" : "text-muted"}`}
         >
-          {status.text}
+          {translateServerText(status.text, locale)}
         </p>
       )}
     </div>

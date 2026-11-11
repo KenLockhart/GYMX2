@@ -14,6 +14,8 @@ import { PhotoUpload } from "@/components/photo-upload";
 import { WeightChart } from "@/components/weight-chart";
 import { loadProgressPhotos } from "@/lib/photos";
 import { PILLARS, type Pillar } from "@/lib/achievements";
+import { LOCALE_TAG, type Locale } from "@/i18n/config";
+import { getLocale, getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -34,7 +36,9 @@ import {
   saveTrackingSettings,
 } from "./actions";
 
-export const metadata: Metadata = { title: "Track" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).track.title };
+}
 
 type Habit = { id: string; name: string; pillar: Pillar };
 type BodyLog = {
@@ -51,8 +55,8 @@ type NutritionLog = {
   notes: string;
 };
 
-function shortDate(day: string) {
-  return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", {
+function formatDay(day: string, locale: Locale) {
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString(LOCALE_TAG[locale], {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
@@ -62,6 +66,13 @@ function shortDate(day: string) {
 export default async function TrackPage() {
   const { profile } = await requireAccount();
   if (profile.role === "admin") redirect("/admin");
+  const all = await getT();
+  const t = all.track;
+  const locale = await getLocale();
+  const tag = LOCALE_TAG[locale];
+  const shortDate = (day: string) => formatDay(day, locale);
+  const pillarName = (value: string) => all.options.pillars[value] ?? value;
+  const suggestion = (name: string) => t.suggestions[name] ?? name;
 
   const week = lastDays(7);
   const today = week[week.length - 1];
@@ -115,22 +126,20 @@ export default async function TrackPage() {
   const change = weightChange(bodyLogs, thirtyDaysAgo);
   const averages = nutritionAverages(nutritionLogs, week);
   const names = new Set(habits.map((habit) => habit.name.toLowerCase()));
-  const dayLabels = week.map(weekdayLabel);
+  const dayLabels = week.map((day) => weekdayLabel(day, locale));
   const photos = await loadProgressPhotos(profile.id);
 
   return (
     <div className="space-y-12">
       <div>
         <p className="text-sm font-semibold uppercase tracking-widest text-accent">
-          Mind <span aria-hidden="true">•</span> Body{" "}
-          <span aria-hidden="true">•</span> Spirit
+          {t.mindBodySpirit[0]} <span aria-hidden="true">•</span>{" "}
+          {t.mindBodySpirit[1]} <span aria-hidden="true">•</span>{" "}
+          {t.mindBodySpirit[2]}
         </p>
-        <h1 className="mt-1 text-5xl">Track</h1>
+        <h1 className="mt-1 text-5xl">{t.title}</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Daily habits, your body and what you eat, in one place.{" "}
-          {profile.share_tracking
-            ? "Your coaches can see this."
-            : "Only you can see this unless you share it below."}
+          {t.intro} {profile.share_tracking ? t.shared : t.private}
         </p>
       </div>
 
@@ -139,17 +148,16 @@ export default async function TrackPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="habits" className="text-3xl">
-              Daily habits
+              {t.habits}
             </h2>
-            <p className="text-sm text-muted">
-              Tick off what you did. Each one is +1 point and keeps your streak
-              going. You can fix the last 7 days.
-            </p>
+            <p className="text-sm text-muted">{t.habitsHint}</p>
           </div>
           {habits.length > 0 && (
             <p className="text-sm">
-              Today: <span className="font-semibold">{todayDone}</span> of{" "}
-              {habits.length}
+              {t.today}:{" "}
+              <span className="font-semibold">
+                {t.todayCount(todayDone, habits.length)}
+              </span>
             </p>
           )}
         </div>
@@ -167,7 +175,7 @@ export default async function TrackPage() {
                   className="rounded-lg border border-border bg-surface p-3"
                 >
                   <dt className="text-sm text-muted">
-                    {pillar.label} this week
+                    {t.thisWeek(pillarName(pillar.value))}
                   </dt>
                   <dd className="text-2xl font-semibold">
                     {row.possible ? `${percent}%` : "–"}
@@ -187,7 +195,9 @@ export default async function TrackPage() {
         {PILLARS.map((pillar) => {
           const group = habits.filter((habit) => habit.pillar === pillar.value);
           const suggestions = HABIT_SUGGESTIONS[pillar.value].filter(
-            (name) => !names.has(name.toLowerCase()),
+            (name) =>
+              !names.has(name.toLowerCase()) &&
+              !names.has(suggestion(name).toLowerCase()),
           );
           return (
             <div
@@ -195,7 +205,7 @@ export default async function TrackPage() {
               className="space-y-3 rounded-lg border border-border bg-surface p-4"
             >
               <h3 className="flex items-center gap-2 text-xl">
-                <PillarTag pillar={pillar.value} /> {pillar.label}
+                <PillarTag pillar={pillar.value} /> {pillarName(pillar.value)}
               </h3>
               {group.length > 0 ? (
                 <HabitGrid
@@ -207,20 +217,24 @@ export default async function TrackPage() {
                 />
               ) : (
                 <p className="text-sm text-muted">
-                  No {pillar.label} habits yet. Add one below.
+                  {t.noHabits(pillarName(pillar.value))}
                 </p>
               )}
               {habits.length < MAX_HABITS && suggestions.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {suggestions.map((name) => (
                     <ActionForm key={name} action={addHabit}>
-                      <input type="hidden" name="name" value={name} />
+                      <input
+                        type="hidden"
+                        name="name"
+                        value={suggestion(name)}
+                      />
                       <input type="hidden" name="pillar" value={pillar.value} />
                       <SubmitButton
-                        pendingText="Adding..."
+                        pendingText={t.adding}
                         className="rounded-full border border-dashed border-border px-3 py-1 text-sm hover:border-accent"
                       >
-                        + {name}
+                        + {suggestion(name)}
                       </SubmitButton>
                     </ActionForm>
                   ))}
@@ -229,14 +243,14 @@ export default async function TrackPage() {
               {group.length > 0 && (
                 <details className="text-sm">
                   <summary className="cursor-pointer text-muted">
-                    Remove a habit
+                    {t.removeHabit}
                   </summary>
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {group.map((habit) => (
                       <li key={habit.id}>
                         <ActionForm
                           action={removeHabit}
-                          confirmMessage={`Remove "${habit.name}"? Past check-ins still count.`}
+                          confirmMessage={t.confirmRemove(habit.name)}
                         >
                           <input
                             type="hidden"
@@ -244,7 +258,7 @@ export default async function TrackPage() {
                             value={habit.id}
                           />
                           <SubmitButton
-                            pendingText="Removing..."
+                            pendingText={t.removing}
                             className="rounded-full border border-border px-3 py-1 text-sm hover:border-danger"
                           >
                             × {habit.name}
@@ -265,15 +279,15 @@ export default async function TrackPage() {
             className="flex max-w-2xl flex-wrap items-end gap-3"
           >
             <Field
-              label="Your own habit"
+              label={t.ownHabit}
               name="name"
               maxLength={60}
-              placeholder="Cold shower"
+              placeholder={t.ownHabitPlaceholder}
               required
               className="field-input w-64"
             />
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium">Pillar</span>
+              <span className="text-sm font-medium">{t.pillar}</span>
               <select
                 name="pillar"
                 required
@@ -281,27 +295,24 @@ export default async function TrackPage() {
                 className="field-input"
               >
                 <option value="" disabled>
-                  Choose
+                  {t.choose}
                 </option>
                 {PILLARS.map((pillar) => (
                   <option key={pillar.value} value={pillar.value}>
-                    {pillar.label}
+                    {pillarName(pillar.value)}
                   </option>
                 ))}
               </select>
             </label>
-            <SubmitButton pendingText="Adding..." className="btn-secondary">
-              Add habit
+            <SubmitButton pendingText={t.adding} className="btn-secondary">
+              {t.addHabit}
             </SubmitButton>
             <div className="w-full">
               <FormStatus />
             </div>
           </ActionForm>
         ) : (
-          <p className="text-sm text-muted">
-            You&apos;re tracking {MAX_HABITS} habits, the most at once. Remove
-            one to add another.
-          </p>
+          <p className="text-sm text-muted">{t.maxHabits(MAX_HABITS)}</p>
         )}
       </section>
 
@@ -309,41 +320,38 @@ export default async function TrackPage() {
       <section className="space-y-5" aria-labelledby="body">
         <div>
           <h2 id="body" className="text-3xl">
-            Body
+            {t.body}
           </h2>
-          <p className="text-sm text-muted">
-            Log as often as you like; weekly is plenty. Progress is more than a
-            number, so use what helps you.
-          </p>
+          <p className="text-sm text-muted">{t.bodyHint}</p>
         </div>
         <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
           <ActionForm
             action={saveBodyLog}
             className="space-y-3 rounded-lg border border-border bg-surface p-4"
           >
-            <p className="font-semibold">Today, {shortDate(today)}</p>
+            <p className="font-semibold">{t.todayDate(shortDate(today))}</p>
             <input type="hidden" name="day" value={today} />
             <Field
-              label="Weight (lb)"
+              label={t.weight}
               name="weight_lb"
               inputMode="decimal"
               defaultValue={todayBody?.weight_lb ?? ""}
             />
             <Field
-              label="Body fat (%)"
+              label={t.bodyFat}
               name="body_fat_pct"
               inputMode="decimal"
               defaultValue={todayBody?.body_fat_pct ?? ""}
             />
             <Field
-              label="Waist (in)"
+              label={t.waist}
               name="waist_in"
               inputMode="decimal"
               defaultValue={todayBody?.waist_in ?? ""}
             />
             <div className="flex items-center gap-3">
-              <SubmitButton pendingText="Saving..." className="btn-primary">
-                Save
+              <SubmitButton pendingText={t.saving} className="btn-primary">
+                {t.save}
               </SubmitButton>
               <FormStatus />
             </div>
@@ -354,30 +362,34 @@ export default async function TrackPage() {
                 <WeightChart points={weights} />
                 {change !== null && (
                   <p className="mt-2 text-sm text-muted">
-                    Last 30 days:{" "}
+                    {t.last30}{" "}
                     {change === 0
-                      ? "no change"
+                      ? t.noChange
                       : `${change > 0 ? "+" : ""}${change} lb`}
                   </p>
                 )}
               </div>
             ) : (
               <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-                Log your weight on two different days to see your trend here.
+                {t.twoDays}
               </p>
             )}
             {bodyLogs.length > 0 && (
               <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-sm">
-                  <caption className="sr-only">
-                    Recent body measurements
-                  </caption>
+                  <caption className="sr-only">{t.recentBody}</caption>
                   <thead className="bg-surface text-muted">
                     <tr>
-                      <th className="p-2 text-left font-medium">Date</th>
-                      <th className="p-2 text-right font-medium">Weight</th>
-                      <th className="p-2 text-right font-medium">Body fat</th>
-                      <th className="p-2 text-right font-medium">Waist</th>
+                      <th className="p-2 text-left font-medium">{t.date}</th>
+                      <th className="p-2 text-right font-medium">
+                        {t.weightCol}
+                      </th>
+                      <th className="p-2 text-right font-medium">
+                        {t.bodyFatCol}
+                      </th>
+                      <th className="p-2 text-right font-medium">
+                        {t.waistCol}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -410,31 +422,40 @@ export default async function TrackPage() {
       <section className="space-y-4" aria-labelledby="photos">
         <div>
           <h2 id="photos" className="text-3xl">
-            Progress photos
+            {t.photos}
           </h2>
           <p className="text-sm text-muted">
-            Private by default. Same pose, same light, every few weeks shows change the scale can&apos;t.
-            {profile.share_tracking ? " Your coaches can see these." : ""}
+            {t.photosHint}
+            {profile.share_tracking ? t.photosShared : ""}
           </p>
         </div>
         <PhotoUpload today={today} />
         {photos.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-            No photos yet. Add a front photo to start; after your second, you&apos;ll see first and latest side by
-            side.
+            {t.noPhotos}
           </p>
         ) : (
           <PhotoGallery
             photos={photos}
+            locale={locale}
             renderDelete={(photo) => (
               <div className="flex items-center gap-3">
-                <Link href={`/community?photo=${photo.id}`} className="text-xs text-muted hover:text-accent">
-                  Share
+                <Link
+                  href={`/community?photo=${photo.id}`}
+                  className="text-xs text-muted hover:text-accent"
+                >
+                  {t.share}
                 </Link>
-                <ActionForm action={deleteProgressPhoto} confirmMessage="Delete this photo for good?">
+                <ActionForm
+                  action={deleteProgressPhoto}
+                  confirmMessage={t.confirmDeletePhoto}
+                >
                   <input type="hidden" name="photo_id" value={photo.id} />
-                  <SubmitButton pendingText="Deleting..." className="text-xs text-muted hover:text-danger">
-                    Delete
+                  <SubmitButton
+                    pendingText={t.deleting}
+                    className="text-xs text-muted hover:text-danger"
+                  >
+                    {t.delete}
                   </SubmitButton>
                 </ActionForm>
               </div>
@@ -447,51 +468,49 @@ export default async function TrackPage() {
       <section className="space-y-5" aria-labelledby="nutrition">
         <div>
           <h2 id="nutrition" className="text-3xl">
-            Nutrition
+            {t.nutrition}
           </h2>
-          <p className="text-sm text-muted">
-            A quick daily log. Fill in what you track and skip the rest.
-          </p>
+          <p className="text-sm text-muted">{t.nutritionHint}</p>
         </div>
         <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
           <ActionForm
             action={saveNutritionLog}
             className="space-y-3 rounded-lg border border-border bg-surface p-4"
           >
-            <p className="font-semibold">Today, {shortDate(today)}</p>
+            <p className="font-semibold">{t.todayDate(shortDate(today))}</p>
             <input type="hidden" name="day" value={today} />
             <Field
-              label="Protein (g)"
+              label={t.protein}
               name="protein_g"
               inputMode="numeric"
               defaultValue={todayFood?.protein_g ?? ""}
             />
             <Field
-              label="Calories"
+              label={t.calories}
               name="calories"
               inputMode="numeric"
               defaultValue={todayFood?.calories ?? ""}
             />
             <Field
-              label="Glasses of water"
+              label={t.water}
               name="water_glasses"
               inputMode="numeric"
               defaultValue={todayFood?.water_glasses ?? ""}
             />
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium">Notes (optional)</span>
+              <span className="text-sm font-medium">{t.notes}</span>
               <textarea
                 name="notes"
                 rows={2}
                 maxLength={500}
                 defaultValue={todayFood?.notes ?? ""}
-                placeholder="Meal prep went well; skipped the late snack."
+                placeholder={t.notesPlaceholder}
                 className="field-input"
               />
             </label>
             <div className="flex items-center gap-3">
-              <SubmitButton pendingText="Saving..." className="btn-primary">
-                Save
+              <SubmitButton pendingText={t.saving} className="btn-primary">
+                {t.save}
               </SubmitButton>
               <FormStatus />
             </div>
@@ -499,35 +518,37 @@ export default async function TrackPage() {
           <div className="space-y-3">
             <dl className="grid grid-cols-3 gap-3">
               {[
-                ["Protein", averages.protein, "g", profile.protein_target_g],
-                ["Calories", averages.calories, "", profile.calorie_target],
-                ["Water", averages.water, " glasses", null],
+                [
+                  t.proteinStat,
+                  averages.protein,
+                  "g",
+                  profile.protein_target_g,
+                ],
+                [t.caloriesStat, averages.calories, "", profile.calorie_target],
+                [t.waterStat, averages.water, t.glasses, null],
               ].map(([label, value, unit, target]) => (
                 <div
                   key={label as string}
                   className="rounded-lg border border-border bg-surface p-3"
                 >
                   <dt className="text-sm text-muted">
-                    {label as string}, 7-day average
+                    {t.average(label as string)}
                   </dt>
                   <dd className="text-2xl font-semibold tabular-nums">
                     {value === null
                       ? "–"
-                      : `${(value as number).toLocaleString("en-US")}${unit as string}`}
+                      : `${(value as number).toLocaleString(tag)}${unit as string}`}
                   </dd>
                   {target !== null && target !== undefined && (
                     <p className="text-xs text-muted">
-                      Target: {(target as number).toLocaleString("en-US")}
+                      {t.target} {(target as number).toLocaleString(tag)}
                       {unit as string}
                     </p>
                   )}
                 </div>
               ))}
             </dl>
-            <p className="text-xs text-muted">
-              Logged {averages.logged} of the last 7 days. Your coach can share
-              meal plans in the Armory.
-            </p>
+            <p className="text-xs text-muted">{t.logged(averages.logged)}</p>
           </div>
         </div>
       </section>
@@ -538,22 +559,22 @@ export default async function TrackPage() {
         aria-labelledby="tracking-settings"
       >
         <h2 id="tracking-settings" className="text-2xl">
-          Targets and sharing
+          {t.settings}
         </h2>
         <ActionForm action={saveTrackingSettings} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="Daily protein target (g)"
+              label={t.proteinTarget}
               name="protein_target_g"
               inputMode="numeric"
               defaultValue={profile.protein_target_g ?? ""}
             />
             <Field
-              label="Daily calorie target"
+              label={t.calorieTarget}
               name="calorie_target"
               inputMode="numeric"
               defaultValue={profile.calorie_target ?? ""}
-              hint="Optional. Your coach can help you set these."
+              hint={t.targetHint}
             />
           </div>
           <label className="flex items-start gap-3 text-sm">
@@ -564,16 +585,13 @@ export default async function TrackPage() {
               className="mt-0.5 size-4 accent-accent"
             />
             <span>
-              Share my tracking with my coaches
-              <span className="block text-muted">
-                Coaches you&apos;ve joined see your habits, body measurements
-                and nutrition log. GYMX2 admins never do.
-              </span>
+              {t.shareTracking}
+              <span className="block text-muted">{t.shareTrackingHint}</span>
             </span>
           </label>
           <div className="flex items-center gap-3">
-            <SubmitButton pendingText="Saving..." className="btn-secondary">
-              Save
+            <SubmitButton pendingText={t.saving} className="btn-secondary">
+              {t.save}
             </SubmitButton>
             <FormStatus />
           </div>

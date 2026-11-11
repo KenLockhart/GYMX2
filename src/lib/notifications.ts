@@ -1,3 +1,4 @@
+import { LOCALE_TAG, type Locale } from "../i18n/config";
 // Wording and grouping for the notification center. Shared by the server and the browser.
 
 export type NotificationType =
@@ -128,6 +129,11 @@ export function describeNotification(
 export function groupByDay<T extends { updatedAt: string }>(
   items: T[],
   now = new Date(),
+  labels: { today: string; yesterday: string; locale: Locale } = {
+    today: "Today",
+    yesterday: "Yesterday",
+    locale: "en",
+  },
 ) {
   const key = (date: Date) => date.toDateString();
   const today = key(now);
@@ -137,10 +143,10 @@ export function groupByDay<T extends { updatedAt: string }>(
     const date = new Date(item.updatedAt);
     const label =
       key(date) === today
-        ? "Today"
+        ? labels.today
         : key(date) === yesterday
-          ? "Yesterday"
-          : date.toLocaleDateString("en-US", {
+          ? labels.yesterday
+          : date.toLocaleDateString(LOCALE_TAG[labels.locale], {
               month: "long",
               day: "numeric",
               ...(date.getFullYear() === now.getFullYear()

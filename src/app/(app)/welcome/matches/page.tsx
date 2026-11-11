@@ -3,13 +3,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PillarTag } from "@/components/game-parts";
 import { formatMoney } from "@/lib/armory";
+import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
-import { goalLabel, matchCoaches } from "@/lib/onboarding";
-import { weeksLabel } from "@/lib/programs";
+import { matchCoaches } from "@/lib/onboarding";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Your matches" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).welcome.matches.title };
+}
 
 type CoachRow = {
   id: string;
@@ -28,6 +30,9 @@ export default async function MatchesPage() {
   const { profile } = await requireAccount();
   if (profile.role !== "member") redirect("/dashboard");
   if (profile.goals.length === 0) redirect("/welcome");
+  const all = await getT();
+  const t = all.welcome.matches;
+  const goalLabel = (value: string) => all.options.goals[value] ?? value;
 
   const supabase = await createClient();
   const [{ data: coachData }, { data: planData }, { data: programData }] =
@@ -78,19 +83,16 @@ export default async function MatchesPage() {
     <div className="space-y-8">
       <div>
         <p className="text-sm font-semibold uppercase tracking-widest text-accent">
-          Your matches
+          {t.title}
         </p>
-        <h1 className="mt-1 text-5xl">
-          {matches.length ? "Coaches for you" : "Find your coach"}
-        </h1>
+        <h1 className="mt-1 text-5xl">{matches.length ? t.forYou : t.find}</h1>
         <p className="mt-3 flex max-w-2xl flex-wrap items-center gap-2 text-muted">
           <span>
-            You want to: {profile.goals.map(goalLabel).join(", ").toLowerCase()}
-            .
+            {t.youWant(profile.goals.map(goalLabel).join(", ").toLowerCase())}
           </span>
           {profile.focus && (
             <span className="inline-flex items-center gap-2">
-              Starting with <PillarTag pillar={profile.focus} />
+              {t.startingWith} <PillarTag pillar={profile.focus} />
             </span>
           )}
         </p>
@@ -98,8 +100,7 @@ export default async function MatchesPage() {
 
       {matches.length === 0 ? (
         <p className="max-w-xl rounded-lg border border-border bg-surface p-4 text-muted">
-          No coach lists those specialties yet. Browse everyone and pick who
-          feels right. You can message a coach once you join them.
+          {t.none}
         </p>
       ) : (
         <ul className="grid gap-4 md:grid-cols-3">
@@ -114,7 +115,7 @@ export default async function MatchesPage() {
               >
                 {index === 0 && (
                   <p className="text-xs font-bold uppercase tracking-widest text-accent">
-                    Best match
+                    {t.best}
                   </p>
                 )}
                 <p className="text-2xl font-bold">{coach.display_name}</p>
@@ -123,28 +124,28 @@ export default async function MatchesPage() {
                 )}
                 {match.shared.length > 0 && (
                   <p className="text-sm">
-                    <span className="text-muted">Helps with: </span>
+                    <span className="text-muted">{t.helpsWith}</span>
                     {match.shared.map(goalLabel).join(", ")}
                   </p>
                 )}
                 {first && (
                   <p className="text-sm">
-                    <span className="text-muted">Start with: </span>
+                    <span className="text-muted">{t.startWith}</span>
                     {first.title} (
-                    {weeksLabel(first.program_days[0]?.count ?? 0)})
+                    {all.programs.weeks(first.program_days[0]?.count ?? 0)})
                   </p>
                 )}
                 {coach.join_mode !== "free" && plan !== undefined && (
                   <p className="text-sm font-semibold text-accent">
-                    {coach.join_mode === "paid" ? "Subscribers only · " : ""}
-                    Plans from {formatMoney(plan)}/month
+                    {coach.join_mode === "paid" ? t.subscribersOnly : ""}
+                    {t.plansFrom(formatMoney(plan))}
                   </p>
                 )}
                 <Link
                   href={`/coaches/${coach.id}`}
                   className={`mt-auto text-center ${index === 0 ? "btn-primary" : "btn-secondary"}`}
                 >
-                  Meet {coach.display_name}
+                  {t.meet(coach.display_name)}
                 </Link>
               </li>
             );
@@ -154,18 +155,18 @@ export default async function MatchesPage() {
 
       <div className="flex flex-wrap gap-3">
         <Link href="/coaches" className="btn-secondary">
-          See all coaches
+          {t.seeAll}
         </Link>
         <Link href="/dashboard" className="btn-secondary">
-          Go to my dashboard
+          {t.dashboard}
         </Link>
       </div>
       <p className="text-sm text-muted">
-        Once you join a coach, their programs show up under{" "}
+        {t.onceJoinedBefore}{" "}
         <Link href="/programs" className="text-link">
-          Programs
+          {t.programs}
         </Link>
-        , where you can start one today.
+        {t.onceJoinedAfter}
       </p>
     </div>
   );

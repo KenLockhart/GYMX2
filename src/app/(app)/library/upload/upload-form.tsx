@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Field } from "@/components/form-parts";
+import { useLocale, useT } from "@/i18n/client";
+import { translateServerText } from "@/i18n/server-text";
 import { VIDEO_CATEGORIES } from "@/lib/video-library";
 import { videoSchema } from "@/lib/validation";
 
@@ -10,6 +12,8 @@ import { videoSchema } from "@/lib/validation";
 const CHUNK_BYTES = 50 * 1024 * 1024;
 
 export function UploadForm() {
+  const t = useT().library;
+  const locale = useLocale();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -28,7 +32,7 @@ export function UploadForm() {
     });
     if (!parsed.success) return setError(parsed.error.issues[0].message);
     if (!(file instanceof File) || file.size === 0)
-      return setError("Choose a video file.");
+      return setError(t.chooseFile);
 
     setError(null);
     setProgress(0);
@@ -48,7 +52,7 @@ export function UploadForm() {
         setProgress(Math.round((sent / total) * 100)),
       onError: () => {
         setProgress(null);
-        setError("The upload stopped. Check your connection and try again.");
+        setError(t.uploadStopped);
       },
       onSuccess: () => {
         router.push("/library");
@@ -60,14 +64,14 @@ export function UploadForm() {
   return (
     <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
       <Field
-        label="Title"
+        label={t.videoTitle}
         name="title"
         maxLength={120}
         required
         disabled={uploading}
       />
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium">Description</span>
+        <span className="text-sm font-medium">{t.description}</span>
         <textarea
           name="description"
           rows={3}
@@ -78,7 +82,7 @@ export function UploadForm() {
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Category</span>
+          <span className="text-sm font-medium">{t.category}</span>
           <select
             name="category"
             defaultValue="Other"
@@ -87,42 +91,42 @@ export function UploadForm() {
           >
             {VIDEO_CATEGORIES.map((category) => (
               <option key={category} value={category}>
-                {category}
+                {t.categories[category] ?? category}
               </option>
             ))}
           </select>
         </label>
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Who can watch</span>
+          <span className="text-sm font-medium">{t.whoCanWatch}</span>
           <select
             name="visibility"
             defaultValue="members"
             disabled={uploading}
             className="field-input"
           >
-            <option value="members">Members who join me</option>
-            <option value="private">Only me (private)</option>
+            <option value="members">{t.membersWhoJoinMe}</option>
+            <option value="private">{t.onlyMe}</option>
           </select>
         </label>
       </div>
       <Field
-        label="Video file"
+        label={t.file}
         name="file"
         type="file"
         accept="video/*"
-        hint="Up to 2 hours long. Large files can take a while, so keep this page open."
+        hint={t.fileHint}
         required
         disabled={uploading}
       />
 
       {error && (
         <p role="alert" className="text-sm text-danger">
-          {error}
+          {translateServerText(error, locale)}
         </p>
       )}
       {uploading && (
         <div className="space-y-1.5" role="status">
-          <p className="text-sm">Uploading: {progress}%</p>
+          <p className="text-sm">{t.uploadingProgress(progress)}</p>
           <div className="h-2 overflow-hidden rounded bg-surface-raised">
             <div
               className="h-full bg-accent"
@@ -133,7 +137,7 @@ export function UploadForm() {
       )}
 
       <button type="submit" disabled={uploading} className="btn-primary">
-        {uploading ? "Uploading..." : "Upload video"}
+        {uploading ? t.uploading : t.submit}
       </button>
     </form>
   );

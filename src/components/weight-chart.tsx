@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useT } from "@/i18n/client";
+import { LOCALE_TAG, type Locale } from "@/i18n/config";
 
 type Point = { day: string; value: number };
 
@@ -8,8 +10,8 @@ const WIDTH = 640;
 const HEIGHT = 220;
 const PAD = { top: 16, right: 16, bottom: 28, left: 44 };
 
-function shortDate(day: string) {
-  return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", {
+function formatDay(day: string, locale: Locale) {
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString(LOCALE_TAG[locale], {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
@@ -20,6 +22,10 @@ function shortDate(day: string) {
 // A single series, so the title names it and no legend is needed. Dates are spaced by real time.
 export function WeightChart({ points }: { points: Point[] }) {
   const [active, setActive] = useState<number | null>(null);
+  const locale = useLocale();
+  const t = useT().track.chart;
+  const shortDate = (day: string) => formatDay(day, locale);
+  const weightTitle = useT().track.weight;
   if (points.length < 2) return null;
 
   const times = points.map((point) =>
@@ -59,18 +65,26 @@ export function WeightChart({ points }: { points: Point[] }) {
   return (
     <figure className="space-y-2">
       <figcaption className="flex items-baseline justify-between text-sm">
-        <span className="font-medium">Weight (lb)</span>
+        <span className="font-medium">{weightTitle}</span>
         <span className="tabular-nums text-muted" aria-live="polite">
           {shown
             ? `${shortDate(shown.day)}: ${shown.value} lb`
-            : `${shortDate(points[0].day)} – ${shortDate(points[points.length - 1].day)}`}
+            : t.range(
+                shortDate(points[0].day),
+                shortDate(points[points.length - 1].day),
+              )}
         </span>
       </figcaption>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="h-auto w-full touch-none select-none"
         role="img"
-        aria-label={`Weight from ${points[0].value} lb on ${shortDate(points[0].day)} to ${points[points.length - 1].value} lb on ${shortDate(points[points.length - 1].day)}`}
+        aria-label={t.label(
+          points[0].value,
+          shortDate(points[0].day),
+          points[points.length - 1].value,
+          shortDate(points[points.length - 1].day),
+        )}
         onPointerMove={(event) =>
           setActive(
             nearest(event.clientX, event.currentTarget.getBoundingClientRect()),

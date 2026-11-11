@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { getPlayerUrl, isStreamConfigured } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Video } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Video" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).library.video };
+}
 
 type WatchVideo = Pick<Video, "id" | "title" | "description" | "status"> & {
   coach: { display_name: string } | null;
@@ -35,6 +38,7 @@ export default async function VideoPage({
 }) {
   await requireAccount();
   const { id } = await params;
+  const t = (await getT()).library;
 
   // Row security answers "may this person watch?". The player link is only made after it says yes.
   const supabase = await createClient();
@@ -54,7 +58,7 @@ export default async function VideoPage({
   return (
     <div className="space-y-6">
       <Link href="/library" className="text-link text-sm">
-        Back to the library
+        {t.back}
       </Link>
 
       {playerUrl ? (
@@ -72,9 +76,7 @@ export default async function VideoPage({
           role="status"
           className="rounded-lg border border-border bg-surface p-4 text-muted"
         >
-          {video.status === "ready"
-            ? "This video can't play right now. Please refresh and try again."
-            : "This video is still being prepared."}
+          {video.status === "ready" ? t.cantPlay : t.preparing}
         </p>
       )}
 

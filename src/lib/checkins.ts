@@ -1,3 +1,4 @@
+import { LOCALE_TAG, type Locale } from "../i18n/config";
 // Weekly check-ins: one per member per week (weeks start Monday, Eastern time).
 
 export const CHECKIN_SCALES = [
@@ -60,8 +61,8 @@ export function previousWeeks(currentWeek: string, count: number) {
   );
 }
 
-export function weekLabel(week: string) {
-  return new Date(`${week}T12:00:00Z`).toLocaleDateString("en-US", {
+export function weekLabel(week: string, locale: Locale = "en") {
+  return new Date(`${week}T12:00:00Z`).toLocaleDateString(LOCALE_TAG[locale], {
     month: "short",
     day: "numeric",
     timeZone: "UTC",

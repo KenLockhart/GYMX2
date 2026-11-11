@@ -1,4 +1,6 @@
-import { pillarLabel } from "@/lib/achievements";
+"use client";
+
+import { useT } from "@/i18n/client";
 import type { Badge } from "@/lib/achievements";
 
 const pillarStyle: Record<string, string> = {
@@ -8,7 +10,8 @@ const pillarStyle: Record<string, string> = {
 };
 
 export function PillarTag({ pillar }: { pillar: string | null | undefined }) {
-  const label = pillarLabel(pillar);
+  const t = useT();
+  const label = pillar ? t.options.pillars[pillar] : null;
   if (!label || !pillar) return null;
   return (
     <span
@@ -27,21 +30,29 @@ export function BadgeRow({
   badges: Badge[];
   max?: number;
 }) {
+  const t = useT();
   if (badges.length === 0) return null;
   const shown = badges.slice(0, max);
   const more = badges.length - shown.length;
   return (
-    <ul className="flex flex-wrap items-center gap-1" aria-label="Badges">
-      {shown.map((badge) => (
-        <li
-          key={badge.key}
-          title={`${badge.name}: ${badge.description}`}
-          className="flex size-7 items-center justify-center rounded-full border border-border bg-surface-raised text-sm"
-        >
-          <span aria-hidden="true">{badge.icon}</span>
-          <span className="sr-only">{badge.name}</span>
-        </li>
-      ))}
+    <ul
+      className="flex flex-wrap items-center gap-1"
+      aria-label={t.options.badgesLabel}
+    >
+      {shown.map((badge) => {
+        const local = t.options.badges[badge.name];
+        const name = local?.name ?? badge.name;
+        return (
+          <li
+            key={badge.key}
+            title={`${name}: ${local?.description ?? badge.description}`}
+            className="flex size-7 items-center justify-center rounded-full border border-border bg-surface-raised text-sm"
+          >
+            <span aria-hidden="true">{badge.icon}</span>
+            <span className="sr-only">{name}</span>
+          </li>
+        );
+      })}
       {more > 0 && <li className="text-xs text-muted">+{more}</li>}
     </ul>
   );

@@ -6,13 +6,16 @@ import {
   FormStatus,
   SubmitButton,
 } from "@/components/form-parts";
+import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
-import { progressPercent, unlockedThrough, weeksLabel } from "@/lib/programs";
+import { progressPercent, unlockedThrough } from "@/lib/programs";
 import { todayKey } from "@/lib/reminders";
 import { createClient } from "@/lib/supabase/server";
 import { createProgram, startProgram } from "./actions";
 
-export const metadata: Metadata = { title: "Programs" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).programs.title };
+}
 
 type Program = {
   id: string;
@@ -29,6 +32,7 @@ export default async function ProgramsPage() {
   const { profile } = await requireAccount();
   const supabase = await createClient();
   const isCoach = profile.role === "coach";
+  const t = (await getT()).programs;
 
   if (isCoach || profile.role === "admin") {
     const query = supabase
@@ -44,11 +48,9 @@ export default async function ProgramsPage() {
     return (
       <div className="space-y-8">
         <div>
-          <h1 className="text-5xl">Programs</h1>
+          <h1 className="text-5xl">{t.title}</h1>
           <p className="mt-2 max-w-2xl text-muted">
-            {isCoach
-              ? "Build multi-week programs as a series of days. Members who joined you start one, and a new day unlocks each day."
-              : "Every coach's programs."}
+            {isCoach ? t.introCoach : t.introAdmin}
           </p>
         </div>
         {isCoach && (
@@ -56,17 +58,17 @@ export default async function ProgramsPage() {
             action={createProgram}
             className="max-w-xl space-y-3 rounded-lg border border-dashed border-border p-4"
           >
-            <p className="font-semibold">New program</p>
+            <p className="font-semibold">{t.new}</p>
             <Field
-              label="Title"
+              label={t.programTitle}
               name="title"
               maxLength={120}
-              placeholder="6-Week Strong Start"
+              placeholder={t.titlePlaceholder}
               required
             />
             <label className="block space-y-1.5">
               <span className="text-sm font-medium">
-                Description (optional)
+                {t.descriptionOptional}
               </span>
               <textarea
                 name="description"
@@ -76,14 +78,14 @@ export default async function ProgramsPage() {
               />
             </label>
             <FormStatus />
-            <SubmitButton pendingText="Creating..." className="btn-primary">
-              Create and add days
+            <SubmitButton pendingText={t.creating} className="btn-primary">
+              {t.create}
             </SubmitButton>
           </ActionForm>
         )}
         {programs.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-            No programs yet.
+            {t.none}
           </p>
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
@@ -101,10 +103,10 @@ export default async function ProgramsPage() {
                   </Link>
                   <p className="text-sm text-muted">
                     {!isCoach &&
-                      `${program.coach?.display_name ?? "A coach"} · `}
-                    {weeksLabel(program.program_days[0]?.count ?? 0)} ·{" "}
-                    {program.program_enrollments?.[0]?.count ?? 0} started ·{" "}
-                    {program.published ? "Published" : "Draft"}
+                      `${program.coach?.display_name ?? t.aCoach} · `}
+                    {t.weeks(program.program_days[0]?.count ?? 0)} ·{" "}
+                    {t.started(program.program_enrollments?.[0]?.count ?? 0)} ·{" "}
+                    {program.published ? t.published : t.draft}
                   </p>
                 </div>
               </li>
@@ -152,18 +154,15 @@ export default async function ProgramsPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-5xl">Programs</h1>
-        <p className="mt-2 max-w-2xl text-muted">
-          Step-by-step plans from your coaches. A new day unlocks each day;
-          finishing one is +3 points.
-        </p>
+        <h1 className="text-5xl">{t.title}</h1>
+        <p className="mt-2 max-w-2xl text-muted">{t.introMember}</p>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-2xl">Your programs</h2>
+        <h2 className="text-2xl">{t.yours}</h2>
         {mine.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-            You haven&apos;t started one yet.
+            {t.noneStarted}
           </p>
         ) : (
           <ul className="grid gap-3 md:grid-cols-2">
@@ -180,12 +179,15 @@ export default async function ProgramsPage() {
                     href={`/programs/${row.program?.id}`}
                     className="text-link font-semibold"
                   >
-                    {row.program?.title ?? "Program"}
+                    {row.program?.title ?? t.program}
                   </Link>
                   <p className="text-sm text-muted">
-                    {row.program?.coach?.display_name} · Day{" "}
-                    {Math.min(unlockedThrough(row.started_on, today), total)} of{" "}
-                    {total} · {done} done
+                    {row.program?.coach?.display_name} ·{" "}
+                    {t.dayOf(
+                      Math.min(unlockedThrough(row.started_on, today), total),
+                      total,
+                      done,
+                    )}
                   </p>
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-raised">
                     <div
@@ -201,12 +203,12 @@ export default async function ProgramsPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-2xl">From your coaches</h2>
+        <h2 className="text-2xl">{t.fromCoaches}</h2>
         {open.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-            No new programs right now.{" "}
+            {t.noneNew}{" "}
             <Link href="/coaches" className="text-link">
-              Find a coach
+              {t.findCoach}
             </Link>
             .
           </p>
@@ -221,7 +223,7 @@ export default async function ProgramsPage() {
                   <p className="font-semibold">{program.title}</p>
                   <p className="text-sm text-muted">
                     {program.coach?.display_name} ·{" "}
-                    {weeksLabel(program.program_days[0]?.count ?? 0)}
+                    {t.weeks(program.program_days[0]?.count ?? 0)}
                   </p>
                 </div>
                 {program.description && (
@@ -232,10 +234,10 @@ export default async function ProgramsPage() {
                 <ActionForm action={startProgram}>
                   <input type="hidden" name="program_id" value={program.id} />
                   <SubmitButton
-                    pendingText="Starting..."
+                    pendingText={t.starting}
                     className="btn-primary"
                   >
-                    Start today
+                    {t.startToday}
                   </SubmitButton>
                   <FormStatus />
                 </ActionForm>

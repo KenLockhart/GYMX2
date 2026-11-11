@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { respondToSession } from "@/app/(app)/calendar/actions";
-import { ActionForm, Field, FormStatus, SubmitButton } from "@/components/form-parts";
+import {
+  ActionForm,
+  Field,
+  FormStatus,
+  SubmitButton,
+} from "@/components/form-parts";
 import {
   formatSessionTime,
   localDayKey,
@@ -11,6 +16,8 @@ import {
   type MonthKey,
   type SessionResponse,
 } from "@/lib/calendar";
+import { useLocale, useT } from "@/i18n/client";
+import { LOCALE_TAG, type Locale } from "@/i18n/config";
 import type { ActionState } from "@/lib/types";
 
 const subscribe = () => () => {};
@@ -25,11 +32,18 @@ function useTimeZone() {
   return isClient ? undefined : "UTC";
 }
 
-export function SessionTime({ startsAt, endsAt }: { startsAt: string; endsAt: string }) {
+export function SessionTime({
+  startsAt,
+  endsAt,
+}: {
+  startsAt: string;
+  endsAt: string;
+}) {
   const timeZone = useTimeZone();
+  const locale = useLocale();
   return (
     <time dateTime={startsAt}>
-      {formatSessionTime(startsAt, endsAt, timeZone)}
+      {formatSessionTime(startsAt, endsAt, timeZone, locale)}
       {timeZone === "UTC" && " UTC"}
     </time>
   );
@@ -47,19 +61,34 @@ export type CalendarItem =
   | { kind: "task"; id: string; title: string; due_on: string; done: boolean };
 
 function itemDay(item: CalendarItem, timeZone: string | undefined) {
-  return item.kind === "task" ? item.due_on : localDayKey(item.starts_at, timeZone);
+  return item.kind === "task"
+    ? item.due_on
+    : localDayKey(item.starts_at, timeZone);
 }
 
-function itemTime(item: CalendarItem, timeZone: string | undefined) {
-  if (item.kind === "task") return "Due";
-  return new Date(item.starts_at).toLocaleTimeString("en-US", {
+function itemTime(
+  item: CalendarItem,
+  timeZone: string | undefined,
+  locale: Locale,
+  due: string,
+) {
+  if (item.kind === "task") return due;
+  return new Date(item.starts_at).toLocaleTimeString(LOCALE_TAG[locale], {
     hour: "numeric",
     minute: "2-digit",
     timeZone,
   });
 }
 
-function ItemLink({ item, timeZone }: { item: CalendarItem; timeZone: string | undefined }) {
+function ItemLink({
+  item,
+  timeZone,
+}: {
+  item: CalendarItem;
+  timeZone: string | undefined;
+}) {
+  const locale = useLocale();
+  const t = useT().calendar;
   const href = item.kind === "task" ? "/tasks" : `/calendar/${item.id}`;
   return (
     <Link
@@ -73,15 +102,31 @@ function ItemLink({ item, timeZone }: { item: CalendarItem; timeZone: string | u
       }`}
       title={item.title}
     >
-      {itemTime(item, timeZone)} {item.title}
+      {itemTime(item, timeZone, locale, t.due)} {item.title}
     </Link>
   );
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// Short weekday names, Sunday first, in the viewer's language. (Jan 4, 1970 was a Sunday.)
+function weekdays(locale: Locale) {
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(Date.UTC(1970, 0, 4 + i)).toLocaleDateString(LOCALE_TAG[locale], {
+      weekday: "short",
+      timeZone: "UTC",
+    }),
+  );
+}
 
-export function CalendarMonth({ month, items }: { month: MonthKey; items: CalendarItem[] }) {
+export function CalendarMonth({
+  month,
+  items,
+}: {
+  month: MonthKey;
+  items: CalendarItem[];
+}) {
   const timeZone = useTimeZone();
+  const locale = useLocale();
+  const t = useT().calendar;
   const weeks = useMemo(() => monthGrid(month), [month]);
   const monthPrefix = `${month.year}-${String(month.month).padStart(2, "0")}`;
   const today = localDayKey(new Date().toISOString(), timeZone);
@@ -100,20 +145,25 @@ export function CalendarMonth({ month, items }: { month: MonthKey; items: Calend
     return map;
   }, [items, timeZone]);
 
-  const daysThisMonth = [...byDay.keys()].filter((day) => day.startsWith(monthPrefix)).sort();
+  const daysThisMonth = [...byDay.keys()]
+    .filter((day) => day.startsWith(monthPrefix))
+    .sort();
 
   return (
     <div className="space-y-6">
       <div className="overflow-hidden rounded-lg border border-border">
         <div className="grid grid-cols-7 border-b border-border bg-surface text-center text-xs font-semibold uppercase tracking-wide text-muted">
-          {WEEKDAYS.map((day) => (
+          {weekdays(locale).map((day) => (
             <div key={day} className="py-2">
               {day}
             </div>
           ))}
         </div>
         {weeks.map((week) => (
-          <div key={week[0]} className="grid grid-cols-7 border-b border-border last:border-b-0">
+          <div
+            key={week[0]}
+            className="grid grid-cols-7 border-b border-border last:border-b-0"
+          >
             {week.map((day) => {
               const dayItems = byDay.get(day) ?? [];
               const inMonth = day.startsWith(monthPrefix);
@@ -126,17 +176,25 @@ export function CalendarMonth({ month, items }: { month: MonthKey; items: Calend
                 >
                   <div
                     className={`mb-1 inline-flex size-6 items-center justify-center rounded-full text-xs ${
-                      day === today ? "bg-accent font-bold text-accent-foreground" : ""
+                      day === today
+                        ? "bg-accent font-bold text-accent-foreground"
+                        : ""
                     }`}
                   >
                     {Number(day.slice(8))}
                   </div>
                   <div className="hidden space-y-1 sm:block">
                     {dayItems.slice(0, 3).map((item) => (
-                      <ItemLink key={`${item.kind}-${item.id}`} item={item} timeZone={timeZone} />
+                      <ItemLink
+                        key={`${item.kind}-${item.id}`}
+                        item={item}
+                        timeZone={timeZone}
+                      />
                     ))}
                     {dayItems.length > 3 && (
-                      <p className="px-1.5 text-xs text-muted">+{dayItems.length - 3} more</p>
+                      <p className="px-1.5 text-xs text-muted">
+                        {t.more(dayItems.length - 3)}
+                      </p>
                     )}
                   </div>
                   {dayItems.length > 0 && (
@@ -157,34 +215,53 @@ export function CalendarMonth({ month, items }: { month: MonthKey; items: Calend
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-2xl">This month</h2>
+        <h2 className="text-2xl">{t.thisMonth}</h2>
         {daysThisMonth.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-muted">
-            Nothing scheduled this month.
+            {t.nothingThisMonth}
           </p>
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
             {daysThisMonth.map((day) => (
-              <li key={day} className="flex flex-col gap-2 p-4 sm:flex-row sm:gap-6">
+              <li
+                key={day}
+                className="flex flex-col gap-2 p-4 sm:flex-row sm:gap-6"
+              >
                 <p className="w-28 shrink-0 text-sm font-semibold">
-                  {new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    timeZone: "UTC",
-                  })}
+                  {new Date(`${day}T00:00:00Z`).toLocaleDateString(
+                    LOCALE_TAG[locale],
+                    {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      timeZone: "UTC",
+                    },
+                  )}
                 </p>
                 <ul className="min-w-0 flex-1 space-y-1.5 text-sm">
                   {(byDay.get(day) ?? []).map((item) => (
-                    <li key={`${item.kind}-${item.id}`} className="flex flex-wrap gap-x-2">
-                      <span className="w-20 shrink-0 text-muted">{itemTime(item, timeZone)}</span>
+                    <li
+                      key={`${item.kind}-${item.id}`}
+                      className="flex flex-wrap gap-x-2"
+                    >
+                      <span className="w-20 shrink-0 text-muted">
+                        {itemTime(item, timeZone, locale, t.due)}
+                      </span>
                       <Link
-                        href={item.kind === "task" ? "/tasks" : `/calendar/${item.id}`}
+                        href={
+                          item.kind === "task"
+                            ? "/tasks"
+                            : `/calendar/${item.id}`
+                        }
                         className={`text-link ${item.kind === "task" && item.done ? "line-through" : ""}`}
                       >
-                        {item.kind === "task" ? `Task: ${item.title}` : item.title}
+                        {item.kind === "task"
+                          ? t.taskItem(item.title)
+                          : item.title}
                       </Link>
-                      {item.kind === "session" && item.note && <span className="text-muted">· {item.note}</span>}
+                      {item.kind === "session" && item.note && (
+                        <span className="text-muted">· {item.note}</span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -204,17 +281,22 @@ export function ResponseButtons({
   sessionId: string;
   response: SessionResponse;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-wrap items-start gap-2">
       {(["going", "not_going"] as const).map((choice) => (
-        <ActionForm key={choice} action={respondToSession} className="space-y-1">
+        <ActionForm
+          key={choice}
+          action={respondToSession}
+          className="space-y-1"
+        >
           <input type="hidden" name="session_id" value={sessionId} />
           <input type="hidden" name="response" value={choice} />
           <SubmitButton
-            pendingText="Saving..."
+            pendingText={t.common.saving}
             className={`${response === choice ? "btn-primary" : "btn-secondary"} px-3 py-2 text-sm`}
           >
-            {choice === "going" ? "Going" : "Can't go"}
+            {t.calendar.responses[choice]}
           </SubmitButton>
           <FormStatus />
         </ActionForm>
@@ -241,7 +323,8 @@ function toMoments(date: string, start: string, end: string) {
   if (!date || !start || !end) return { startsAt: "", endsAt: "" };
   const startsAt = new Date(`${date}T${start}`);
   const endsAt = new Date(`${date}T${end}`);
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) return { startsAt: "", endsAt: "" };
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()))
+    return { startsAt: "", endsAt: "" };
   if (endsAt <= startsAt) endsAt.setDate(endsAt.getDate() + 1);
   return { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() };
 }
@@ -264,6 +347,7 @@ function SessionFields({
   members: { id: string; display_name: string }[];
   initial: SessionFormValues;
 }) {
+  const f = useT().calendar.form;
   const [date, setDate] = useState(() => {
     if (initial.starts_at) return localDateValue(new Date(initial.starts_at));
     const tomorrow = new Date();
@@ -273,7 +357,9 @@ function SessionFields({
   const [start, setStart] = useState(() =>
     initial.starts_at ? localTimeValue(new Date(initial.starts_at)) : "09:00",
   );
-  const [end, setEnd] = useState(() => (initial.ends_at ? localTimeValue(new Date(initial.ends_at)) : "10:00"));
+  const [end, setEnd] = useState(() =>
+    initial.ends_at ? localTimeValue(new Date(initial.ends_at)) : "10:00",
+  );
   const moments = toMoments(date, start, end);
   const overnight = moments.startsAt !== "" && end <= start;
   const zoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -283,19 +369,48 @@ function SessionFields({
       <input type="hidden" name="id" value={initial.id} />
       <input type="hidden" name="starts_at" value={moments.startsAt} />
       <input type="hidden" name="ends_at" value={moments.endsAt} />
-      <Field label="Title" name="title" maxLength={120} required defaultValue={initial.title} />
+      <Field
+        label={f.title}
+        name="title"
+        maxLength={120}
+        required
+        defaultValue={initial.title}
+      />
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Date" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
-        <Field label="Starts" type="time" required value={start} onChange={(event) => setStart(event.target.value)} />
-        <Field label="Ends" type="time" required value={end} onChange={(event) => setEnd(event.target.value)} />
+        <Field
+          label={f.date}
+          type="date"
+          required
+          value={date}
+          onChange={(event) => setDate(event.target.value)}
+        />
+        <Field
+          label={f.starts}
+          type="time"
+          required
+          value={start}
+          onChange={(event) => setStart(event.target.value)}
+        />
+        <Field
+          label={f.ends}
+          type="time"
+          required
+          value={end}
+          onChange={(event) => setEnd(event.target.value)}
+        />
       </div>
       <p className="text-xs text-muted">
-        Times are in your time zone ({zoneName}). Members see them in theirs.
-        {overnight && " The end time is before the start, so the session ends the next day."}
+        {f.zone(zoneName)}
+        {overnight && f.overnight}
       </p>
-      <Field label="Location (optional)" name="location" maxLength={200} defaultValue={initial.location} />
       <Field
-        label="Video call link (optional)"
+        label={f.location}
+        name="location"
+        maxLength={200}
+        defaultValue={initial.location}
+      />
+      <Field
+        label={f.videoLink}
         name="meeting_url"
         type="url"
         maxLength={500}
@@ -303,11 +418,17 @@ function SessionFields({
         defaultValue={initial.meeting_url}
       />
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium">Notes (optional)</span>
-        <textarea name="notes" rows={3} maxLength={2000} className="field-input" defaultValue={initial.notes} />
+        <span className="text-sm font-medium">{f.notes}</span>
+        <textarea
+          name="notes"
+          rows={3}
+          maxLength={2000}
+          className="field-input"
+          defaultValue={initial.notes}
+        />
       </label>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Invite</legend>
+        <legend className="text-sm font-medium">{f.invite}</legend>
         {members.map((member) => (
           <label key={member.id} className="flex items-center gap-3 text-sm">
             <input
@@ -338,13 +459,15 @@ export function SessionForm({
 }) {
   // The date and time fields need the browser's time zone, so the form is drawn in the browser.
   const timeZone = useTimeZone();
-  if (timeZone === "UTC") return <p className="text-muted">Loading...</p>;
+  const t = useT();
+  if (timeZone === "UTC")
+    return <p className="text-muted">{t.calendar.form.loading}</p>;
 
   return (
     <ActionForm action={action} className="max-w-xl space-y-5">
       <SessionFields members={members} initial={initial} />
       <FormStatus />
-      <SubmitButton pendingText="Saving..." className="btn-primary">
+      <SubmitButton pendingText={t.common.saving} className="btn-primary">
         {submitLabel}
       </SubmitButton>
     </ActionForm>
