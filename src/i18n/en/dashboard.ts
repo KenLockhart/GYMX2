@@ -1,6 +1,23 @@
 export const dashboard = {
   title: "Dashboard",
   welcome: (name: string) => `Welcome, ${name}`,
+  coachWelcome: (name: string) => `Welcome back, ${name}.`,
+  coachIntro: "Your coaching day at a glance.",
+  coachProfile: "Coach profile",
+  photoMissing: "Add a portrait to your profile",
+  addPhoto: "Add or update photo",
+  photoAlt: (name: string) => `${name}'s portrait`,
+  specialties: "Specialties",
+  quickActions: "Quick actions",
+  upcomingSessions: "Upcoming sessions",
+  viewCalendar: "View calendar",
+  noUpcomingSessions: "No sessions are coming up. Add one when you’re ready.",
+  memberActivity: "Member activity",
+  viewMembers: "View members",
+  noMemberActivity: "Check-ins and messages from your members will show up here.",
+  activityCheckin: "Shared a weekly check-in",
+  activityMessage: "Sent you a message",
+  dashboardLoadError: "We couldn’t load this activity. Please refresh to try again.",
   intro: {
     member:
       "You're in. Join a coach to start getting Tasks and sessions, and keep daily notes in your Memos.",

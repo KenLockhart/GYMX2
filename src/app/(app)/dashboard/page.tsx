@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { getT } from "@/i18n/server";
 import { syncProgress } from "@/lib/achievements-data";
 import { requireAccount } from "@/lib/auth";
+import { CoachDashboard } from "@/components/coach-dashboard";
+import { loadCoachDashboardData } from "@/lib/coach-dashboard-data";
 import { weekStart } from "@/lib/checkins";
 import { todayKey } from "@/lib/reminders";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +22,23 @@ export default async function DashboardPage() {
   if (profile.role === "member" && !profile.onboarded_at) redirect("/welcome");
   // Visiting the dashboard also catches up on any badges earned elsewhere (messages, sales).
   const progress = await syncProgress(profile).catch(() => null);
+
+  if (profile.role === "coach") {
+    const data = await loadCoachDashboardData(profile.id);
+    return (
+      <CoachDashboard
+        profile={profile}
+        photoUrl={data.photoUrl}
+        sessions={data.sessions.items}
+        sessionsError={data.sessions.error}
+        activity={data.activity.items}
+        activityError={data.activity.error}
+        goals={t.options.goals}
+        copy={d}
+        roleLabel={t.common.roles.coach}
+      />
+    );
+  }
 
   // From Thursday on, members with a coach see a nudge until they check in for the week.
   let checkinDue = false;
@@ -133,22 +152,6 @@ export default async function DashboardPage() {
             </Link>
             <Link href="/coaches" className="btn-secondary">
               {d.findCoach}
-            </Link>
-          </>
-        )}
-        {profile.role === "coach" && (
-          <>
-            <Link href="/tasks/new" className="btn-primary">
-              {d.giveTask}
-            </Link>
-            <Link href="/library/upload" className="btn-secondary">
-              {d.uploadVideo}
-            </Link>
-            <Link href="/calendar/new" className="btn-secondary">
-              {d.scheduleSession}
-            </Link>
-            <Link href="/armory/new" className="btn-secondary">
-              {d.addToArmory}
             </Link>
           </>
         )}
