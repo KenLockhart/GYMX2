@@ -74,6 +74,22 @@ async function removeStoredFiles(userId: string) {
   }
 }
 
+// Profile photos have one folder per account and may include retired uploads kept as tombstones.
+// Re-list the first page after each delete so more than 1,000 files are removed without offset skips.
+async function removeProfilePhotoFiles(userId: string) {
+  const storage = createAdminClient().storage.from("profile-photos");
+  while (true) {
+    const { data, error } = await storage.list(userId, { limit: 1000 });
+    if (error) throw error;
+    const paths = (data ?? [])
+      .filter((file) => file.id !== null)
+      .map((file) => `${userId}/${file.name}`);
+    if (!paths.length) return;
+    const { error: removeError } = await storage.remove(paths);
+    if (removeError) throw removeError;
+  }
+}
+
 // Community photos sit one folder deeper (<person>/<upload>/<n>.jpg), and message photos too.
 async function removeCommunityFiles(userId: string) {
   const admin = createAdminClient();
@@ -135,6 +151,7 @@ export async function deleteAccount(person: {
 }) {
   for (const [label, step] of [
     ["files", () => removeStoredFiles(person.id)],
+    ["profile photos", () => removeProfilePhotoFiles(person.id)],
     ["community files", () => removeCommunityFiles(person.id)],
     ["videos", () => removeVideos(person.id)],
     ["memberships", () => cancelAllMemberships(person.id)],

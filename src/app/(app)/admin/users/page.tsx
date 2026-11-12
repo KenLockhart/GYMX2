@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AdminMembersRoster } from "@/components/admin-members-roster";
 import { requireAdmin } from "@/lib/auth";
+import { PROFILE_PHOTO_BUCKET } from "@/lib/profile-photo-shared";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AdminUser } from "@/lib/types";
-import { RoleForm } from "../role-form";
 
 export const metadata: Metadata = { title: "Members and roles" };
 
@@ -59,6 +61,33 @@ export default async function UsersPage({
         `${u.display_name} ${u.email}`.toLowerCase().includes(w),
       ),
     );
+  const photoByUser = new Map<string, string>();
+  if (!error && users.length) {
+    const { data: photos } = await supabase
+      .from("profile_photos")
+      .select("user_id, photo_path")
+      .in(
+        "user_id",
+        users.map((user) => user.id),
+      );
+    if (photos?.length) {
+      const { data: signed } = await createAdminClient()
+        .storage.from(PROFILE_PHOTO_BUCKET)
+        .createSignedUrls(
+          photos.map((photo) => photo.photo_path),
+          60 * 60,
+        );
+      const urlByPath = new Map(
+        (signed ?? []).flatMap((photo) =>
+          photo.signedUrl ? [[photo.path, photo.signedUrl]] : [],
+        ),
+      );
+      for (const photo of photos) {
+        const url = urlByPath.get(photo.photo_path);
+        if (url) photoByUser.set(photo.user_id, url);
+      }
+    }
+  }
   const href = (key: Filter) => {
     const next = new URLSearchParams();
     if (key !== "all") next.set("show", key);
@@ -133,35 +162,12 @@ export default async function UsersPage({
               : "No one here yet."}
         </p>
       ) : (
-        <ul className="divide-y divide-border rounded-2xl border border-border bg-surface">
-          {users.map((user) => (
-            <li
-              key={user.id}
-              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="font-semibold">
-                  {user.display_name}
-                  {isRequest(user) && (
-                    <span className="ml-2 rounded bg-accent px-1.5 py-0.5 text-xs font-semibold text-accent-foreground">
-                      Coach request
-                    </span>
-                  )}
-                </p>
-                <p className="truncate text-sm text-muted">
-                  {user.email} · {user.role} · joined{" "}
-                  {new Date(user.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                    timeZone: "UTC",
-                  })}
-                </p>
-              </div>
-              <RoleForm user={user} />
-            </li>
-          ))}
-        </ul>
+        <AdminMembersRoster
+          users={users.map((user) => ({
+            ...user,
+            photoUrl: photoByUser.get(user.id) ?? null,
+          }))}
+        />
       )}
     </div>
   );

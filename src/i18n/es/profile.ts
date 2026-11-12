@@ -12,6 +12,33 @@ export const profile: Messages["profile"] = {
   coachProfileLink: "Tu perfil de coach",
   coachProfileHint:
     "Foto, historia, estilo de coaching, precios y más: la página que ven los miembros cuando te encuentran.",
+  photo: {
+    title: "Tu foto de cuenta",
+    body: "Personaliza tu cuenta de GYMX2 con una foto.",
+    privacy:
+      "Solo tú y los administradores de GYMX2 pueden ver esta foto privada de cuenta. Es independiente de la foto de tu perfil público de coach.",
+    upload: "Agregar foto",
+    replace: "Cambiar foto",
+    remove: "Quitar foto",
+    fileHint: "JPG, PNG o WebP · hasta 5 MB",
+    imageAlt: "Tu foto de cuenta",
+    previewAlt: "Vista previa de tu nueva foto de cuenta",
+    uploading: "Subiendo y revisando tu foto…",
+    removing: "Quitando foto…",
+    uploadSuccess: "Tu foto está guardada.",
+    removeSuccess: "Tu foto se quitó.",
+    errors: {
+      "invalid-type": "Elige una imagen JPG, PNG o WebP.",
+      "too-large": "Elige una imagen de hasta 5 MB.",
+      "invalid-path": "No se pudo verificar esa carga de foto.",
+      "upload-unavailable": "Esta carga de foto venció. Elígela de nuevo.",
+      "upload-missing": "La foto no terminó de subir. Inténtalo de nuevo.",
+      "invalid-image": "Ese archivo no es una imagen válida. Elige otra foto.",
+      "save-failed": "No pudimos guardar la foto. Inténtalo de nuevo.",
+      "remove-failed": "No pudimos quitar la foto. Inténtalo de nuevo.",
+      "upload-failed": "La carga se detuvo. Revisa tu conexión e inténtalo de nuevo.",
+    },
+  },
   goals: {
     title: "Tus metas",
     body: "Las usamos para sugerirte coaches. Los coaches a los que te unes las ven para adaptar tu entrenamiento.",
