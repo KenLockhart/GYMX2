@@ -148,7 +148,7 @@ function Hero({
             // eslint-disable-next-line @next/next/no-img-element -- coach photos come from storage
             <img
               src={profile.photoUrl}
-              alt={`Portrait of ${name}`}
+              alt={`Portrait of ${profile.name}`}
               className="size-full object-cover object-top"
             />
           ) : (
