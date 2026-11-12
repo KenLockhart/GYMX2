@@ -5,10 +5,13 @@ import { translateServerText } from "@/i18n/server-text";
 import { deletionBlocker } from "@/lib/account-deletion";
 import { requireAccount } from "@/lib/auth";
 import { GoalsForm, SpecialtiesForm } from "@/components/goals-form";
+import { ProfilePhotoForm } from "@/components/profile-photo-form";
 import { PublicPageForm } from "@/components/public-page-form";
 import { NotificationSettingsForm } from "@/components/notification-settings-form";
 import { PushToggle } from "@/components/push-toggle";
 import { NOTIFICATION_SETTINGS } from "@/lib/notifications";
+import { PROFILE_PHOTO_BUCKET } from "@/lib/profile-photo-shared";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { suggestSlug } from "@/lib/public-pages";
 import { updateGoals, updateSpecialties } from "../welcome/actions";
@@ -26,6 +29,18 @@ export default async function ProfilePage() {
   const locale = await getLocale();
   const p = t.profile;
   const supabase = await createClient();
+  const { data: savedPhoto } = await supabase
+    .from("profile_photos")
+    .select("photo_path")
+    .eq("user_id", profile.id)
+    .maybeSingle();
+  let photoUrl: string | null = null;
+  if (savedPhoto?.photo_path) {
+    const { data: signedPhoto } = await createAdminClient()
+      .storage.from(PROFILE_PHOTO_BUCKET)
+      .createSignedUrl(savedPhoto.photo_path, 60 * 60);
+    photoUrl = signedPhoto?.signedUrl ?? null;
+  }
   const { data: savedSettings } = await supabase
     .from("notification_settings")
     .select("type, in_app, push, email")
@@ -60,6 +75,10 @@ export default async function ProfilePage() {
             </span>
           </Link>
         )}
+        <ProfilePhotoForm
+          currentPhotoUrl={photoUrl}
+          displayName={profile.display_name}
+        />
         <ProfileForm profile={profile} email={email} />
       </div>
 

@@ -10,6 +10,33 @@ export const profile = {
   coachProfileLink: "Your coach profile",
   coachProfileHint:
     "Photo, story, coaching style, pricing and more: the page members see when they find you.",
+  photo: {
+    title: "Your account photo",
+    body: "Personalize your GYMX2 account with a photo.",
+    privacy:
+      "Only you and GYMX2 admins can see this private account photo. It is separate from any photo on your public coach profile.",
+    upload: "Add a photo",
+    replace: "Change photo",
+    remove: "Remove photo",
+    fileHint: "JPG, PNG or WebP · up to 5 MB",
+    imageAlt: "Your account photo",
+    previewAlt: "Preview of your new account photo",
+    uploading: "Uploading and checking your photo…",
+    removing: "Removing photo…",
+    uploadSuccess: "Your photo is saved.",
+    removeSuccess: "Your photo is removed.",
+    errors: {
+      "invalid-type": "Choose a JPG, PNG or WebP image.",
+      "too-large": "Choose an image up to 5 MB.",
+      "invalid-path": "That photo upload could not be verified.",
+      "upload-unavailable": "This photo upload expired. Please choose it again.",
+      "upload-missing": "The photo did not finish uploading. Please try again.",
+      "invalid-image": "That file is not a valid image. Choose another photo.",
+      "save-failed": "We could not save the photo. Please try again.",
+      "remove-failed": "We could not remove the photo. Please try again.",
+      "upload-failed": "The upload stopped. Please check your connection and try again.",
+    },
+  },
   goals: {
     title: "Your goals",
     body: "Used to suggest coaches. Coaches you join see these so they can tailor your training.",
