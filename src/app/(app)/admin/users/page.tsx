@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminMembersRoster } from "@/components/admin-members-roster";
 import { requireAdmin } from "@/lib/auth";
-import { PROFILE_PHOTO_BUCKET } from "@/lib/profile-photo-shared";
+import {
+  ADMIN_ROSTER_COACH_PHOTO_BUCKET,
+  ADMIN_ROSTER_PHOTO_URL_TTL_SECONDS,
+  ADMIN_ROSTER_PROFILE_PHOTO_BUCKET,
+  resolveAdminRosterPhotoUrls,
+} from "@/lib/admin-roster-photos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AdminUser } from "@/lib/types";
@@ -63,30 +68,58 @@ export default async function UsersPage({
     );
   const photoByUser = new Map<string, string>();
   if (!error && users.length) {
-    const { data: photos } = await supabase
-      .from("profile_photos")
-      .select("user_id, photo_path")
-      .in(
-        "user_id",
-        users.map((user) => user.id),
-      );
-    if (photos?.length) {
-      const { data: signed } = await createAdminClient()
-        .storage.from(PROFILE_PHOTO_BUCKET)
-        .createSignedUrls(
-          photos.map((photo) => photo.photo_path),
-          60 * 60,
-        );
-      const urlByPath = new Map(
-        (signed ?? []).flatMap((photo) =>
-          photo.signedUrl ? [[photo.path, photo.signedUrl]] : [],
-        ),
-      );
-      for (const photo of photos) {
-        const url = urlByPath.get(photo.photo_path);
-        if (url) photoByUser.set(photo.user_id, url);
-      }
+    const userIds = users.map((user) => user.id);
+    const [accountResult, draftResult, publishedResult] = await Promise.allSettled([
+      supabase
+        .from("profile_photos")
+        .select("user_id, photo_path")
+        .in("user_id", userIds),
+      supabase
+        .from("coach_profile_drafts")
+        .select("coach_id, photo_path")
+        .in("coach_id", userIds),
+      supabase
+        .from("coach_profiles_public")
+        .select("coach_id, photo_path")
+        .in("coach_id", userIds),
+    ]);
+    const accountPhotos =
+      accountResult.status === "fulfilled" ? accountResult.value.data ?? [] : [];
+    const coachDrafts =
+      draftResult.status === "fulfilled" ? draftResult.value.data ?? [] : [];
+    const publishedCoaches =
+      publishedResult.status === "fulfilled"
+        ? publishedResult.value.data ?? []
+        : [];
+
+    let adminClient: ReturnType<typeof createAdminClient> | null = null;
+    try {
+      adminClient = createAdminClient();
+    } catch {
+      // Private-photo signing is optional; show the existing initials fallback if unavailable.
     }
+    const photos = await resolveAdminRosterPhotoUrls({
+      userIds,
+      accountPhotos,
+      coachDrafts,
+      publishedCoaches,
+      signBatch: async (bucket, paths) => {
+        if (!adminClient) return [];
+        const storageBucket =
+          bucket === ADMIN_ROSTER_PROFILE_PHOTO_BUCKET
+            ? ADMIN_ROSTER_PROFILE_PHOTO_BUCKET
+            : ADMIN_ROSTER_COACH_PHOTO_BUCKET;
+        const { data } = await adminClient.storage
+          .from(storageBucket)
+          .createSignedUrls([...paths], ADMIN_ROSTER_PHOTO_URL_TTL_SECONDS);
+        return (data ?? []).flatMap((photo) =>
+          photo.path
+            ? [{ path: photo.path, signedUrl: photo.signedUrl }]
+            : [],
+        );
+      },
+    });
+    for (const [userId, url] of photos) photoByUser.set(userId, url);
   }
   const href = (key: Filter) => {
     const next = new URLSearchParams();
