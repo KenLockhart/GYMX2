@@ -1,20 +1,20 @@
-.layout {
+.coach-dashboard {
   display: grid;
   gap: 1.25rem;
 }
 
-.portraitCard,
-.panel {
+.coach-dashboard .portraitCard,
+.coach-dashboard .panel {
   border: 1px solid var(--border);
   background: var(--surface);
 }
 
-.portraitCard {
+.coach-dashboard .portraitCard {
   overflow: hidden;
   border-radius: 1rem;
 }
 
-.photoFrame {
+.coach-dashboard .photoFrame {
   position: relative;
   aspect-ratio: 4 / 5;
   overflow: hidden;
@@ -23,7 +23,7 @@
     linear-gradient(145deg, #20261a, #11140f 62%, #242b1b);
 }
 
-.photoImage {
+.coach-dashboard .photoImage {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -32,7 +32,7 @@
   object-position: center 30%;
 }
 
-.photoFallback {
+.coach-dashboard .photoFallback {
   position: absolute;
   inset: 0;
   display: grid;
@@ -43,7 +43,7 @@
   text-align: center;
 }
 
-.fallbackIcon {
+.coach-dashboard .fallbackIcon {
   display: grid;
   width: 5rem;
   height: 5rem;
@@ -54,13 +54,13 @@
   background: rgb(200 241 53 / 7%);
 }
 
-.portraitCaption {
+.coach-dashboard .portraitCaption {
   display: grid;
   gap: 0.8rem;
   padding: 1.1rem 1.2rem 1.2rem;
 }
 
-.specialties {
+.coach-dashboard .specialties {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -69,7 +69,7 @@
   list-style: none;
 }
 
-.specialty {
+.coach-dashboard .specialty {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.28rem 0.6rem;
@@ -78,37 +78,37 @@
   overflow-wrap: anywhere;
 }
 
-.rightColumn {
+.coach-dashboard .rightColumn {
   min-width: 0;
   display: grid;
   align-content: start;
   gap: 1.35rem;
 }
 
-.actions {
+.coach-dashboard .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
 }
 
-.link:focus-visible,
-.panelLink:focus-visible {
+.coach-dashboard .link:focus-visible,
+.coach-dashboard .panelLink:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
-.panels {
+.coach-dashboard .panels {
   display: grid;
   gap: 0.8rem;
 }
 
-.panel {
+.coach-dashboard .panel {
   min-width: 0;
   border-radius: 0.9rem;
   padding: 1rem;
 }
 
-.panelHeader {
+.coach-dashboard .panelHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -116,7 +116,7 @@
   margin-bottom: 0.8rem;
 }
 
-.panelTitle {
+.coach-dashboard .panelTitle {
   margin: 0;
   color: var(--foreground);
   font-family: var(--font-barlow), system-ui, sans-serif;
@@ -126,7 +126,7 @@
   text-transform: none;
 }
 
-.welcomeTitle {
+.coach-dashboard .welcomeTitle {
   font-family: var(--font-barlow), system-ui, sans-serif;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -134,7 +134,7 @@
   overflow-wrap: anywhere;
 }
 
-.panelList {
+.coach-dashboard .panelList {
   display: grid;
   gap: 0.15rem;
   margin: 0;
@@ -142,7 +142,7 @@
   list-style: none;
 }
 
-.listLink {
+.coach-dashboard .listLink {
   display: grid;
   grid-template-columns: 1.8rem minmax(0, 1fr) auto;
   align-items: start;
@@ -153,20 +153,20 @@
   text-decoration: none;
 }
 
-.listLink:hover {
+.coach-dashboard .listLink:hover {
   background: var(--surface-raised);
 }
 
-.listIcon {
+.coach-dashboard .listIcon {
   color: var(--accent);
   margin-top: 0.1rem;
 }
 
-.listMain {
+.coach-dashboard .listMain {
   min-width: 0;
 }
 
-.listTitle {
+.coach-dashboard .listTitle {
   display: block;
   font-size: 0.85rem;
   font-weight: 650;
@@ -174,7 +174,7 @@
   white-space: normal;
 }
 
-.listMeta {
+.coach-dashboard .listMeta {
   display: block;
   margin-top: 0.25rem;
   color: var(--muted);
@@ -182,7 +182,7 @@
   line-height: 1.4;
 }
 
-.listDate {
+.coach-dashboard .listDate {
   display: block;
   margin-top: 0.3rem;
   color: var(--muted);
@@ -191,40 +191,40 @@
   overflow-wrap: anywhere;
 }
 
-.activityLink {
+.coach-dashboard .activityLink {
   grid-template-columns: 1.8rem minmax(0, 1fr);
 }
 
-.coachName {
+.coach-dashboard .coachName {
   overflow-wrap: anywhere;
 }
 
-.empty,
-.panelError {
+.coach-dashboard .empty,
+.coach-dashboard .panelError {
   margin: 0;
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.5;
 }
 
-.panelError {
+.coach-dashboard .panelError {
   margin-top: 0.55rem;
   color: var(--danger);
 }
 
-.panelLink,
-.link {
+.coach-dashboard .panelLink,
+.coach-dashboard .link {
   color: var(--accent);
   font-size: 0.8rem;
   font-weight: 650;
   text-underline-offset: 3px;
 }
 
-.panelLink {
+.coach-dashboard .panelLink {
   flex-shrink: 0;
 }
 
-.link {
+.coach-dashboard .link {
   display: inline-flex;
   width: fit-content;
   align-items: center;
@@ -232,51 +232,51 @@
 }
 
 @media (min-width: 760px) {
-  .panels {
+  .coach-dashboard .panels {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 899px) {
-  .portraitCard {
+  .coach-dashboard .portraitCard {
     display: grid;
     grid-template-columns: minmax(7rem, 36%) minmax(0, 1fr);
   }
 
-  .photoFrame {
+  .coach-dashboard .photoFrame {
     height: clamp(7rem, 25vw, 12rem);
     aspect-ratio: auto;
   }
 
-  .portraitCaption {
+  .coach-dashboard .portraitCaption {
     align-content: center;
     padding: 0.85rem;
   }
 
-  .photoFallback {
+  .coach-dashboard .photoFallback {
     gap: 0.3rem;
     padding: 0.35rem;
     font-size: 0.7rem;
   }
 
-  .fallbackIcon {
+  .coach-dashboard .fallbackIcon {
     display: none;
   }
 
-  .photoFallback .link {
+  .coach-dashboard .photoFallback .link {
     justify-content: center;
     font-size: 0.7rem;
   }
 }
 
 @media (min-width: 900px) {
-  .layout {
+  .coach-dashboard {
     grid-template-columns: minmax(0, 0.34fr) minmax(0, 0.66fr);
     gap: clamp(1.25rem, 2vw, 2rem);
     align-items: start;
   }
 
-  .photoFrame {
+  .coach-dashboard .photoFrame {
     min-height: 23rem;
   }
 }

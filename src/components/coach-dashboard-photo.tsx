@@ -4,7 +4,6 @@ import Image from "next/image";
 import { UserRound } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import styles from "./coach-dashboard.module.css";
 
 export function CoachDashboardPhoto({
   photoUrl,
@@ -21,7 +20,7 @@ export function CoachDashboardPhoto({
   const hasPhoto = Boolean(photoUrl) && failedUrl !== photoUrl;
 
   return (
-    <div className={styles.photoFrame}>
+    <div className="photoFrame">
       {hasPhoto && (
         <Image
           src={photoUrl!}
@@ -29,17 +28,17 @@ export function CoachDashboardPhoto({
           width={880}
           height={1100}
           unoptimized
-          className={styles.photoImage}
+          className="photoImage"
           onError={() => setFailedUrl(photoUrl)}
         />
       )}
       {!hasPhoto && (
-        <div className={styles.photoFallback}>
-          <span className={styles.fallbackIcon} aria-hidden="true">
+        <div className="photoFallback">
+          <span className="fallbackIcon" aria-hidden="true">
             <UserRound size={40} strokeWidth={1.4} />
           </span>
           <span>{missingLabel}</span>
-          <Link className={styles.link} href="/profile">
+          <Link className="link" href="/profile">
             {addPhotoLabel}
           </Link>
         </div>

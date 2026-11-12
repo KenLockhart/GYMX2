@@ -17,7 +17,6 @@ import type {
   CoachDashboardSession,
 } from "@/lib/coach-dashboard-data";
 import { CoachDashboardPhoto } from "./coach-dashboard-photo";
-import styles from "./coach-dashboard.module.css";
 
 type DashboardCopy = Messages["dashboard"];
 
@@ -51,11 +50,11 @@ function SessionRow({
 }) {
   return (
     <li>
-      <Link className={styles.listLink} href={`/calendar/${session.id}`}>
-        <CalendarDays size={17} className={styles.listIcon} aria-hidden="true" />
-        <span className={styles.listMain}>
-          <span className={styles.listTitle}>{session.title}</span>
-          <span className={styles.listMeta}>
+      <Link className="listLink" href={`/calendar/${session.id}`}>
+        <CalendarDays size={17} className="listIcon" aria-hidden="true" />
+        <span className="listMain">
+          <span className="listTitle">{session.title}</span>
+          <span className="listMeta">
             <SessionTime startsAt={session.starts_at} endsAt={session.ends_at} />
             {session.location && <> · {session.location}</>}
           </span>
@@ -77,14 +76,14 @@ function ActivityRow({
   const Icon = isCheckin ? CheckCircle2 : MessageCircle;
   return (
     <li>
-      <Link className={`${styles.listLink} ${styles.activityLink}`} href={isCheckin ? "/checkins" : `/messages/${item.memberId}`}>
-        <Icon size={17} className={styles.listIcon} aria-hidden="true" />
-        <span className={styles.listMain}>
-          <span className={styles.listTitle}>{item.memberName}</span>
-          <span className={styles.listMeta}>
+      <Link className="listLink activityLink" href={isCheckin ? "/checkins" : `/messages/${item.memberId}`}>
+        <Icon size={17} className="listIcon" aria-hidden="true" />
+        <span className="listMain">
+          <span className="listTitle">{item.memberName}</span>
+          <span className="listMeta">
             {isCheckin ? copy.activityCheckin : copy.activityMessage}
           </span>
-          <span className={styles.listDate}>
+          <span className="listDate">
             <LocalDateTime iso={item.createdAt} />
           </span>
         </span>
@@ -117,44 +116,44 @@ export function CoachDashboard({
   const specialties = profile.specialties.map((specialty) => goals[specialty] ?? specialty);
 
   return (
-    <div className={styles.layout}>
-      <aside className={styles.portraitCard} aria-label={copy.coachProfile}>
+    <div className="coach-dashboard">
+      <aside className="portraitCard" aria-label={copy.coachProfile}>
         <CoachDashboardPhoto
           photoUrl={photoUrl}
           photoAlt={copy.photoAlt(profile.display_name)}
           missingLabel={copy.photoMissing}
           addPhotoLabel={copy.addPhoto}
         />
-        <div className={styles.portraitCaption}>
+        <div className="portraitCaption">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
               {roleLabel}
             </p>
-            <p className={`${styles.coachName} mt-1 font-display text-2xl font-bold leading-tight`}>
+            <p className="coachName mt-1 font-display text-2xl font-bold leading-tight">
               {profile.display_name}
             </p>
           </div>
           {specialties.length > 0 && (
-            <ul className={styles.specialties} aria-label={copy.specialties}>
+            <ul className="specialties" aria-label={copy.specialties}>
               {specialties.map((specialty) => (
-                <li className={styles.specialty} key={specialty}>
+                <li className="specialty" key={specialty}>
                   {specialty}
                 </li>
               ))}
             </ul>
           )}
-          <Link className={styles.link} href="/profile">
+          <Link className="link" href="/profile">
             {copy.editProfile} <ArrowUpRight size={14} aria-hidden="true" />
           </Link>
         </div>
       </aside>
 
-      <div className={styles.rightColumn}>
+      <div className="rightColumn">
         <header>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-accent">
             {roleLabel}
           </p>
-          <h1 className={`${styles.welcomeTitle} mt-1 text-4xl leading-tight sm:text-5xl`}>
+          <h1 className="welcomeTitle mt-1 text-4xl leading-tight sm:text-5xl">
             {copy.coachWelcome(profile.display_name)}
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
@@ -163,10 +162,10 @@ export function CoachDashboard({
         </header>
 
         <section aria-labelledby="coach-quick-actions">
-          <h2 id="coach-quick-actions" className={`${styles.panelTitle} normal-case`}>
+          <h2 id="coach-quick-actions" className="panelTitle normal-case">
             {copy.quickActions}
           </h2>
-          <div className={`${styles.actions} mt-3`}>
+          <div className="actions mt-3">
             <ActionCard href="/tasks/new" label={copy.giveTask} icon={ClipboardPlus} primary />
             <ActionCard href="/library/upload" label={copy.uploadVideo} icon={Video} />
             <ActionCard href="/calendar/new" label={copy.scheduleSession} icon={CalendarDays} />
@@ -174,22 +173,22 @@ export function CoachDashboard({
           </div>
         </section>
 
-        <div className={styles.panels}>
-          <section className={styles.panel} aria-labelledby="coach-upcoming-sessions">
-            <div className={styles.panelHeader}>
-              <h2 id="coach-upcoming-sessions" className={`${styles.panelTitle} normal-case`}>
+        <div className="panels">
+          <section className="panel" aria-labelledby="coach-upcoming-sessions">
+            <div className="panelHeader">
+              <h2 id="coach-upcoming-sessions" className="panelTitle normal-case">
                 {copy.upcomingSessions}
               </h2>
-              <Link className={styles.panelLink} href="/calendar">
+              <Link className="panelLink" href="/calendar">
                 {copy.viewCalendar}
               </Link>
             </div>
             {sessionsError ? (
-              <p className={styles.panelError} role="alert">{copy.dashboardLoadError}</p>
+              <p className="panelError" role="alert">{copy.dashboardLoadError}</p>
             ) : sessions.length === 0 ? (
-              <p className={styles.empty}>{copy.noUpcomingSessions}</p>
+              <p className="empty">{copy.noUpcomingSessions}</p>
             ) : (
-              <ul className={styles.panelList}>
+              <ul className="panelList">
                 {sessions.map((session) => (
                   <SessionRow key={session.id} session={session} />
                 ))}
@@ -197,26 +196,26 @@ export function CoachDashboard({
             )}
           </section>
 
-          <section className={styles.panel} aria-labelledby="coach-member-activity">
-            <div className={styles.panelHeader}>
-              <h2 id="coach-member-activity" className={`${styles.panelTitle} normal-case`}>
+          <section className="panel" aria-labelledby="coach-member-activity">
+            <div className="panelHeader">
+              <h2 id="coach-member-activity" className="panelTitle normal-case">
                 {copy.memberActivity}
               </h2>
-              <Link className={styles.panelLink} href="/members">
+              <Link className="panelLink" href="/members">
                 {copy.viewMembers}
               </Link>
             </div>
             {activity.length === 0 && !activityError ? (
-              <p className={styles.empty}>{copy.noMemberActivity}</p>
+              <p className="empty">{copy.noMemberActivity}</p>
             ) : (
-              <ul className={styles.panelList}>
+              <ul className="panelList">
                 {activity.map((item) => (
                   <ActivityRow key={item.id} item={item} copy={copy} />
                 ))}
               </ul>
             )}
             {activityError && (
-              <p className={styles.panelError} role="alert">{copy.dashboardLoadError}</p>
+              <p className="panelError" role="alert">{copy.dashboardLoadError}</p>
             )}
           </section>
         </div>
