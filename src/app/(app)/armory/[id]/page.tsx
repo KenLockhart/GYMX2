@@ -9,6 +9,7 @@ import {
   orderStatusLabel,
   formatMoney,
   formatPrice,
+  isDisplayOnly,
   publicImageUrl,
 } from "@/lib/armory";
 import { confirmCheckoutSession } from "@/lib/purchases";
@@ -160,7 +161,7 @@ export default async function ArmoryItemPage({
                 </T>
               </p>
             </div>
-          ) : item.kind === "product" ? (
+          ) : item.kind === "product" || item.kind === "preview" ? (
             <div className="space-y-3">
               {returnedSession && hasBought && (
                 <p
@@ -192,7 +193,18 @@ export default async function ArmoryItemPage({
                     : "Free shipping"}
                 </span>
               </p>
-              {isOwner || profile.role === "admin" ? (
+              {isDisplayOnly(item) ? (
+                <div className="space-y-2">
+                  <p role="status" className="rounded-lg border border-accent bg-surface p-3 text-sm">
+                    <T>Coming soon · Not for sale</T>
+                  </p>
+                  {item.sizes.length > 0 && (
+                    <p className="text-sm text-muted">
+                      <T>Sizes</T>: {item.sizes.join(", ")}
+                    </p>
+                  )}
+                </div>
+              ) : isOwner || profile.role === "admin" ? (
                 <p className="text-sm text-muted">
                   {item.sizes.length > 0
                     ? tr("Sizes: {p0} · ", { p0: item.sizes.join(", ") })

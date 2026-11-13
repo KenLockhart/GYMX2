@@ -58,11 +58,11 @@ export default async function EditArmoryItemPage({
               ? ""
               : (data.price_cents / 100).toFixed(2),
           shipping:
-            data.kind === "product"
+            (data.kind === "product" || data.kind === "preview")
               ? (data.shipping_cents / 100).toFixed(2)
               : "",
           sizes:
-            data.kind === "product" ? data.sizes.join(", ") : DEFAULT_SIZES,
+            (data.kind === "product" || data.kind === "preview") ? data.sizes.join(", ") : DEFAULT_SIZES,
           buy_url: data.buy_url ?? "",
           file_path: data.file_path ?? "",
           file_name: data.file_name ?? "",

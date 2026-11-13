@@ -8,7 +8,7 @@ export const ARMORY_CATEGORIES = [
 ] as const;
 
 export type ArmoryCategory = (typeof ARMORY_CATEGORIES)[number]["value"];
-export type ArmoryKind = "link" | "download" | "paid" | "product";
+export type ArmoryKind = "link" | "download" | "paid" | "product" | "preview";
 
 export function categoryLabel(category: string) {
   return ARMORY_CATEGORIES.find((item) => item.value === category)?.label ?? "Other";
@@ -156,4 +156,9 @@ export function orderStatusLabel(order: {
   }
   if (order.fulfillment_status === "to_ship") return "Preparing to ship";
   return "Paid";
+}
+
+// Preview is a distinct kind so even older deployments reject it at checkout.
+export function isDisplayOnly(item: { kind: string }) {
+  return item.kind === "preview";
 }

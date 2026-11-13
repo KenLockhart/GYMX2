@@ -1,6 +1,12 @@
 // Coach tools: affiliate, Armory selling and payouts, check-ins, insights, members, reports,
 // memberships, coach profile editor, credentials and intro times.
 export const coachTools: Record<string, string> = {
+  "Display gear only": "Solo mostrar artículos físicos",
+  "Show a physical product without allowing purchases.": "Muestra un producto físico sin permitir compras.",
+  "Display only: members can view this product, but cannot purchase it.": "Solo mostrar: los miembros pueden ver este producto, pero no comprarlo.",
+  "Coming soon · Not for sale": "Próximamente · No está a la venta",
+  "Sizes": "Tallas",
+
   "Affiliate program": "Programa de afiliados",
   "Earn by bringing people to GYMX2.": "Gana dinero trayendo personas a GYMX2.",
   "Your last application wasn't approved. You're welcome to apply again.":

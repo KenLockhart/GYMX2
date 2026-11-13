@@ -166,7 +166,7 @@ export function ArmoryForm({
   // Choosing gear picks the Gear category; a digital file can't stay in Gear.
   function chooseKind(next: ArmoryKind) {
     setKind(next);
-    if (next === "product") setCategory("gear");
+    if (next === "product" || next === "preview") setCategory("gear");
     else if ((next === "download" || next === "paid") && category === "gear")
       setCategory("other");
   }
@@ -200,6 +200,11 @@ export function ArmoryForm({
         <div className="grid gap-2 sm:grid-cols-2">
           {(
             [
+              [
+                "preview",
+                "Display gear only",
+                "Show a physical product without allowing purchases.",
+              ],
               [
                 "link",
                 "Buy it elsewhere",
@@ -295,9 +300,9 @@ export function ArmoryForm({
         />
       </label>
 
-      {kind === "product" ? (
+      {kind === "product" || kind === "preview" ? (
         <>
-          {payouts === "missing" && (
+          {kind === "product" && payouts === "missing" && (
             <p
               role="status"
               className="rounded-lg border border-accent bg-surface p-3 text-sm"
@@ -307,6 +312,11 @@ export function ArmoryForm({
                 <T>Set up payouts</T>
               </Link>
               <T>. You can save the item now.</T>
+            </p>
+          )}
+          {kind === "preview" && (
+            <p role="status" className="rounded-lg border border-accent bg-surface p-3 text-sm">
+              <T>Display only: members can view this product, but cannot purchase it.</T>
             </p>
           )}
           <div className="grid gap-4 sm:grid-cols-2">

@@ -71,9 +71,9 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     };
   }
   // Gear only: a flat shipping fee (blank means free) and the sizes a buyer chooses from.
-  const shipping_cents = kind === "product" ? (parsePrice(String(formData.get("shipping") ?? "")) ?? 0) : 0;
+  const shipping_cents = (kind === "product" || kind === "preview") ? (parsePrice(String(formData.get("shipping") ?? "")) ?? 0) : 0;
   if (Number.isNaN(shipping_cents)) return { error: "Enter the shipping fee like 5.99, or 0 for free shipping." };
-  const sizes = kind === "product" ? parseSizes(String(formData.get("sizes") ?? "")) : [];
+  const sizes = (kind === "product" || kind === "preview") ? parseSizes(String(formData.get("sizes") ?? "")) : [];
 
   const parsed = armoryItemSchema.safeParse({
     kind,
@@ -111,8 +111,8 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     file_name: item.kind === "download" || item.kind === "paid" ? item.file_name : null,
     image_path: item.image_path,
     visible_to_all: item.visible_to_all,
-    sizes: item.kind === "product" ? item.sizes : [],
-    shipping_cents: item.kind === "product" ? item.shipping_cents : 0,
+    sizes: (item.kind === "product" || item.kind === "preview") ? item.sizes : [],
+    shipping_cents: (item.kind === "product" || item.kind === "preview") ? item.shipping_cents : 0,
   };
 
   const supabase = await createClient();

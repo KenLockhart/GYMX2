@@ -6,6 +6,7 @@ import {
   categoryLabel,
   formatPrice,
   isCategory,
+  isDisplayOnly,
   publicImageUrl,
 } from "@/lib/armory";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -176,6 +177,11 @@ export default async function ArmoryPage({
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    {isDisplayOnly(item) && (
+                      <p className="text-sm font-semibold text-accent">
+                        <T>Coming soon · Not for sale</T>
+                      </p>
+                    )}
                     {item.coach_id === profile.id && (
                       <p className="text-xs text-muted">
                         {item.visible_to_all

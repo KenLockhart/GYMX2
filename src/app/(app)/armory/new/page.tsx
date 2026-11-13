@@ -34,8 +34,8 @@ export default async function NewArmoryItemPage() {
         payouts={payouts}
         initial={{
           id: "",
-          kind: "link",
-          category: "ebook",
+          kind: profile.role === "admin" ? "preview" : "link",
+          category: profile.role === "admin" ? "gear" : "ebook",
           title: "",
           description: "",
           price: "",

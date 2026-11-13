@@ -103,6 +103,8 @@ export async function buyArmoryItem(_: CheckoutState, formData: FormData): Promi
     ArmoryItem,
     "id" | "coach_id" | "kind" | "title" | "price_cents" | "sizes" | "shipping_cents"
   >) | null;
+  // Preview gear is deliberately not in this allowlist. Never create a Stripe
+  // session for it, even if a caller submits the server action directly.
   if (
     !sellable ||
     (sellable.kind !== "paid" && sellable.kind !== "product") ||

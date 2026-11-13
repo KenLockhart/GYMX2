@@ -87,7 +87,7 @@ export type Message = {
 export type ArmoryItem = {
   id: string;
   coach_id: string;
-  kind: "link" | "download" | "paid" | "product";
+  kind: "link" | "download" | "paid" | "product" | "preview";
   sizes: string[];
   shipping_cents: number;
   category: string;
