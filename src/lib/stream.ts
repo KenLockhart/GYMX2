@@ -25,6 +25,38 @@ function requireStreamEnv() {
   return env;
 }
 
+function getLiveStreamEnv() {
+  const override = {
+    accountId: process.env.CLOUDFLARE_LIVE_ACCOUNT_ID,
+    token: process.env.CLOUDFLARE_LIVE_STREAM_TOKEN,
+    customerCode: process.env.CLOUDFLARE_LIVE_CUSTOMER_CODE,
+  };
+  const hasOverride = Object.values(override).some(
+    (value) => value !== undefined,
+  );
+  if (hasOverride) {
+    return Object.values(override).every(
+      (value) => typeof value === "string" && value.length > 0,
+    )
+      ? {
+          accountId: override.accountId!,
+          token: override.token!,
+          customerCode: override.customerCode!,
+        }
+      : null;
+  }
+  return getStreamEnv();
+}
+
+function requireLiveStreamEnv() {
+  const env = getLiveStreamEnv();
+  if (!env)
+    throw new Error(
+      "Missing complete Cloudflare Live Stream settings. See .env.example.",
+    );
+  return env;
+}
+
 function streamRequest(path: string, init: RequestInit = {}) {
   const { accountId, token } = requireStreamEnv();
   return fetch(
@@ -35,6 +67,48 @@ function streamRequest(path: string, init: RequestInit = {}) {
       cache: "no-store",
     },
   );
+}
+
+function liveStreamRequest(path: string, init: RequestInit = {}) {
+  const { accountId, token } = requireLiveStreamEnv();
+  return fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream${path}`,
+    {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, ...init.headers },
+      cache: "no-store",
+    },
+  );
+}
+
+export function isLiveStreamConfigured() {
+  return getLiveStreamEnv() !== null;
+}
+
+export function hasDedicatedLiveStreamConfig() {
+  return [
+    process.env.CLOUDFLARE_LIVE_ACCOUNT_ID,
+    process.env.CLOUDFLARE_LIVE_STREAM_TOKEN,
+    process.env.CLOUDFLARE_LIVE_CUSTOMER_CODE,
+  ].every((value) => typeof value === "string" && value.length > 0);
+}
+
+export function getLiveStreamCustomerCode() {
+  const env = getLiveStreamEnv();
+  if (!env)
+    throw new Error(
+      "Missing complete Cloudflare Live Stream settings. See .env.example.",
+    );
+  return env.customerCode;
+}
+
+export function getLiveStreamAccountId() {
+  const env = getLiveStreamEnv();
+  if (!env)
+    throw new Error(
+      "Missing complete Cloudflare Live Stream settings. See .env.example.",
+    );
+  return env.accountId;
 }
 
 // The browser sends the file straight to this one-time address, so the API token never leaves the server.
@@ -133,11 +207,20 @@ export async function deleteVideo(uid: string) {
 
 // Live inputs for coach broadcasts. The browser publishes over WebRTC (WHIP) and viewers play
 // over WebRTC (WHEP). Cloudflare doesn't record WebRTC broadcasts.
-export async function createLiveInput(name: string) {
-  const response = await streamRequest("/live_inputs", {
+export async function createLiveInput(
+  name: string,
+  options: { privatePlayback?: boolean } = {},
+) {
+  const response = await liveStreamRequest("/live_inputs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ meta: { name }, recording: { mode: "off" } }),
+    body: JSON.stringify({
+      meta: { name },
+      recording: {
+        mode: "off",
+        ...(options.privatePlayback ? { requireSignedURLs: true } : {}),
+      },
+    }),
   });
   if (!response.ok)
     throw new Error(
@@ -152,7 +235,7 @@ export async function createLiveInput(name: string) {
 
 // The secret address the coach's browser streams to. Only ever sent to the session's coach.
 export async function getLiveIngestUrl(uid: string) {
-  const response = await streamRequest(`/live_inputs/${uid}`);
+  const response = await liveStreamRequest(`/live_inputs/${encodeURIComponent(uid)}`);
   if (!response.ok)
     throw new Error(
       `Cloudflare couldn't open the live room (${response.status}).`,
@@ -164,8 +247,37 @@ export async function getLiveIngestUrl(uid: string) {
   return url;
 }
 
+// Private cleanup can retry after a delete request succeeded but its database acknowledgement
+// failed. Read only the harmless metadata name to confirm an existing UID still belongs to the
+// exact cleanup job before trying another delete; never return provider URLs or credentials.
+export async function getLiveInputMetaName(uid: string): Promise<string | null> {
+  if (!uid || uid.length > 64)
+    throw new Error("A valid live input identifier is required.");
+  const response = await liveStreamRequest(
+    `/live_inputs/${encodeURIComponent(uid)}`,
+  );
+  if (response.status === 404) return null;
+  if (!response.ok)
+    throw new Error(
+      `Cloudflare couldn't check the live room (${response.status}).`,
+    );
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== "object")
+    throw new Error("Cloudflare returned invalid live room metadata.");
+  const result = (payload as { result?: unknown }).result;
+  if (!result || typeof result !== "object")
+    throw new Error("Cloudflare returned invalid live room metadata.");
+  const meta = (result as { meta?: unknown }).meta;
+  if (!meta || typeof meta !== "object")
+    throw new Error("Cloudflare returned invalid live room metadata.");
+  const name = (meta as { name?: unknown }).name;
+  if (typeof name !== "string")
+    throw new Error("Cloudflare returned invalid live room metadata.");
+  return name;
+}
+
 export async function deleteLiveInput(uid: string) {
-  const response = await streamRequest(`/live_inputs/${uid}`, {
+  const response = await liveStreamRequest(`/live_inputs/${encodeURIComponent(uid)}`, {
     method: "DELETE",
   });
   if (!response.ok && response.status !== 404) {
@@ -173,6 +285,64 @@ export async function deleteLiveInput(uid: string) {
       `Cloudflare couldn't close the live room (${response.status}).`,
     );
   }
+}
+
+// Reconcile an expired provider-provision lease that failed before its UID could be
+// persisted. Cloudflare's Live Inputs list endpoint does not document cursor/page
+// parameters, so do one bounded API list request with include_counts and fail closed
+// unless Cloudflare confirms the returned row count is complete. The caller must keep
+// cleanup pending otherwise; absence was not established safely.
+export async function findLiveInputsByMetaName(metaName: string): Promise<string[]> {
+  if (!metaName || metaName.length > 120)
+    throw new Error("A valid live input metadata name is required.");
+
+  const response = await liveStreamRequest("/live_inputs?include_counts=true");
+  if (!response.ok)
+    throw new Error(
+      `Cloudflare couldn't list live rooms (${response.status}).`,
+    );
+
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== "object")
+    throw new Error("Cloudflare returned an invalid live room list.");
+  const result = (payload as { result?: unknown }).result;
+  if (!result || typeof result !== "object")
+    throw new Error("Cloudflare returned an invalid live room list.");
+  const list = result as {
+    liveInputs?: unknown;
+    total?: unknown;
+  };
+  if ((payload as { success?: unknown }).success === false)
+    throw new Error("Cloudflare couldn't list live rooms.");
+  if (!Array.isArray(list.liveInputs))
+    throw new Error("Cloudflare returned an invalid live room list.");
+
+  const returnedCount = list.liveInputs.length;
+  const total = typeof list.total === "number" ? list.total : null;
+  if (total === null || !Number.isSafeInteger(total) || total < 0)
+    throw new Error("Cloudflare didn't confirm the live room count.");
+  if (total !== returnedCount) {
+    throw new Error("Cloudflare's live room list was incomplete.");
+  }
+
+  const matches: string[] = [];
+  for (const item of list.liveInputs) {
+    if (!item || typeof item !== "object") continue;
+    const candidate = item as {
+      meta?: unknown;
+      uid?: unknown;
+    };
+    if (
+      !candidate.meta ||
+      typeof candidate.meta !== "object" ||
+      (candidate.meta as { name?: unknown }).name !== metaName
+    )
+      continue;
+    if (typeof candidate.uid !== "string" || !candidate.uid)
+      throw new Error("Cloudflare returned a live room without an identifier.");
+    matches.push(candidate.uid);
+  }
+  return matches;
 }
 
 // Who started an upload (set from the signed-in person when the upload began).
