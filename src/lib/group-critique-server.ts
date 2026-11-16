@@ -247,6 +247,8 @@ export async function readGroupCritiqueSnapshot(
   }
   const access = await authorizedForSession(user, admin, actor, parsed.data.sessionId);
   if (!access.ok) return fail(access.error);
+  const coachId = zUuid(access.session.coach_id);
+  if (!coachId) return fail("temporarily_unavailable");
   const runtime = await providerRuntime();
   const { data, error } = await user.rpc("read_group_critique_room", {
     p_session_id: parsed.data.sessionId,
@@ -306,25 +308,27 @@ export async function readGroupCritiqueSnapshot(
     return fail("temporarily_unavailable");
 
   const participantTags = new Map<string, string>();
-  if (runtime && currentRows.length) {
+  if (runtime) {
     let providerQuery = runtime.admin
       .from("group_critique_provider_participants")
       .select("actor_id,idempotency_key,participant_epoch,state")
       .eq("session_id", parsed.data.sessionId)
       .eq("generation", generation);
-    if (actor.role === "member") providerQuery = providerQuery.eq("actor_id", actor.id);
+    if (actor.role === "member")
+      providerQuery = providerQuery.in("actor_id", [actor.id, coachId]);
     const { data: providerRows, error: providerError } = await providerQuery;
     if (providerError || !Array.isArray(providerRows)) return fail("temporarily_unavailable");
+    const allowedActorIds = actor.role === "member" ? new Set([actor.id, coachId]) : null;
     for (const providerRow of providerRows) {
       if (!isRecord(providerRow)) return fail("temporarily_unavailable");
       const actorId = zUuid(providerRow.actor_id);
+      if (!actorId || (allowedActorIds && !allowedActorIds.has(actorId))) continue;
+      if (providerRow.state !== "ready") continue;
       const idempotency = zUuid(providerRow.idempotency_key);
       const epoch = Number(providerRow.participant_epoch);
-      if (!actorId || !idempotency || !Number.isSafeInteger(epoch) || epoch < 0 ||
-          !["ready", "provisioning", "remove_pending", "removed"].includes(String(providerRow.state)))
+      if (!idempotency || !Number.isSafeInteger(epoch) || epoch < 0 || participantTags.has(actorId))
         return fail("temporarily_unavailable");
-      if (providerRow.state === "ready")
-        participantTags.set(actorId, expectedParticipantId(idempotency, epoch));
+      participantTags.set(actorId, expectedParticipantId(idempotency, epoch));
     }
   }
   const snapshotInput: GroupCritiqueSnapshot = {
@@ -333,6 +337,7 @@ export async function readGroupCritiqueSnapshot(
     state: parsedRows[0].roomState as GroupCritiqueSnapshot["state"],
     joinExpiresAt: parsedRows[0].joinExpiresAt,
     role: actor.role,
+    coachCustomParticipantId: participantTags.get(coachId) ?? null,
     allMembersMuted: parsedRows[0].allMembersMuted as boolean,
     members: currentRows.map((row) => ({
       memberId: row.memberId as string,

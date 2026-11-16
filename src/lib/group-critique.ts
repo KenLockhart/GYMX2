@@ -61,6 +61,7 @@ export const groupCritiqueSnapshotSchema = z.object({
   state: groupCritiqueRoomStateSchema,
   joinExpiresAt: z.iso.datetime(),
   role: z.enum(["coach", "member"]),
+  coachCustomParticipantId: z.string().min(1).max(160).nullable(),
   allMembersMuted: z.boolean(),
   members: z.array(groupCritiqueSnapshotMemberSchema).max(30),
 });

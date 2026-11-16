@@ -9,6 +9,7 @@ import {
   groupCritiqueCirclePositions,
   groupCritiqueCircleStyle,
   groupCritiqueMobilePage,
+  partitionGroupCritiquePeers,
   queueGroupMutePolicy,
   shouldLeaveGroupMeeting,
   toggleSessionMemberSelection,
@@ -84,6 +85,65 @@ describe("session invite cap", () => {
 });
 
 describe("group participant identity helpers", () => {
+  it("matches and removes a coach with the authoritative tag even when isHost is false", () => {
+    const taggedCoach = {
+      customParticipantId: "coach-session:3",
+      isHost: false,
+      name: "Coach",
+    };
+    const member = {
+      customParticipantId: "member-session:1",
+      isHost: false,
+      name: "Member",
+    };
+
+    expect(
+      partitionGroupCritiquePeers([taggedCoach, member], "coach-session:3"),
+    ).toEqual({ coach: taggedCoach, members: [member] });
+  });
+
+  it("does not classify a host-flagged or coach-named peer with the wrong tag", () => {
+    const spoofedPeer = {
+      customParticipantId: "member-session:1",
+      isHost: true,
+      name: "Coach",
+    };
+
+    expect(
+      partitionGroupCritiquePeers([spoofedPeer], "coach-session:3"),
+    ).toEqual({ coach: null, members: [spoofedPeer] });
+  });
+
+  it.each([null, ""])(
+    "leaves all peers in the member set when the coach tag is %s",
+    (coachCustomParticipantId) => {
+      const peers = [
+        { customParticipantId: null },
+        { customParticipantId: "" },
+        { customParticipantId: "coach-session:3" },
+      ];
+
+      expect(
+        partitionGroupCritiquePeers(peers, coachCustomParticipantId),
+      ).toEqual({ coach: null, members: peers });
+    },
+  );
+
+  it("selects the peer matching an updated coach tag", () => {
+    const oldCoach = { customParticipantId: "coach-session:2", name: "Old" };
+    const currentCoach = { customParticipantId: "coach-session:3", name: "Current" };
+    const peers = [oldCoach, currentCoach];
+
+    expect(partitionGroupCritiquePeers(peers, "coach-session:2")).toEqual({
+      coach: oldCoach,
+      members: [currentCoach],
+    });
+    expect(partitionGroupCritiquePeers(peers, "coach-session:3")).toEqual({
+      coach: currentCoach,
+      members: [oldCoach],
+    });
+  });
+
   it("requires a provider tag from the current consent epoch", () => {
     expect(groupCritiqueParticipantEpochMatches("opaque-id:4", 4)).toBe(true);
     expect(groupCritiqueParticipantEpochMatches("opaque-id:3", 4)).toBe(false);

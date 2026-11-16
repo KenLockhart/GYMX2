@@ -33,6 +33,7 @@ import {
   groupCritiqueCircleStyle,
   groupCritiqueMobilePage,
   groupCritiqueParticipantEpochMatches,
+  partitionGroupCritiquePeers,
   queueGroupMutePolicy,
   shouldLeaveGroupMeeting,
   type GroupMutePolicy,
@@ -782,7 +783,10 @@ function GroupCritiqueRoom({
   }, [isCoach, meeting, muteRetry, peers, snapshot.members, snapshotFresh, t.actionError]);
 
   const ownTrack = meeting?.self.videoEnabled ? meeting.self.videoTrack : null;
-  const remoteCoach = peers.find((peer) => peer.isHost) ?? null;
+  const remoteCoach = partitionGroupCritiquePeers(
+    peers,
+    snapshot.coachCustomParticipantId,
+  ).coach;
   const centerTile = isCoach
     ? { key: "coach", name: coachName || t.coach, participant: null, track: ownTrack }
     : {
@@ -796,7 +800,10 @@ function GroupCritiqueRoom({
       };
 
   const circleMembers: CircleMember[] = useMemo(() => {
-    const remoteMembers = peers.filter((peer) => !peer.isHost);
+    const remoteMembers = partitionGroupCritiquePeers(
+      peers,
+      snapshot.coachCustomParticipantId,
+    ).members;
     if (isCoach) {
       return snapshot.members
         .filter((member) => member.membershipState !== "removed")
@@ -855,6 +862,7 @@ function GroupCritiqueRoom({
     memberIsMuted,
     ownMember,
     peers,
+    snapshot.coachCustomParticipantId,
     snapshot.members,
     youLabel,
   ]);

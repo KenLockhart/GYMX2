@@ -86,6 +86,27 @@ export function groupCritiqueParticipantEpochMatches(
   return Number.isSafeInteger(epoch) && epoch === participantEpoch;
 }
 
+export function partitionGroupCritiquePeers<T extends {
+  customParticipantId?: string | null;
+}>(
+  peers: readonly T[],
+  coachCustomParticipantId: string | null | undefined,
+): { coach: T | null; members: T[] } {
+  const hasCoachIdentity =
+    typeof coachCustomParticipantId === "string" &&
+    coachCustomParticipantId.length > 0;
+  const isCoach = (peer: T) =>
+    hasCoachIdentity &&
+    typeof peer.customParticipantId === "string" &&
+    peer.customParticipantId.length > 0 &&
+    peer.customParticipantId === coachCustomParticipantId;
+
+  return {
+    coach: peers.find(isCoach) ?? null,
+    members: peers.filter((peer) => !isCoach(peer)),
+  };
+}
+
 export function countUniqueLiveParticipants(
   remoteUserIds: readonly string[],
   ownUserId: string,

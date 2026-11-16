@@ -50,11 +50,13 @@ const joinExpiry = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
 function makeAdmin(options: {
   invited?: boolean;
+  sessionCoachId?: string;
   providerState?: unknown;
   rpcHandlers?: Record<string, unknown | (() => unknown)>;
 } = {}) {
   const handlers = options.rpcHandlers ?? {};
   const rpcCalls: { name: string; args?: Record<string, unknown> }[] = [];
+  const queries: { table: string; method: string; args: unknown[] }[] = [];
   const rpc = vi.fn(async (name: string, args?: Record<string, unknown>) => {
     rpcCalls.push({ name, args });
     const configured = handlers[name];
@@ -67,7 +69,7 @@ function makeAdmin(options: {
   const from = vi.fn((table: string) => {
     let result: unknown = null;
     if (table === "calendar_sessions") {
-      result = { id: sessionId, coach_id: coachId, live_mode: "broadcast" };
+      result = { id: sessionId, coach_id: options.sessionCoachId ?? coachId, live_mode: "broadcast" };
     } else if (table === "session_invites" && options.invited !== false) {
       result = { member_id: memberId };
     } else if (table === "profiles") {
@@ -77,14 +79,17 @@ function makeAdmin(options: {
     }
     const query: Record<string, unknown> = {};
     for (const method of ["select", "eq", "in", "limit"]) {
-      query[method] = vi.fn(() => query);
+      query[method] = vi.fn((...args: unknown[]) => {
+        queries.push({ table, method, args });
+        return query;
+      });
     }
     query.maybeSingle = vi.fn(async () => ({ data: result, error: null }));
     query.then = (resolve: (value: unknown) => unknown) =>
       Promise.resolve({ data: Array.isArray(result) ? result : result ? [result] : [], error: null }).then(resolve);
     return query;
   });
-  return { rpc, from, rpcCalls };
+  return { rpc, from, rpcCalls, queries };
 }
 
 function makeUser(rpcResult: unknown = { data: null, error: null }) {
@@ -118,11 +123,14 @@ describe("group critique server authorization and races", () => {
   });
 
   it("returns an accepted member's own opaque participant tag without other members' tags", async () => {
+    const coachIdempotencyKey = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const providerState = [
+      { actor_id: memberId, idempotency_key: idempotencyKey, participant_epoch: 4, state: "ready" },
+      { actor_id: coachId, idempotency_key: coachIdempotencyKey, participant_epoch: 0, state: "ready" },
+      { actor_id: "5d3501bb-1970-46cd-b064-250858c1b6ee", idempotency_key: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", participant_epoch: 1, state: "ready" },
+    ];
     const admin = makeAdmin({
-      providerState: [
-        { actor_id: memberId, idempotency_key: idempotencyKey, participant_epoch: 4, state: "ready" },
-        { actor_id: coachId, idempotency_key: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", participant_epoch: 0, state: "ready" },
-      ],
+      providerState,
     });
     mocks.createAdminClient.mockReturnValue(admin);
     const user = makeUser({
@@ -152,6 +160,99 @@ describe("group critique server authorization and races", () => {
     expect(result.snapshot?.members).toHaveLength(1);
     expect(result.snapshot?.members[0].customParticipantId).toBe(participantTag);
     expect(result.snapshot?.members[0].memberId).toBe(memberId);
+    expect(result.snapshot?.coachCustomParticipantId).toBe(`${coachIdempotencyKey}:0`);
+    expect(admin.queries).toContainEqual({
+      table: "group_critique_provider_participants",
+      method: "in",
+      args: ["actor_id", [memberId, coachId]],
+    });
+
+    (providerState[1] as { state: string }).state = "removed";
+    const removedCoach = await readGroupCritiqueSnapshot(
+      user as never,
+      { id: memberId, role: "member" },
+      sessionId,
+    );
+    expect(removedCoach.ok).toBe(true);
+    if (removedCoach.ok) expect(removedCoach.snapshot?.coachCustomParticipantId).toBeNull();
+  });
+
+  it("queries the coach identity for an empty coach roster and ignores unrelated provider rows", async () => {
+    const coachIdempotencyKey = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const admin = makeAdmin({
+      providerState: [
+        { actor_id: coachId, idempotency_key: coachIdempotencyKey, participant_epoch: 0, state: "ready" },
+        { actor_id: memberId, idempotency_key: idempotencyKey, participant_epoch: 4, state: "ready" },
+      ],
+    });
+    mocks.createAdminClient.mockReturnValue(admin);
+    const user = makeUser({
+      data: [{
+        generation: 4,
+        room_state: "open",
+        join_expires_at: joinExpiry,
+        all_members_muted: false,
+        member_id: null,
+        membership_state: null,
+        offered_at: null,
+        camera_allowed: false,
+        microphone_allowed: false,
+        coach_muted: false,
+        participant_epoch: 0,
+      }],
+      error: null,
+    });
+
+    const result = await readGroupCritiqueSnapshot(
+      user as never,
+      { id: coachId, role: "coach" },
+      sessionId,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot?.members).toEqual([]);
+    expect(result.snapshot?.coachCustomParticipantId).toBe(`${coachIdempotencyKey}:0`);
+    expect(admin.queries).toContainEqual({
+      table: "group_critique_provider_participants",
+      method: "eq",
+      args: ["generation", 4],
+    });
+    expect(admin.queries).not.toContainEqual(expect.objectContaining({
+      table: "group_critique_provider_participants",
+      method: "in",
+      args: expect.arrayContaining(["actor_id"]),
+    }));
+  });
+
+  it("fails closed when the authorized session has no valid coach UUID", async () => {
+    const admin = makeAdmin({ sessionCoachId: "not-a-uuid" });
+    mocks.createAdminClient.mockReturnValue(admin);
+    const result = await readGroupCritiqueSnapshot(
+      makeUser({
+        data: [{
+          generation: 4,
+          room_state: "open",
+          join_expires_at: joinExpiry,
+          all_members_muted: false,
+          member_id: memberId,
+          membership_state: "eligible",
+          offered_at: null,
+          camera_allowed: false,
+          microphone_allowed: false,
+          coach_muted: false,
+          participant_epoch: 4,
+        }],
+        error: null,
+      }) as never,
+      { id: memberId, role: "member" },
+      sessionId,
+    );
+
+    expect(result).toEqual({ ok: false, error: "temporarily_unavailable" });
+    expect(admin.queries).not.toContainEqual(expect.objectContaining({
+      table: "group_critique_provider_participants",
+    }));
   });
 
   it("does not call provider readiness or issue credentials for a non-invited member", async () => {
