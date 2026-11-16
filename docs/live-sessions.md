@@ -36,8 +36,15 @@ account settings for private live. Existing VOD configuration remains on the leg
 
 ## Verification status (2026-11-15)
 
-The private-live database migration has been applied to the verified hosted Supabase project. A
-provider-only test against Cloudflare account `6bd04970867bcfdeae0e5768cb8239c5` created one tagged
+Both private-live database migrations (`20261115010000_private_live_sessions` and
+`20261115020000_private_live_provider_state_read`) have been applied to the verified hosted Supabase
+project. The second migration grants `service_role` SELECT only on
+`private_live_provider_state`, which lets the backend inspect existing provider state for input
+reuse and initial-state checks. Direct provider-state INSERT, UPDATE, and DELETE remain denied to
+`service_role`; authenticated and anonymous clients cannot SELECT the table. Provider-state changes
+remain limited to the service-only lifecycle RPCs.
+
+A provider-only test against Cloudflare account `6bd04970867bcfdeae0e5768cb8239c5` created one tagged
 live input with recording disabled and signed playback required. Its WHIP publish address used a
 separate secret from the input UID; its WHEP playback address used the input UID. A synthetic
 video-and-audio stream published over WHIP and played through short-lived signed WHEP; the unsigned
@@ -106,7 +113,8 @@ than three minutes old, after which the database rejects private-mode and media 
 
 Use this order for each deployment environment:
 
-1. Confirm the reviewed database migration is applied to the target Supabase project.
+1. Confirm both reviewed private-live migrations (`20261115010000` and `20261115020000`) are applied
+   to the target Supabase project.
 2. Set the dedicated live and signing-key variables in the matching Vercel project/environment.
 3. Deploy the application containing the cleanup endpoint and confirm the deployment is ready.
 4. Configure the Vault secret and minutely `pg_cron` + `pg_net` request. Do not install the

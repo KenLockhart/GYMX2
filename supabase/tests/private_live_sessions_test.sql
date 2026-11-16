@@ -207,15 +207,33 @@ select throws_ok(
   'admins cannot read provider identifiers'
 );
 reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"71000000-0000-0000-0000-000000000003","role":"authenticated"}';
+select throws_ok(
+  $$select session_id, direction, state from public.private_live_provider_state$$,
+  '42501', null,
+  'authenticated participants cannot read provider state directly'
+);
+reset role;
 set local role anon;
 select throws_ok(
   $$select grant_id from public.private_session_grants$$,
   '42501', null,
   'anonymous users cannot read private grants'
 );
+select throws_ok(
+  $$select session_id, direction, state from public.private_live_provider_state$$,
+  '42501', null,
+  'anonymous users cannot read provider state'
+);
 reset role;
 
 set local role service_role;
+select lives_ok(
+  $$select session_id, direction, state from public.private_live_provider_state
+    where session_id = '71000000-0000-0000-0000-000000000101' and direction = 'coach'$$,
+  'service can perform an empty session-and-direction provider-state read'
+);
 select throws_ok(
   $$select public.claim_private_live_provision('71000000-0000-0000-0000-000000000101',
     (select grant_id from pg_temp.private_live_test_data where label = 'offer_a'),
@@ -234,6 +252,18 @@ select throws_ok(
       (select grant_id from pg_temp.private_live_test_data where label = 'offer_a'), 1, 'coach', 'direct-write', 'ready')$$,
   '42501', null,
   'service role cannot bypass provider lifecycle RPCs with direct writes'
+);
+select throws_ok(
+  $$update public.private_live_provider_state set state = 'revoked'
+    where session_id = '71000000-0000-0000-0000-000000000101'$$,
+  '42501', null,
+  'service role cannot update provider state directly'
+);
+select throws_ok(
+  $$delete from public.private_live_provider_state
+    where session_id = '71000000-0000-0000-0000-000000000101'$$,
+  '42501', null,
+  'service role cannot delete provider state directly'
 );
 reset role;
 
@@ -288,6 +318,13 @@ select is(
   ),
   true,
   'current coach provision completion is accepted'
+);
+select is(
+  (select state from public.private_live_provider_state
+    where session_id = '71000000-0000-0000-0000-000000000104'
+      and generation = 1 and direction = 'coach'),
+  'ready',
+  'service can read the selected provider-state row after provisioning'
 );
 select is(
   public.mark_private_live_started(
