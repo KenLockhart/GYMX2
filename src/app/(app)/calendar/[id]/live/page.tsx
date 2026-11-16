@@ -3,12 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SessionTime } from "@/components/calendar-parts";
 import { LiveRoom } from "@/components/live-room";
+import {
+  PrivateLiveRoom,
+  PrivateOneOnOneOffer,
+} from "@/components/private-live-room";
 import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { canGoLive } from "@/lib/live";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
+import { readPrivateLiveSession } from "./private-actions";
 import type { LiveChatMessage } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -26,14 +31,95 @@ export default async function LivePage({
 
   // Row security: only the coach, invited members and admins can open the session.
   const supabase = await createClient();
-  const { data: session } = await supabase
+  const { data: session, error: sessionError } = await supabase
     .from("calendar_sessions")
     .select(
-      "id, coach_id, title, starts_at, ends_at, session_invites(member_id)",
+      "id, coach_id, title, starts_at, ends_at, live_mode, session_invites(member_id, response)",
     )
     .eq("id", id)
     .maybeSingle();
-  if (!session) notFound();
+  if (sessionError || !session) notFound();
+
+  // Members can't read each other's profiles, so the server shares just the names.
+  const invites = session.session_invites ?? [];
+  const inviteeIds = invites.map((row) => row.member_id as string);
+  const isCoach = session.coach_id === profile.id;
+  const invited = inviteeIds.includes(profile.id);
+  const privateMemberId = inviteeIds.length === 1 ? inviteeIds[0] : null;
+
+  const { data: people } = await createAdminClient()
+    .from("profiles")
+    .select("id, display_name")
+    .in("id", [session.coach_id as string, ...inviteeIds]);
+  const names = Object.fromEntries(
+    (people ?? []).map((person) => [
+      person.id as string,
+      person.display_name as string,
+    ]),
+  );
+
+  const all = (await getT()).calendar;
+  const t = all.live;
+  const coachName = names[session.coach_id as string];
+
+  if (session.live_mode === "one_on_one") {
+    // Never read or forward the group session_live playback URL for private sessions.
+    if (
+      !isCoach &&
+      privateMemberId !== profile.id
+    )
+      notFound();
+    const privateSnapshot = await readPrivateLiveSession(id);
+    if (!privateSnapshot.ok || privateSnapshot.mode !== "one_on_one")
+      notFound();
+    const { data: privateChat } = await supabase
+      .from("live_chat_messages")
+      .select("id, session_id, sender_id, body, created_at")
+      .eq("session_id", id)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const memberName = privateMemberId
+      ? names[privateMemberId] ?? t.private.otherParticipant
+      : t.private.otherParticipant;
+    const otherName = isCoach
+      ? memberName
+      : coachName ?? t.private.otherParticipant;
+
+    return (
+      <div className="space-y-6">
+        <Link href={`/calendar/${session.id}`} className="text-link text-sm">
+          {all.edit.back}
+        </Link>
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-widest text-accent">
+            {!isCoach && coachName ? t.liveWith(coachName) : t.private.title}
+          </p>
+          <h1 className="mt-1 text-4xl sm:text-5xl">{session.title}</h1>
+          <p className="mt-2 text-muted">
+            <SessionTime
+              startsAt={session.starts_at as string}
+              endsAt={session.ends_at as string}
+            />
+          </p>
+        </div>
+        <PrivateLiveRoom
+          key={session.id as string}
+          sessionId={session.id as string}
+          startsAt={session.starts_at as string}
+          endsAt={session.ends_at as string}
+          me={profile.id}
+          coachId={session.coach_id as string}
+          otherName={otherName}
+          memberId={privateMemberId}
+          memberName={memberName}
+          canChat={isCoach || invited}
+          names={names}
+          initialChat={((privateChat ?? []) as LiveChatMessage[]).reverse()}
+          initialSnapshot={{ mode: privateSnapshot.mode, grant: privateSnapshot.grant }}
+        />
+      </div>
+    );
+  }
 
   const [{ data: room }, { data: chat }] = await Promise.all([
     supabase
@@ -48,27 +134,6 @@ export default async function LivePage({
       .order("created_at", { ascending: false })
       .limit(200),
   ]);
-
-  // Members can't read each other's profiles, so the server shares just the names.
-  const inviteeIds = (session.session_invites ?? []).map(
-    (row) => row.member_id as string,
-  );
-  const { data: people } = await createAdminClient()
-    .from("profiles")
-    .select("id, display_name")
-    .in("id", [session.coach_id as string, ...inviteeIds]);
-  const names = Object.fromEntries(
-    (people ?? []).map((person) => [
-      person.id as string,
-      person.display_name as string,
-    ]),
-  );
-
-  const isCoach = session.coach_id === profile.id;
-  const all = (await getT()).calendar;
-  const t = all.live;
-  const coachName = names[session.coach_id as string];
-  const invited = inviteeIds.includes(profile.id);
 
   return (
     <div className="space-y-6">
@@ -88,7 +153,10 @@ export default async function LivePage({
         </p>
       </div>
       <LiveRoom
+        key={session.id as string}
         sessionId={session.id as string}
+        startsAt={session.starts_at as string}
+        endsAt={session.ends_at as string}
         me={profile.id}
         coachId={session.coach_id as string}
         mode={isCoach ? "coach" : "viewer"}
@@ -112,6 +180,18 @@ export default async function LivePage({
         names={names}
         initialChat={((chat ?? []) as LiveChatMessage[]).reverse()}
       />
+      {isCoach && privateMemberId && !room && (
+        <PrivateOneOnOneOffer
+          sessionId={session.id as string}
+          memberId={privateMemberId}
+          memberName={names[privateMemberId] ?? t.private.otherParticipant}
+        />
+      )}
+      {isCoach && privateMemberId && room && (
+        <p className="rounded-lg border border-border p-4 text-sm text-muted">
+          {t.private.previousGroupRoom}
+        </p>
+      )}
       <p className="text-xs text-muted">{t.notRecorded}</p>
     </div>
   );

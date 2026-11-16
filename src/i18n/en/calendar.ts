@@ -98,12 +98,16 @@ export const calendar = {
       "We couldn't use your camera and microphone. Allow access in your browser and try again.",
     couldntGoLive: "We couldn't go live.",
     dropped: "Your connection dropped. Press Go live to reconnect.",
+    endError: "We couldn't end the live session. Please try again.",
+    chatActionError: "We couldn't update live chat. Please try again.",
     serviceError:
       "We couldn't connect to the live video service. Check your internet and try again.",
     confirmEnd: "End the live session for everyone?",
     turnOnCamera: "Turn on camera",
     ending: "Ending...",
     end: "End live session",
+    endRetryMessage:
+      "The live room is still marked active. You can end it here.",
     connecting: "Connecting...",
     reconnect: "Reconnect",
     goLive: "Go live",
@@ -130,5 +134,81 @@ export const calendar = {
     sendPlaceholder: "Send a message",
     chatOpensShort: "Chat opens when live",
     send: "Send",
+    private: {
+      title: "Private one-on-one",
+      otherParticipant: "Invited member",
+      offerDescription:
+        "Offer a private video session to the one invited member. Only the coach and that member can watch. The member camera stays off unless they accept and then turn it on themselves. Invited member:",
+      offer: "Offer private session",
+      offering: "Sending invitation...",
+      offerAgain: "Offer another private session",
+      offered: "Your private invitation is ready. The invited member can accept or decline.",
+      waitingForMember: "Waiting for the invited member to accept.",
+      acceptTitle: "Your coach invited you to a private session.",
+      acceptDescription:
+        "You can watch with your camera off. Accepting will not turn on your camera.",
+      allowMemberCamera:
+        "I may turn on my camera after I accept (optional).",
+      accept: "Accept invitation",
+      accepting: "Accepting...",
+      decline: "Decline invitation",
+      cancelOffer: "Cancel invitation",
+      declined: "Invitation declined.",
+      acceptedWaiting: "Invitation accepted. Waiting for your coach to go live.",
+      enableCamera: "Turn on my camera",
+      turnCameraOff: "Turn my camera off",
+      cameraStarting: "Starting camera...",
+      cameraEnabled: "Your camera is on for this private session.",
+      cameraDisabled: "Your camera is off. You can watch without sharing video.",
+      cameraPermission:
+        "You opted in to sharing your camera. It stays off until you turn it on.",
+      cameraNotAllowed:
+        "You chose watch-only when accepting, so your camera stays off.",
+      cameraError:
+        "We couldn't use your camera and microphone. Allow access in your browser and try again.",
+      goLive: "Go live",
+      reconnect: "Reconnect",
+      broadcasting: "Your video is live to the other participant.",
+      waitingForCoach: "Waiting for your coach to go live.",
+      waitForCoachVideo:
+        "Your coach must go live before your camera can broadcast.",
+      waitingForMemberVideo: "Your video is live. Waiting for the invited member's video.",
+      startVideoFirst:
+        "Start your video first. The invited member may choose to turn on theirs.",
+      connectionError: "The video connection dropped. You can reconnect.",
+      end: "End private session",
+      confirmEnd: "End this private session for both participants?",
+      ending: "Ending private session...",
+      revoking: "This session is closing. Video access is being revoked.",
+      ended: "This private session has ended.",
+      expired: "This private invitation has expired.",
+      modeResetDescription:
+        "The one-on-one invitation is closed. You can switch this session back to a group broadcast.",
+      resetToGroupMode: "Use group broadcast",
+      resettingMode: "Switching to group broadcast...",
+      window:
+        "Video can start from 30 minutes before the session until an hour after it ends.",
+      previousGroupRoom:
+        "A group live room is already attached to this session. It must be cleaned up before you can offer a private one-on-one. Contact support@gymx2.com.",
+      notRecorded:
+        "Private video isn't recorded. The invited member may turn on their camera only after explicitly opting in. GYMX2 admins may review live chat to keep everyone safe.",
+      sayHi: "Start a private chat.",
+      chatOpens: "Private chat opens when the coach goes live.",
+      chatOpensShort: "Chat opens when coach is live",
+      errors: {
+        invalid_request: "This private session request is invalid.",
+        not_allowed: "You aren't allowed to access this private session.",
+        not_found: "This private session is no longer available.",
+        wrong_mode: "This session isn't set up for private video.",
+        outside_window: "This session is outside its live video window.",
+        camera_consent_required:
+          "The invited member must explicitly allow camera access first.",
+        not_ready: "The other participant isn't ready to connect yet.",
+        cleanup_pending:
+          "A previous or closing live room still needs cleanup before another private session can start. Try again shortly; if it persists, contact support@gymx2.com.",
+        temporarily_unavailable:
+          "Private video is temporarily unavailable. Please try again.",
+      },
+    },
   },
 };

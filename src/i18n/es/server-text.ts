@@ -32,6 +32,8 @@ export const esServerText: Record<string, string> = {
   "Fill in your profile first.": "Primero llena tu perfil.",
   "We couldn't take your profile down.": "No pudimos despublicar tu perfil.",
   "Choose how members join you.": "Elige cómo se unen a ti los miembros.",
+  "Use the private one-on-one live controls for this session.":
+    "Usa los controles privados de transmisión individual para esta sesión.",
   "Payments aren't switched on yet.": "Los pagos todavía no están activados.",
   "We couldn't save that plan. Please try again.":
     "No pudimos guardar ese plan. Inténtalo de nuevo.",
@@ -407,6 +409,10 @@ export const esServerText: Record<string, string> = {
   "We couldn't find that video.": "No encontramos ese video.",
   "We couldn't leave that program. Please try again.":
     "No pudimos sacarte de ese programa. Inténtalo de nuevo.",
+  "We couldn't mark the session as live. Please try again.":
+    "No pudimos marcar la sesión como en vivo. Inténtalo de nuevo.",
+  "We couldn't end the live session. Please try again.":
+    "No pudimos terminar la sesión en vivo. Inténtalo de nuevo.",
   "We couldn't open the live room. Please try again.":
     "No pudimos abrir la sala en vivo. Inténtalo de nuevo.",
   "We couldn't remove that day.": "No pudimos quitar ese día.",

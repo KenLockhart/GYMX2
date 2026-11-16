@@ -102,12 +102,16 @@ export const calendar: Messages["calendar"] = {
     couldntGoLive: "No pudimos iniciar la transmisión en vivo.",
     dropped:
       "Se cayó tu conexión. Presiona Transmitir en vivo para reconectarte.",
+    endError: "No pudimos terminar la sesión en vivo. Inténtalo de nuevo.",
+    chatActionError: "No pudimos actualizar el chat en vivo. Inténtalo de nuevo.",
     serviceError:
       "No pudimos conectarnos al servicio de video en vivo. Revisa tu internet e inténtalo de nuevo.",
     confirmEnd: "¿Terminar la sesión en vivo para todos?",
     turnOnCamera: "Encender cámara",
     ending: "Terminando...",
     end: "Terminar sesión en vivo",
+    endRetryMessage:
+      "La sala en vivo todavía aparece activa. Puedes terminarla aquí.",
     connecting: "Conectando...",
     reconnect: "Reconectar",
     goLive: "Transmitir en vivo",
@@ -135,5 +139,81 @@ export const calendar: Messages["calendar"] = {
     sendPlaceholder: "Envía un mensaje",
     chatOpensShort: "El chat se abre en vivo",
     send: "Enviar",
+    private: {
+      title: "Sesión privada individual",
+      otherParticipant: "Miembro invitado",
+      offerDescription:
+        "Invita al único miembro invitado a una sesión de video privada. Solo el coach y ese miembro pueden mirar. La cámara del miembro permanece apagada a menos que acepte y luego la encienda por su cuenta. Miembro invitado:",
+      offer: "Invitar a una sesión privada",
+      offering: "Enviando invitación...",
+      offerAgain: "Invitar a otra sesión privada",
+      offered: "La invitación privada está lista. El miembro invitado puede aceptarla o rechazarla.",
+      waitingForMember: "Esperando a que el miembro invitado acepte.",
+      acceptTitle: "Tu coach te invitó a una sesión privada.",
+      acceptDescription:
+        "Puedes mirar con la cámara apagada. Aceptar no encenderá tu cámara.",
+      allowMemberCamera:
+        "Quizá encienda mi cámara después de aceptar (opcional).",
+      accept: "Aceptar invitación",
+      accepting: "Aceptando...",
+      decline: "Rechazar invitación",
+      cancelOffer: "Cancelar invitación",
+      declined: "Invitación rechazada.",
+      acceptedWaiting: "Invitación aceptada. Esperando a que tu coach inicie la transmisión.",
+      enableCamera: "Encender mi cámara",
+      turnCameraOff: "Apagar mi cámara",
+      cameraStarting: "Iniciando la cámara...",
+      cameraEnabled: "Tu cámara está encendida para esta sesión privada.",
+      cameraDisabled: "Tu cámara está apagada. Puedes mirar sin compartir video.",
+      cameraPermission:
+        "Elegiste compartir tu cámara. Permanecerá apagada hasta que la enciendas.",
+      cameraNotAllowed:
+        "Elegiste mirar sin compartir video, así que tu cámara permanece apagada.",
+      cameraError:
+        "No pudimos usar tu cámara y micrófono. Permite el acceso en tu navegador e inténtalo de nuevo.",
+      goLive: "Iniciar transmisión",
+      reconnect: "Reconectar",
+      broadcasting: "Tu video está en vivo para la otra persona.",
+      waitingForCoach: "Esperando a que tu coach inicie la transmisión.",
+      waitForCoachVideo:
+        "Tu coach debe iniciar la transmisión antes de que tu cámara pueda transmitir.",
+      waitingForMemberVideo: "Tu video está en vivo. Esperando el video del miembro invitado.",
+      startVideoFirst:
+        "Inicia tu video primero. El miembro invitado puede elegir si enciende el suyo.",
+      connectionError: "Se perdió la conexión de video. Puedes volver a conectarte.",
+      end: "Terminar sesión privada",
+      confirmEnd: "¿Terminar esta sesión privada para ambos participantes?",
+      ending: "Terminando la sesión privada...",
+      revoking: "La sesión está cerrando. Se está revocando el acceso al video.",
+      ended: "Esta sesión privada terminó.",
+      expired: "Esta invitación privada venció.",
+      modeResetDescription:
+        "La invitación individual está cerrada. Puedes volver a cambiar esta sesión a una transmisión grupal.",
+      resetToGroupMode: "Usar transmisión grupal",
+      resettingMode: "Cambiando a transmisión grupal...",
+      window:
+        "El video puede empezar desde 30 minutos antes de la sesión hasta una hora después de que termine.",
+      previousGroupRoom:
+        "Ya hay una sala grupal en vivo asociada a esta sesión. Debe limpiarse antes de ofrecer una sesión privada individual. Escribe a support@gymx2.com.",
+      notRecorded:
+        "El video privado no se graba. El miembro invitado solo puede encender su cámara después de dar permiso explícito. Los administradores de GYMX2 pueden revisar el chat en vivo para mantener a todos seguros.",
+      sayHi: "Inicien un chat privado.",
+      chatOpens: "El chat privado se abre cuando el coach inicia la transmisión.",
+      chatOpensShort: "El chat se abre cuando el coach está en vivo",
+      errors: {
+        invalid_request: "La solicitud de esta sesión privada no es válida.",
+        not_allowed: "No tienes permiso para acceder a esta sesión privada.",
+        not_found: "Esta sesión privada ya no está disponible.",
+        wrong_mode: "Esta sesión no está configurada para video privado.",
+        outside_window: "Esta sesión está fuera del horario de video en vivo.",
+        camera_consent_required:
+          "El miembro invitado debe permitir explícitamente el acceso a la cámara primero.",
+        not_ready: "La otra persona todavía no está lista para conectarse.",
+        cleanup_pending:
+          "Una sala en vivo anterior o que se está cerrando todavía necesita limpieza antes de iniciar otra sesión privada. Inténtalo pronto; si continúa, escribe a support@gymx2.com.",
+        temporarily_unavailable:
+          "El video privado no está disponible por ahora. Inténtalo de nuevo.",
+      },
+    },
   },
 };
