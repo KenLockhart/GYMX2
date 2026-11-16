@@ -155,7 +155,7 @@ export const sessionSchema = z
     member_ids: z
       .array(z.uuid())
       .min(1, "Invite at least one member.")
-      .max(200),
+      .max(30, "A session can invite at most 30 members."),
   })
   .refine((value) => Date.parse(value.ends_at) > Date.parse(value.starts_at), {
     error: "The session must end after it starts.",

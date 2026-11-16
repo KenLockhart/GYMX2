@@ -11,6 +11,7 @@
     "test:db": "supabase test db"
   },
   "dependencies": {
+    "@cloudflare/realtimekit": "2.0.4",
     "@stripe/react-stripe-js": "7.0.1",
     "@stripe/stripe-js": "10.2.1",
     "@supabase/ssr": "^0.12.7",

@@ -24,6 +24,7 @@ import {
 } from "@/lib/live";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { NotLiveYet, play, publish, type Connection } from "@/lib/webrtc";
+import { LiveFullscreenRegion } from "@/components/live-fullscreen";
 
 type Props = {
   sessionId: string;
@@ -49,6 +50,7 @@ const isLive = (room: Room) =>
   Boolean(room?.live_started_at && !room.live_ended_at);
 
 export function LiveRoom(props: Props) {
+  const fullscreenT = useT().common.fullscreen;
   const [room, setRoom] = useState<Room>(props.initialRoom);
   const [playbackUrl, setPlaybackUrl] = useState(props.playbackUrl);
   const roomRevision = useRef(0);
@@ -155,33 +157,39 @@ export function LiveRoom(props: Props) {
   }, [props.sessionId]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-      {props.mode === "coach" ? (
-        <Broadcaster
+    <LiveFullscreenRegion
+      label={fullscreenT.liveRoom}
+      className="relative"
+      controlPlacement="inline"
+    >
+      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+        {props.mode === "coach" ? (
+          <Broadcaster
+            sessionId={props.sessionId}
+            live={isLive(room)}
+            room={room}
+            canStart={canStart}
+            onRoom={setRoom}
+          />
+        ) : (
+          <Viewer
+            sessionId={props.sessionId}
+            live={isLive(room)}
+            ended={Boolean(room?.live_ended_at)}
+            playbackUrl={playbackUrl}
+          />
+        )}
+        <LiveChat
           sessionId={props.sessionId}
+          me={props.me}
+          coachId={props.coachId}
+          canChat={props.canChat}
+          names={props.names}
+          initialChat={props.initialChat}
           live={isLive(room)}
-          room={room}
-          canStart={canStart}
-          onRoom={setRoom}
         />
-      ) : (
-        <Viewer
-          sessionId={props.sessionId}
-          live={isLive(room)}
-          ended={Boolean(room?.live_ended_at)}
-          playbackUrl={playbackUrl}
-        />
-      )}
-      <LiveChat
-        sessionId={props.sessionId}
-        me={props.me}
-        coachId={props.coachId}
-        canChat={props.canChat}
-        names={props.names}
-        initialChat={props.initialChat}
-        live={isLive(room)}
-      />
-    </div>
+      </div>
+    </LiveFullscreenRegion>
   );
 }
 
@@ -221,17 +229,22 @@ export function useCanStartLive(startsAt: string, endsAt: string, initial: boole
 }
 
 function Stage({
+  label,
   children,
   status,
 }: {
+  label: string;
   children: React.ReactNode;
   status?: React.ReactNode;
 }) {
   return (
     <div className="space-y-3">
-      <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black">
+      <LiveFullscreenRegion
+        label={label}
+        className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black"
+      >
         {children}
-      </div>
+      </LiveFullscreenRegion>
       {status}
     </div>
   );
@@ -260,6 +273,7 @@ function Broadcaster({
   onRoom: (room: Room) => void;
 }) {
   const t = useT().calendar.live;
+  const fullscreenT = useT().common.fullscreen;
   const locale = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mounted = useRef(false);
@@ -425,6 +439,7 @@ function Broadcaster({
 
   return (
     <Stage
+      label={fullscreenT.yourVideo}
       status={
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-3">
@@ -514,6 +529,7 @@ function Viewer({
   playbackUrl: string | null;
 }) {
   const t = useT().calendar.live;
+  const fullscreenT = useT().common.fullscreen;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -617,6 +633,7 @@ function Viewer({
 
   return (
     <Stage
+      label={fullscreenT.coachVideo}
       status={
         live && (
           <button

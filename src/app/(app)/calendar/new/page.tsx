@@ -31,21 +31,31 @@ export default async function NewSessionPage() {
           {t.new.noMembers}
         </p>
       ) : (
-        <SessionForm
-          action={saveSession}
-          members={members}
-          submitLabel={t.new.submit}
-          initial={{
-            id: "",
-            title: "",
-            notes: "",
-            location: "",
-            meeting_url: "",
-            starts_at: null,
-            ends_at: null,
-            member_ids: members.map((member) => member.id),
-          }}
-        />
+        <>
+          {members.length > 30 && (
+            <p className="max-w-xl text-sm text-muted">
+              {t.new.groupLimitHint}
+            </p>
+          )}
+          <SessionForm
+            action={saveSession}
+            members={members}
+            submitLabel={t.new.submit}
+            initial={{
+              id: "",
+              title: "",
+              notes: "",
+              location: "",
+              meeting_url: "",
+              starts_at: null,
+              ends_at: null,
+              member_ids:
+                members.length <= 30
+                  ? members.map((member) => member.id)
+                  : [],
+            }}
+          />
+        </>
       )}
     </div>
   );

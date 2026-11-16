@@ -39,6 +39,23 @@ async function ownSession(sessionId: string) {
   return data;
 }
 
+const GROUP_ROOM_CONFLICT =
+  "A coaching circle is open or closing. End it before using the broadcast controls.";
+
+async function hasActiveGroupRoom(
+  admin: ReturnType<typeof createAdminClient>,
+  sessionId: string,
+) {
+  const { data, error } = await admin
+    .from("group_critique_rooms")
+    .select("generation")
+    .eq("session_id", sessionId)
+    .in("state", ["provisioning", "open", "ending"])
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
 // Step 1 of going live: hand the coach's browser the secret broadcast address.
 export async function prepareBroadcast(
   sessionId: string,
@@ -56,6 +73,8 @@ export async function prepareBroadcast(
 
   const admin = createAdminClient();
   try {
+    if (await hasActiveGroupRoom(admin, session.id))
+      return { error: GROUP_ROOM_CONFLICT };
     const { data: room, error: roomReadError } = await admin
       .from("session_live")
       .select("input_uid")
@@ -117,6 +136,8 @@ export async function prepareBroadcast(
       !canGoLive(currentSession)
     )
       return { error: "We couldn't open the live room. Please try again." };
+    if (await hasActiveGroupRoom(admin, session.id))
+      return { error: GROUP_ROOM_CONFLICT };
     return { ingestUrl };
   } catch (error) {
     console.error("Couldn't prepare a live room", error);
@@ -138,6 +159,8 @@ export async function markLive(sessionId: string): Promise<{ error?: string }> {
 
   try {
     const admin = createAdminClient();
+    if (await hasActiveGroupRoom(admin, session.id))
+      return { error: GROUP_ROOM_CONFLICT };
     const { data: started, error: startError } = await admin
       .from("session_live")
       .update({ live_started_at: new Date().toISOString(), live_ended_at: null })
@@ -178,6 +201,8 @@ export async function endLive(sessionId: string): Promise<{ error?: string }> {
     return { error: "Use the private one-on-one live controls for this session." };
   try {
     const admin = createAdminClient();
+    if (await hasActiveGroupRoom(admin, session.id))
+      return { error: GROUP_ROOM_CONFLICT };
     const { data: ended, error } = await admin
       .from("session_live")
       .update({ live_ended_at: new Date().toISOString() })

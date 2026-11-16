@@ -2,10 +2,14 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const cleanup = vi.hoisted(() => vi.fn());
+const groupCleanup = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/private-live-server", () => ({
   cleanupPrivateLiveInputsAndRecordHeartbeat: cleanup,
   verifyLiveCleanupHmac: vi.fn(async () => false),
+}));
+vi.mock("@/lib/group-critique-server", () => ({
+  cleanupGroupCritiqueAndRecordHeartbeat: groupCleanup,
 }));
 
 import { GET } from "./route";
@@ -32,6 +36,14 @@ beforeEach(() => {
     claimed: 0,
     completed: 0,
     heartbeatRecorded: true,
+  });
+  groupCleanup.mockReset();
+  groupCleanup.mockResolvedValue({
+    ok: true,
+    enabled: false,
+    claimed: 0,
+    completed: 0,
+    heartbeatRecorded: false,
   });
   vi.mocked(verifyLiveCleanupHmac).mockImplementation(({ signature }) =>
     Boolean(signature && /^[0-9a-f]{64}$/.test(signature)),
@@ -76,9 +88,15 @@ describe("live cleanup cron route", () => {
       }),
     );
     expect(valid.status).toBe(200);
-    expect(await valid.json()).toEqual({ ok: true, claimed: 0, completed: 0 });
+    expect(await valid.json()).toEqual({
+      ok: true,
+      claimed: 0,
+      completed: 0,
+      groupCleanup: { enabled: false, claimed: 0, completed: 0 },
+    });
     expect(valid.headers.get("cache-control")).toBe("no-store");
     expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(groupCleanup).toHaveBeenCalledTimes(1);
   });
 
   it("does not mark a failed or un-heartbeated batch successful", async () => {
@@ -95,5 +113,44 @@ describe("live cleanup cron route", () => {
     );
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ ok: false, error: "cleanup_failed" });
+  });
+
+  it("runs group cleanup even when private cleanup fails and requires its own heartbeat when enabled", async () => {
+    cleanup.mockResolvedValueOnce({
+      ok: false,
+      claimed: 1,
+      completed: 0,
+      heartbeatRecorded: false,
+    });
+    groupCleanup.mockResolvedValueOnce({
+      ok: true,
+      enabled: true,
+      claimed: 2,
+      completed: 2,
+      heartbeatRecorded: true,
+    });
+    const privateFailure = await GET(
+      new Request("https://gymx2.com/api/cron/live-cleanup", { headers: signedHeaders() }),
+    );
+    expect(privateFailure.status).toBe(503);
+    expect(groupCleanup).toHaveBeenCalledTimes(1);
+
+    cleanup.mockResolvedValueOnce({
+      ok: true,
+      claimed: 0,
+      completed: 0,
+      heartbeatRecorded: true,
+    });
+    groupCleanup.mockResolvedValueOnce({
+      ok: true,
+      enabled: true,
+      claimed: 1,
+      completed: 1,
+      heartbeatRecorded: false,
+    });
+    const missingGroupHeartbeat = await GET(
+      new Request("https://gymx2.com/api/cron/live-cleanup", { headers: signedHeaders() }),
+    );
+    expect(missingGroupHeartbeat.status).toBe(503);
   });
 });

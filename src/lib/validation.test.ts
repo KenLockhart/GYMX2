@@ -188,6 +188,23 @@ describe("sessionSchema", () => {
   it("requires a member", () => {
     expect(sessionSchema.safeParse({ ...valid, member_ids: [] }).success).toBe(false);
   });
+
+  it("allows up to 30 invited members and rejects 31", () => {
+    const memberIds = Array.from({ length: 31 }, (_, index) => {
+      const suffix = String(index + 1).padStart(12, "0");
+      return `00000000-0000-4000-8000-${suffix}`;
+    });
+    expect(
+      sessionSchema.safeParse({ ...valid, member_ids: memberIds.slice(0, 30) })
+        .success,
+    ).toBe(true);
+    const result = sessionSchema.safeParse({ ...valid, member_ids: memberIds });
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.issues[0]?.message).toBe(
+        "A session can invite at most 30 members.",
+      );
+  });
 });
 
 describe("sessionResponseSchema", () => {

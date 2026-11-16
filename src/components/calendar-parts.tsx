@@ -18,6 +18,11 @@ import {
 } from "@/lib/calendar";
 import { useLocale, useT } from "@/i18n/client";
 import { LOCALE_TAG, type Locale } from "@/i18n/config";
+import {
+  canSelectSessionMember,
+  GROUP_CRITIQUE_MEMBER_LIMIT,
+  toggleSessionMemberSelection,
+} from "@/lib/group-critique-ui";
 import type { ActionState } from "@/lib/types";
 
 const subscribe = () => () => {};
@@ -348,6 +353,12 @@ function SessionFields({
   initial: SessionFormValues;
 }) {
   const f = useT().calendar.form;
+  const [selectedMemberIds, setSelectedMemberIds] = useState(
+    () => new Set(initial.member_ids),
+  );
+  const unavailableMemberIds = [...selectedMemberIds].filter(
+    (id) => !members.some((member) => member.id === id),
+  );
   const [date, setDate] = useState(() => {
     if (initial.starts_at) return localDateValue(new Date(initial.starts_at));
     const tomorrow = new Date();
@@ -429,13 +440,56 @@ function SessionFields({
       </label>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">{f.invite}</legend>
+        <p className="text-xs text-muted" aria-live="polite">
+          {f.inviteLimitCount(selectedMemberIds.size)}
+          {selectedMemberIds.size > GROUP_CRITIQUE_MEMBER_LIMIT && (
+            <>
+              {" · "}
+              {f.inviteLimitReduce(
+                selectedMemberIds.size - GROUP_CRITIQUE_MEMBER_LIMIT,
+              )}
+            </>
+          )}
+        </p>
+        {unavailableMemberIds.map((memberId) => (
+          <label key={memberId} className="flex items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              name="member_ids"
+              value={memberId}
+              checked={selectedMemberIds.has(memberId)}
+              onChange={(event) =>
+                setSelectedMemberIds((current) =>
+                  toggleSessionMemberSelection(
+                    current,
+                    memberId,
+                    event.target.checked,
+                  ),
+                )
+              }
+              disabled={!canSelectSessionMember(selectedMemberIds, memberId)}
+              className="size-4 accent-accent"
+            />
+            {f.previousMember}
+          </label>
+        ))}
         {members.map((member) => (
           <label key={member.id} className="flex items-center gap-3 text-sm">
             <input
               type="checkbox"
               name="member_ids"
               value={member.id}
-              defaultChecked={initial.member_ids.includes(member.id)}
+              checked={selectedMemberIds.has(member.id)}
+              onChange={(event) =>
+                setSelectedMemberIds((current) =>
+                  toggleSessionMemberSelection(
+                    current,
+                    member.id,
+                    event.target.checked,
+                  ),
+                )
+              }
+              disabled={!canSelectSessionMember(selectedMemberIds, member.id)}
               className="size-4 accent-accent"
             />
             {member.display_name}
