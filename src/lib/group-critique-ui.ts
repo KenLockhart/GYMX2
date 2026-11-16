@@ -138,9 +138,10 @@ export async function enableMediaOnlyWhileCurrent(options: {
   isCurrent: () => boolean;
   authorize: () => Promise<boolean>;
   enable: () => Promise<void>;
+  isEnabled: () => boolean;
   disable: () => Promise<void>;
 }): Promise<boolean> {
-  const { isCurrent, authorize, enable, disable } = options;
+  const { isCurrent, authorize, enable, isEnabled, disable } = options;
   if (!isCurrent() || !(await authorize()) || !isCurrent()) return false;
   try {
     await enable();
@@ -151,6 +152,12 @@ export async function enableMediaOnlyWhileCurrent(options: {
   if (!isCurrent()) {
     await disable().catch(() => {});
     return false;
+  }
+  try {
+    if (!isEnabled()) throw new Error("media-enable-not-confirmed");
+  } catch (error) {
+    await disable().catch(() => {});
+    throw error;
   }
   return true;
 }

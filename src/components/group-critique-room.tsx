@@ -1033,6 +1033,8 @@ function GroupCritiqueRoom({
         isCurrent,
         authorize: () => hasFreshPublishAuthorization("video"),
         enable: () => client.self.enableVideo(),
+        isEnabled: () =>
+          client.self.videoEnabled && client.self.videoTrack?.readyState === "live",
         disable: () => client.self.disableVideo(),
       });
     } catch {
@@ -1074,6 +1076,8 @@ function GroupCritiqueRoom({
         isCurrent,
         authorize: () => hasFreshPublishAuthorization("audio"),
         enable: () => client.self.enableAudio(),
+        isEnabled: () =>
+          client.self.audioEnabled && client.self.audioTrack?.readyState === "live",
         disable: () => client.self.disableAudio(),
       });
     } catch {

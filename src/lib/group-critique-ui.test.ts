@@ -187,6 +187,7 @@ describe("group participant identity helpers", () => {
       isCurrent: () => active,
       authorize: () => authorization,
       enable,
+      isEnabled: () => true,
       disable,
     });
 
@@ -209,6 +210,7 @@ describe("group participant identity helpers", () => {
       isCurrent: () => active,
       authorize: async () => true,
       enable,
+      isEnabled: () => true,
       disable,
     });
 
@@ -231,6 +233,7 @@ describe("group participant identity helpers", () => {
       isCurrent: () => active,
       authorize: async () => true,
       enable,
+      isEnabled: () => true,
       disable,
     });
 
@@ -239,6 +242,42 @@ describe("group participant identity helpers", () => {
     rejectEnable(new Error("permission prompt closed"));
     await expect(operation).rejects.toThrow("permission prompt closed");
     expect(disable).toHaveBeenCalledOnce();
+  });
+
+  it("reports an enable that resolves without activating the device and cleans it up", async () => {
+    const enable = vi.fn(async () => {});
+    const disable = vi.fn(async () => {});
+    const isEnabled = vi.fn(() => false);
+
+    const operation = enableMediaOnlyWhileCurrent({
+      isCurrent: () => true,
+      authorize: async () => true,
+      enable,
+      isEnabled,
+      disable,
+    });
+
+    await expect(operation).rejects.toThrow("media-enable-not-confirmed");
+    expect(enable).toHaveBeenCalledOnce();
+    expect(isEnabled).toHaveBeenCalledOnce();
+    expect(disable).toHaveBeenCalledOnce();
+  });
+
+  it("confirms device activation after a successful enable", async () => {
+    const enable = vi.fn(async () => {});
+    const disable = vi.fn(async () => {});
+
+    await expect(
+      enableMediaOnlyWhileCurrent({
+        isCurrent: () => true,
+        authorize: async () => true,
+        enable,
+        isEnabled: () => true,
+        disable,
+      }),
+    ).resolves.toBe(true);
+    expect(enable).toHaveBeenCalledOnce();
+    expect(disable).not.toHaveBeenCalled();
   });
 
   it("reapplies the newest mute policy after an older provider update resolves", async () => {
