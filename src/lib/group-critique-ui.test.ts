@@ -4,6 +4,7 @@ import {
   countUniqueLiveParticipants,
   createGroupMutePolicy,
   enableMediaOnlyWhileCurrent,
+  hasGroupCritiqueCapacity,
   groupCritiqueParticipantEpochMatches,
   groupCritiqueCirclePositions,
   groupCritiqueCircleStyle,
@@ -41,6 +42,19 @@ describe("group critique circle layout", () => {
     expect(groupCritiqueMobilePage(attendees, 4)).toEqual([24, 25, 26, 27, 28, 29]);
     expect(groupCritiqueMobilePage(attendees, 99)).toEqual([24, 25, 26, 27, 28, 29]);
   });
+});
+
+describe("group critique SDK capacity", () => {
+  it("accepts the preset-provided 31-person limit", () => {
+    expect(hasGroupCritiqueCapacity(31)).toBe(true);
+  });
+
+  it.each([24, 30, undefined, null, Number.NaN, "31"])(
+    "fails closed when the preset active-stream limit is %s",
+    (limit) => {
+      expect(hasGroupCritiqueCapacity(limit)).toBe(false);
+    },
+  );
 });
 
 describe("group critique circle CSS", () => {

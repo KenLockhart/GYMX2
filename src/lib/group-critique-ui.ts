@@ -1,5 +1,12 @@
 export const GROUP_CRITIQUE_MEMBER_LIMIT = 30;
+export const GROUP_CRITIQUE_TOTAL_PARTICIPANT_LIMIT =
+  GROUP_CRITIQUE_MEMBER_LIMIT + 1;
 export const GROUP_CRITIQUE_MOBILE_PAGE_SIZE = 6;
+
+/** Require the published preset to supply capacity for the coach and 30 members. */
+export function hasGroupCritiqueCapacity(maxActiveParticipantsCount: unknown): boolean {
+  return maxActiveParticipantsCount === GROUP_CRITIQUE_TOTAL_PARTICIPANT_LIMIT;
+}
 
 export type CirclePosition = {
   x: number;

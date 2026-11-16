@@ -25,6 +25,7 @@ import { useT } from "@/i18n/client";
 import {
   GROUP_CRITIQUE_MEMBER_LIMIT,
   GROUP_CRITIQUE_MOBILE_PAGE_SIZE,
+  hasGroupCritiqueCapacity,
   countUniqueLiveParticipants,
   createGroupMutePolicy,
   enableMediaOnlyWhileCurrent,
@@ -910,7 +911,13 @@ function GroupCritiqueRoom({
             setError(t.connectionError);
         },
       });
-      created.participants.setMaxActiveParticipantsCount(31);
+      // The pinned SDK setter rejects values above 24; the verified preset supplies 31.
+      if (
+        !hasGroupCritiqueCapacity(
+          created.participants.maxActiveParticipantsCount,
+        )
+      )
+        throw new Error("unsupported_group_critique_capacity");
       await created.participants.setViewMode("ACTIVE_GRID");
       await created.join();
       if (!mounted.current || revision !== joinRevision.current) {

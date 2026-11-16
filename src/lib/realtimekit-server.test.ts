@@ -52,27 +52,93 @@ describe("RealtimeKit REST adapter", () => {
     } as unknown as NodeJS.ProcessEnv)).toBeNull();
   });
 
-  it("reads top-level paging and reconciles every meeting page", async () => {
+  it("starts meeting pagination at page one and reconciles all contiguous pages", async () => {
     const urls: URL[] = [];
-    const firstPage = Array.from({ length: 100 }, (_, index) => ({
-      id: uuidFrom(index + 1),
-      title: index === 0 ? "gymx2-group:target" : `other-${index}`,
-      status: "ACTIVE",
-    }));
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
       urls.push(url);
-      return url.searchParams.get("page_no") === "0"
-        ? jsonResponse(firstPage, { start_offset: 1, end_offset: 100, total_count: 101 })
-        : jsonResponse([
-            { id: uuidFrom(101), title: "gymx2-group:target", status: "ACTIVE" },
-          ], { start_offset: 101, end_offset: 101, total_count: 101 });
+      const pageNo = url.searchParams.get("page_no");
+      if (pageNo === "1") {
+        return jsonResponse(Array.from({ length: 100 }, (_, index) => ({
+          id: uuidFrom(index + 1),
+          title: index === 0 ? "gymx2-group:target" : `other-${index}`,
+          status: "ACTIVE",
+        })), { start_offset: 1, end_offset: 100, total_count: 201 });
+      }
+      if (pageNo === "2") {
+        return jsonResponse(Array.from({ length: 100 }, (_, index) => ({
+          id: uuidFrom(index + 101),
+          title: `other-${index + 100}`,
+          status: "ACTIVE",
+        })), { start_offset: 101, end_offset: 200, total_count: 201 });
+      }
+      if (pageNo === "3") {
+        return jsonResponse([
+          { id: uuidFrom(201), title: "gymx2-group:target", status: "ACTIVE" },
+        ], { start_offset: 201, end_offset: 201, total_count: 201 });
+      }
+      return new Response(JSON.stringify({ success: false }), { status: 400 });
     });
     const api = createRealtimeKitApi(config, fetcher as typeof fetch);
 
     await expect(api.listMeetingsByTitle("gymx2-group:target")).resolves.toHaveLength(2);
-    expect(urls.map((url) => url.searchParams.get("page_no"))).toEqual(["0", "1"]);
+    const pageNumbers = urls.map((url) => url.searchParams.get("page_no"));
+    expect(pageNumbers).toEqual(["1", "2", "3"]);
+    expect(pageNumbers).not.toContain("0");
     expect(urls[0].searchParams.get("per_page")).toBe("100");
+  });
+
+  it("starts preset pagination at page one and rejects page-zero fixtures", async () => {
+    const pageNumbers: Array<string | null> = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const pageNo = url.searchParams.get("page_no");
+      pageNumbers.push(pageNo);
+      const offset = pageNo === "1" ? 0 : pageNo === "2" ? 100 : pageNo === "3" ? 200 : -1;
+      if (offset < 0) return new Response(JSON.stringify({ success: false }), { status: 400 });
+      const count = offset === 200 ? 1 : 100;
+      return jsonResponse(Array.from({ length: count }, (_, index) => ({
+        id: uuidFrom(offset + index + 1000),
+        name: `preset-${offset + index}`,
+      })), {
+        start_offset: offset + 1,
+        end_offset: offset + count,
+        total_count: 201,
+      });
+    });
+    const api = createRealtimeKitApi(config, fetcher as typeof fetch);
+
+    await expect(api.listPresetDefinitions()).resolves.toHaveLength(201);
+    expect(pageNumbers).toEqual(["1", "2", "3"]);
+    expect(pageNumbers).not.toContain("0");
+  });
+
+  it("starts participant pagination at page one and rejects page-zero fixtures", async () => {
+    const pageNumbers: Array<string | null> = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const pageNo = url.searchParams.get("page_no");
+      pageNumbers.push(pageNo);
+      const offset = pageNo === "1" ? 0 : pageNo === "2" ? 100 : pageNo === "3" ? 200 : -1;
+      if (offset < 0) return new Response(JSON.stringify({ success: false }), { status: 400 });
+      const count = offset === 200 ? 1 : 100;
+      return jsonResponse(Array.from({ length: count }, (_, index) => ({
+        id: uuidFrom(offset + index + 2000),
+        ...(offset + index === 200 ? { custom_participant_id: "target" } : {}),
+        preset_name: "observer",
+      })), {
+        start_offset: offset + 1,
+        end_offset: offset + count,
+        total_count: 201,
+      });
+    });
+    const api = createRealtimeKitApi(config, fetcher as typeof fetch);
+
+    await expect(api.listParticipantsByCustomId(meetingId, "target")).resolves.toEqual([
+      { id: uuidFrom(2200), customParticipantId: "target", presetName: "observer" },
+    ]);
+    expect(pageNumbers).toEqual(["1", "2", "3"]);
+    expect(pageNumbers).not.toContain("0");
   });
 
   it("fails closed on incomplete or gapped pagination", async () => {
@@ -152,11 +218,11 @@ describe("RealtimeKit REST adapter", () => {
     ]);
   });
 
-  it("accepts only webinar-stage presets with the intended publisher and moderation boundaries", async () => {
+  it("requires 31-stream webinar presets with the intended publisher and moderation boundaries", async () => {
     const presetDefinitions = new Map<string, Record<string, unknown>>([
       [uuidFrom(1), {
         id: uuidFrom(1),
-        config: { view_type: "WEBINAR" },
+        config: { view_type: "WEBINAR", max_video_streams: { desktop: 31, mobile: 31 } },
         permissions: {
           stage_enabled: true,
           stage_access: "ALLOWED",
@@ -172,7 +238,7 @@ describe("RealtimeKit REST adapter", () => {
       }],
       [uuidFrom(2), {
         id: uuidFrom(2),
-        config: { view_type: "WEBINAR" },
+        config: { view_type: "WEBINAR", max_video_streams: { desktop: 31, mobile: 31 } },
         permissions: {
           stage_enabled: true,
           stage_access: "NOT_ALLOWED",
@@ -188,7 +254,7 @@ describe("RealtimeKit REST adapter", () => {
       }],
       [uuidFrom(3), {
         id: uuidFrom(3),
-        config: { view_type: "WEBINAR" },
+        config: { view_type: "WEBINAR", max_video_streams: { desktop: 31, mobile: 31 } },
         permissions: {
           stage_enabled: true,
           stage_access: "CAN_REQUEST",
@@ -219,6 +285,16 @@ describe("RealtimeKit REST adapter", () => {
     });
     const api = createRealtimeKitApi(config, fetcher as typeof fetch);
     await expect(api.verifyPresetDefinitions()).resolves.toBe(true);
+
+    const hostConfig = presetDefinitions.get(uuidFrom(1))?.config as Record<string, unknown>;
+    hostConfig.max_video_streams = { desktop: 24, mobile: 31 };
+    await expect(api.verifyPresetDefinitions()).resolves.toBe(false);
+    hostConfig.max_video_streams = { desktop: 31, mobile: 31 };
+
+    const observerConfig = presetDefinitions.get(uuidFrom(2))?.config as Record<string, unknown>;
+    delete observerConfig.max_video_streams;
+    await expect(api.verifyPresetDefinitions()).resolves.toBe(false);
+    observerConfig.max_video_streams = { desktop: 31, mobile: 31 };
 
     const unsafeObserver = presetDefinitions.get(uuidFrom(2)) as Record<string, unknown>;
     (unsafeObserver.permissions as Record<string, unknown>).kick_participant = true;

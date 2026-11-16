@@ -241,7 +241,7 @@ export function createRealtimeKitApi(
   async function listMeetingsByTitle(title: string) {
     const cleanTitle = z.string().min(1).max(256).parse(title);
     const matches: RealtimeKitMeeting[] = [];
-    let pageNo = 0;
+    let pageNo = 1;
     let expectedTotal: number | null = null;
     let previousEnd = 0;
     let observedCount = 0;
@@ -287,7 +287,7 @@ export function createRealtimeKitApi(
 
   async function listPresetDefinitions() {
     const presets: { id: string; name: string }[] = [];
-    let pageNo = 0;
+    let pageNo = 1;
     let expectedTotal: number | null = null;
     let previousEnd = 0;
     let observedCount = 0;
@@ -335,7 +335,7 @@ export function createRealtimeKitApi(
     const meeting = providerIdSchema.parse(meetingId);
     const target = z.string().min(1).max(160).parse(customParticipantId);
     const matches: RealtimeKitParticipant[] = [];
-    let pageNo = 0;
+    let pageNo = 1;
     let expectedTotal: number | null = null;
     let previousEnd = 0;
     let observedCount = 0;
@@ -403,8 +403,13 @@ export function createRealtimeKitApi(
     const definition = (value: { config: Record<string, unknown>; permissions: Record<string, unknown> }) => {
       const permissions = value.permissions;
       const media = record(permissions.media) ? permissions.media : null;
+      const maxVideoStreams = record(value.config.max_video_streams)
+        ? value.config.max_video_streams
+        : null;
       return {
         isWebinarStage: value.config.view_type === "WEBINAR" && permissions.stage_enabled === true,
+        hasThirtyOneVideoStreams: maxVideoStreams !== null &&
+          maxVideoStreams.desktop === 31 && maxVideoStreams.mobile === 31,
         stageAccess: permissions.stage_access,
         audio: media && record(media.audio) ? media.audio.can_produce : null,
         video: media && record(media.video) ? media.video.can_produce : null,
@@ -422,17 +427,17 @@ export function createRealtimeKitApi(
     const o = definition(observer);
     const c = definition(consented);
     return (
-      h.isWebinarStage && h.stageAccess === "ALLOWED" && h.audio === "ALLOWED" &&
+      h.isWebinarStage && h.hasThirtyOneVideoStreams && h.stageAccess === "ALLOWED" && h.audio === "ALLOWED" &&
       h.video === "ALLOWED" && h.screenshare === "NOT_ALLOWED" &&
       h.canRecord === false && h.canLivestream === false && h.canDisableAudio === true &&
       h.canDisableVideo === true && h.canKick === true && h.canAcceptProductionRequests === true &&
       h.canChangeParticipantPermissions === true &&
-      o.isWebinarStage && o.stageAccess === "NOT_ALLOWED" && o.audio === "NOT_ALLOWED" &&
+      o.isWebinarStage && o.hasThirtyOneVideoStreams && o.stageAccess === "NOT_ALLOWED" && o.audio === "NOT_ALLOWED" &&
       o.video === "NOT_ALLOWED" && o.screenshare === "NOT_ALLOWED" &&
       o.canRecord === false && o.canLivestream === false &&
       o.canDisableAudio === false && o.canDisableVideo === false && o.canKick === false &&
       o.canAcceptProductionRequests === false && o.canChangeParticipantPermissions === false &&
-      c.isWebinarStage && c.stageAccess === "CAN_REQUEST" && c.audio === "CAN_REQUEST" &&
+      c.isWebinarStage && c.hasThirtyOneVideoStreams && c.stageAccess === "CAN_REQUEST" && c.audio === "CAN_REQUEST" &&
       c.video === "CAN_REQUEST" && c.screenshare === "NOT_ALLOWED" &&
       c.canRecord === false && c.canLivestream === false && c.canDisableAudio === false &&
       c.canDisableVideo === false && c.canKick === false &&
