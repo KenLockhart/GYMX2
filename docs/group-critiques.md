@@ -12,6 +12,10 @@ Create one RealtimeKit app in the verified GYMX2 Cloudflare account
 unchanged; set the separate RealtimeKit app and API token in these new server
 environment variables; none may use a `NEXT_PUBLIC_` prefix:
 
+- Current GYMX2 RealtimeKit app ID: `220a2e60-9bca-434e-ae68-9671d4653b66`.
+- Current preset names: `GYMX2-Group-Host`, `GYMX2-Group-Observer`, and
+  `GYMX2-Group-Consented`.
+
 - `CLOUDFLARE_REALTIMEKIT_ACCOUNT_ID`: the 32-character Cloudflare account ID.
 - `CLOUDFLARE_REALTIMEKIT_APP_ID`: the app UUID.
 - `CLOUDFLARE_REALTIMEKIT_API_TOKEN`: a token with the Realtime permissions needed to list/read
@@ -20,7 +24,8 @@ environment variables; none may use a `NEXT_PUBLIC_` prefix:
   `CLOUDFLARE_REALTIMEKIT_CONSENTED_PRESET`: exact preset names in that app.
 
 Configure all three presets as `WEBINAR` with stage enabled, no recording, no livestreaming, and
-screenshare production disabled:
+screenshare production disabled. Set `max_video_streams` to 31 for both desktop and mobile on all
+three presets; the default limit is too low for a 30-member room plus its coach:
 
 | Preset | Stage access | Audio/video production | Required extra permissions |
 | --- | --- | --- | --- |
@@ -84,3 +89,55 @@ requests, per-participant stage grants, selected/all mute behavior across reconn
 participant removal/rejoin, and meeting deactivation. This implementation deliberately imposes an
 application cap of 30 members; provider account capacity and the browser's practical receive
 capacity still need runtime verification at that size.
+
+## Provider verification record
+
+2026-11-16: the exact GYMX2 account/app and all three preset definitions verified successfully. A
+two-person synthetic coach/member SDK probe published audio and video from both participants and
+decoded the other participant's video on each side. A three-person run later joined all three,
+confirmed no automatic capture, published synthetic audio/video, and decoded two remote videos on
+each client. A preliminary mute check observed advancing RTP counters after mute; because RTP can
+continue while carrying silence, this alone was not an audio-mute result.
+
+A later three-person synthetic controls run joined/staged all participants and published synthetic
+audio/video with capture disabled at join. With unmuted audio sinks attached, inbound energy advanced
+for both member sources by approximately `0.000176` over 1.2 seconds. Host bulk mute set both member
+and host peer audio states to disabled; inbound `totalAudioEnergy` stayed unchanged for both over
+1.25 seconds, while packet counters continued to increase. Selected allow did not enable the member
+microphone by itself; an explicit synthetic mic action then advanced that member's inbound energy,
+while the other member remained muted. Individual mute also left energy unchanged over 1.25 seconds;
+the remote audio track reported `enabled=false` while its sink remained attached and playing.
+
+The same run confirmed reconnect with local audio/video off and no capture on join. A 30-second
+refreshed member token was rejected on join with SDK `ClientError` code `0004`; the original
+15-minute token remained usable as a positive control. Deleting a participant caused its old token
+to be rejected with `0004`, and an inactive meeting also rejected the old host token with `0004`.
+After reconnect, host mute was applied, but the harness attempted mic enable before waiting for the
+SDK's public permission state to settle and observed one synthetic capture. This does not establish
+post-settlement reconnect mute behavior. The final permission-settled denial check was not run: the
+local QA server served `/api/status`, but its static QA routes timed out. No new provider resources
+were created by those failed startup attempts.
+
+Two earlier isolated 31-participant runs joined all 31 clients and stage-granted all 30 members but
+failed while publishing at 27 and 19 clients. Those attempts used a synthetic track fixture that
+advertised device IDs during enumeration but returned tracks without matching IDs in `getSettings()`.
+The pinned SDK compares these identities and may stop or reacquire a mismatched track, so those runs
+are fixture-affected and do not establish provider capacity limits.
+
+After correcting the fixture, a paced isolated run again joined all 31 clients and stage-granted all
+30 members. It published 27 clients before `member-27` reported `actor-publish-incomplete` after
+27.9 seconds. Sanitized state showed audio enabled, but the SDK video flag was disabled and no live
+video track existed. A historical `video_on` event for `member-27` had zero outbound video producer
+stats; successful neighboring `member-26` also had the same video permission event category and
+seven outbound video-stat entries. The cause remains unknown. The run did not reach all-to-all RTP
+or decoded-video measurements, so 31-person media capacity remains unverified. This result does not
+prove an account capacity limit. The first-join-to-browser-close upper bound was 174.7 seconds. All
+31 participants were deleted and the meeting was verified inactive.
+
+A separate local zero-provider preflight after the fixture correction exercised 31 synthetic actor
+documents and 62 AudioContexts. All original and cloned synthetic tracks matched their advertised
+device IDs, group IDs, and labels; live audio/video tracks, AudioContext resumes, and local cleanup
+passed. It loaded no RealtimeKit SDK and made no provider requests, so it does not establish provider
+capacity.
+The Cloudflare project account was used for provider control-plane verification; no real member
+profiles or physical camera/microphone media were used. Media in these probes was synthetic.
