@@ -4,6 +4,10 @@ import { recordPurchase } from "@/lib/purchases";
 import { recordMembershipInvoice, syncSubscription, syncSubscriptionById } from "@/lib/membership-server";
 import { recordRefundFromCharge } from "@/lib/refunds";
 import { getStripe } from "@/lib/stripe";
+import {
+  releasePlatformCheckout,
+  syncPlatformSubscriptionById,
+} from "@/lib/platform-membership-server";
 
 // Stripe calls this after a payment. The signature check proves the message really came from Stripe.
 export async function POST(request: NextRequest) {
@@ -25,16 +29,59 @@ export async function POST(request: NextRequest) {
       event.type === "customer.subscription.updated" ||
       event.type === "customer.subscription.deleted"
     ) {
-      await syncSubscription(event.data.object);
+      const subscription = event.data.object;
+      if (subscription.metadata?.kind === "platform_membership") {
+        // Retrieve Stripe's current subscription state instead of trusting a delayed snapshot.
+        // The database revision CAS prevents an earlier in-flight read from overwriting it;
+        // event.created is retained only as audit data because delivery order is not guaranteed.
+        await syncPlatformSubscriptionById(subscription.id, {
+          id: event.id,
+          created: event.created,
+        });
+      } else {
+        await syncSubscription(subscription);
+      }
       return NextResponse.json({ received: true });
     }
     if (event.type === "invoice.paid") {
+      const subscriptionMetadata =
+        event.data.object.parent?.subscription_details?.metadata;
+      if (subscriptionMetadata?.kind === "platform_membership") {
+        // Platform invoices are not coach purchases and never include Connect commissions.
+        return NextResponse.json({ received: true });
+      }
       const saved = await recordMembershipInvoice(event.data.object);
       return saved ? NextResponse.json({ received: true }) : new NextResponse("Could not record invoice", { status: 500 });
     }
     if (event.type === "checkout.session.completed" && event.data.object.mode === "subscription") {
-      const subscription = event.data.object.subscription;
-      if (typeof subscription === "string") await syncSubscriptionById(subscription);
+      const session = event.data.object;
+      const subscription = session.subscription;
+      if (session.metadata?.kind === "platform_membership") {
+        if (
+          session.metadata.member_id &&
+          session.metadata.checkout_request_id &&
+          typeof subscription === "string"
+        ) {
+          await syncPlatformSubscriptionById(
+            subscription,
+            { id: event.id, created: event.created },
+            {
+              memberId: session.metadata.member_id,
+              checkoutRequestId: session.metadata.checkout_request_id,
+            },
+          );
+        }
+        // A malformed platform session must never fall through into coach billing sync.
+      } else if (typeof subscription === "string") {
+        await syncSubscriptionById(subscription);
+      }
+      return NextResponse.json({ received: true });
+    }
+    if (
+      event.type === "checkout.session.expired" &&
+      event.data.object.metadata?.kind === "platform_membership"
+    ) {
+      await releasePlatformCheckout(event.data.object.id);
       return NextResponse.json({ received: true });
     }
   } catch (error) {

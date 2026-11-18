@@ -298,6 +298,9 @@ describe("armoryItemSchema", () => {
     sizes: ["S", "M"],
     image_path: "",
     visible_to_all: true,
+    made_to_order: false,
+    delivery_min_weeks: null,
+    delivery_max_weeks: null,
   };
 
   it("accepts gear with sizes and shipping", () => {
@@ -310,6 +313,43 @@ describe("armoryItemSchema", () => {
 
   it("allows free shipping", () => {
     expect(armoryItemSchema.safeParse({ ...product, shipping_cents: 0 }).success).toBe(true);
+  });
+
+  it("accepts a made-to-order gear delivery window", () => {
+    expect(
+      armoryItemSchema.safeParse({
+        ...product,
+        made_to_order: true,
+        delivery_min_weeks: 3,
+        delivery_max_weeks: 4,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires a valid delivery window when an item is made to order", () => {
+    expect(
+      armoryItemSchema.safeParse({
+        ...product,
+        made_to_order: true,
+        delivery_min_weeks: null,
+        delivery_max_weeks: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      armoryItemSchema.safeParse({
+        ...product,
+        made_to_order: true,
+        delivery_min_weeks: 4,
+        delivery_max_weeks: 3,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("keeps Legacy / Other available only when editing an existing item", () => {
+    expect(armoryItemSchema.safeParse({ ...link, category: "other" }).success).toBe(false);
+    expect(
+      armoryItemSchema.safeParse({ ...link, id: owner, category: "other" }).success,
+    ).toBe(true);
   });
 
   it.each([null, 50])("needs a paid price of at least $1 (got %s)", (price_cents) => {

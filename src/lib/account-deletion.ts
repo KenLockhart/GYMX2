@@ -4,6 +4,7 @@ import type { Locale } from "@/i18n/config";
 import { sendEmail } from "@/lib/email";
 import { accountDeletedEmail } from "@/lib/email-templates";
 import { cancelAllMemberships } from "@/lib/membership-server";
+import { cancelAllPlatformMemberships } from "@/lib/platform-membership-server";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { deleteVideo, isStreamConfigured } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -140,15 +141,22 @@ async function removePayoutAccount(userId: string) {
     await getStripe().accounts.del(data.stripe_account_id as string);
 }
 
-// Deletes the person and everything that belongs to them. Files and videos outside the database
-// go first, each on a best-effort basis, so a hiccup at Cloudflare or Stripe never leaves an
-// account half-deleted. Orders they bought stay, without their name.
+// Deletes the person and everything that belongs to them. Platform billing must stop successfully
+// before cleanup begins so a Stripe outage cannot leave a deleted account with recurring charges.
+// Orders they bought stay, without their name.
 export async function deleteAccount(person: {
   id: string;
   email: string;
   name: string;
   locale?: Locale;
 }) {
+  try {
+    await cancelAllPlatformMemberships(person.id);
+  } catch (error) {
+    console.error("Account deletion: stopping platform billing failed", error);
+    return false;
+  }
+
   for (const [label, step] of [
     ["files", () => removeStoredFiles(person.id)],
     ["profile photos", () => removeProfilePhotoFiles(person.id)],

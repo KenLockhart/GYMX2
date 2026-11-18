@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { MIN_PAID_PRICE_CENTS, platformFeeCents } from "@/lib/armory";
+import { isPremiumCategory, MIN_PAID_PRICE_CENTS, platformFeeCents } from "@/lib/armory";
 import { requireAccount, requireCoach } from "@/lib/auth";
 import { notifyOrderShipped } from "@/lib/notify";
 import { refreshPayoutAccount } from "@/lib/purchases";
@@ -11,6 +11,7 @@ import { refundPurchase } from "@/lib/refunds";
 import { getStripe, isStripeConfigured, stripePublishableKey } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
+import { platformHasTier } from "@/lib/platform-membership-server";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState, ArmoryItem, CheckoutState } from "@/lib/types";
 import { idSchema, purchaseRequestSchema, shipOrderSchema } from "@/lib/validation";
@@ -96,12 +97,13 @@ export async function buyArmoryItem(_: CheckoutState, formData: FormData): Promi
   const supabase = await createClient();
   const { data: item } = await supabase
     .from("armory_items")
-    .select("id, coach_id, kind, title, price_cents, sizes, shipping_cents")
+    .select("id, coach_id, kind, category, title, price_cents, sizes, shipping_cents")
     .eq("id", request.data.item_id)
     .maybeSingle();
   const sellable = item as (Pick<
     ArmoryItem,
     "id" | "coach_id" | "kind" | "title" | "price_cents" | "sizes" | "shipping_cents"
+    | "category"
   >) | null;
   // Preview gear is deliberately not in this allowlist. Never create a Stripe
   // session for it, even if a caller submits the server action directly.
@@ -114,6 +116,12 @@ export async function buyArmoryItem(_: CheckoutState, formData: FormData): Promi
     return { error: "This item can't be bought right now." };
   }
   if (sellable.coach_id === profile.id) return { error: "This is your own item." };
+  if (
+    isPremiumCategory(sellable.category) &&
+    !(await platformHasTier(profile.id, "premium"))
+  ) {
+    return { error: "Premium membership required to buy this item." };
+  }
   const isGear = sellable.kind === "product";
 
   // Gear with sizes needs one of them. Digital files are bought once; gear can be ordered again.

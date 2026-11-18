@@ -1,0 +1,15 @@
+# Platform memberships
+
+Platform memberships are separate from coach subscriptions. They unlock member features and eligible Armory access and cost **$8/month for Regular** or **$24.95/month for Premium**, in USD. There is no platform trial. A member needs a verified active paid plan at launch; cancellation keeps access through the paid period end. Past-due subscriptions do not grant access. Platform billing has no coach Connect transfer or 10% fee.
+
+Regular includes ebooks, gear, accessories, and programs. Premium adds supplements and Doctor Network products. Premium catalog browsing and new purchases require Premium access. The signed-in member catalog has four Regular categories and two additional Premium categories; legacy `other` records remain preserved but are not a member catalog category. Previously purchased downloads stay available through My Purchases after a membership ends, subject to the existing purchase ownership checks.
+
+At rollout, a guarded update will mark the two existing gear products as made-to-order with a **3–4 week delivery estimate**. No other inventory rows will be changed. The structured delivery fields can be used for other physical items; sellers retain their normal inventory and fulfillment controls.
+
+The application requires server-configured `STRIPE_PLATFORM_REGULAR_PRICE_ID` and `STRIPE_PLATFORM_PREMIUM_PRICE_ID` values that identify the expected monthly USD prices. Those variables were absent from the production and preview environment metadata at the last readiness check. The Stripe customer portal configuration has not been verified. Do not activate platform checkout until both price IDs are configured and verified against Stripe, and the portal return flow is confirmed.
+
+Migration order is immutable member daily check-ins `20261117210000`, platform memberships `20261117220000`, then the platform paid-write gate for daily check-ins `20261117230000`. The third migration depends on both prior migrations. Review the exact migration set and target before applying it; do not use a blind production database push. The 22/23 migrations have only been exercised on isolated local database clones so far.
+
+The platform gate is enforced by the supported Next.js pages, server actions, credential-issuing endpoints, and Premium catalog RLS. Existing owned-download and privacy routes use their authenticated ownership checks without requiring a current plan. This does not claim a universal paid gate on every legacy direct Supabase RPC/table surface; review such surfaces separately before expanding the enforcement scope.
+
+Manual test entitlements are a separate, audited `manual_test` source, inserted through the service-only guarded operations procedure after exact target, member role, confirmed email, uniqueness, and explicit review checks. They are not Stripe subscriptions, invoice records, or charges. The generic template is `supabase/ops/grant_manual_platform_test_entitlement.sql`; never run it against a hosted project without a freshly reviewed target and explicit authorization. It records a documented service actor rather than attributing the grant to a human administrator.

@@ -1,0 +1,278 @@
+.member-dashboard {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.member-dashboard .portraitCard,
+.member-dashboard .panel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.member-dashboard .portraitCard {
+  overflow: hidden;
+  border-radius: 1rem;
+}
+
+.member-dashboard .memberPhotoFrame {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 68% 30%, rgb(200 241 53 / 18%), transparent 46%),
+    linear-gradient(145deg, #20261a, #11140f 62%, #242b1b);
+}
+
+.member-dashboard .memberPhotoImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+.member-dashboard .memberPhotoFallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.member-dashboard .memberFallbackIcon {
+  display: grid;
+  width: 5rem;
+  height: 5rem;
+  place-items: center;
+  border: 1px solid rgb(200 241 53 / 28%);
+  border-radius: 50%;
+  color: var(--accent);
+  background: rgb(200 241 53 / 7%);
+}
+
+.member-dashboard .portraitCaption {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.1rem 1.2rem 1.2rem;
+}
+
+.member-dashboard .memberName {
+  overflow-wrap: anywhere;
+}
+
+.member-dashboard .rightColumn {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 1.35rem;
+}
+
+.member-dashboard .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.member-dashboard .actions a {
+  display: inline-flex;
+  align-items: center;
+}
+
+.member-dashboard .panels {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.member-dashboard .panel {
+  min-width: 0;
+  border-radius: 0.9rem;
+  padding: 1rem;
+}
+
+.member-dashboard .panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.member-dashboard .panelTitle {
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.member-dashboard .welcomeTitle {
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+}
+
+.member-dashboard .panelList {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member-dashboard .listLink {
+  display: grid;
+  grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.6rem;
+  border-radius: 0.55rem;
+  padding: 0.6rem 0.35rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.member-dashboard .listLink:hover {
+  background: var(--surface-raised);
+}
+
+.member-dashboard .listIcon {
+  color: var(--accent);
+  margin-top: 0.1rem;
+}
+
+.member-dashboard .listMain {
+  min-width: 0;
+}
+
+.member-dashboard .listTitle {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.member-dashboard .listMeta {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.member-dashboard .empty,
+.member-dashboard .panelError {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.member-dashboard .panelError {
+  margin-top: 0.55rem;
+  color: var(--danger);
+}
+
+.member-dashboard .panelLink {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-underline-offset: 3px;
+}
+
+.member-dashboard .panelLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.member-dashboard .progressCard {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--surface);
+  padding: 1rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.member-dashboard .progressCard:hover {
+  border-color: var(--accent);
+}
+
+.member-dashboard .progressCard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.member-dashboard .statusError {
+  border: 1px solid var(--danger);
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+
+.member-dashboard .statusError a {
+  margin-left: 0.4rem;
+  color: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (min-width: 760px) {
+  .member-dashboard .panels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .member-dashboard .progressCard {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 899px) {
+  .member-dashboard .portraitCard {
+    display: grid;
+    grid-template-columns: minmax(7rem, 36%) minmax(0, 1fr);
+  }
+
+  .member-dashboard .memberPhotoFrame {
+    height: clamp(7rem, 25vw, 12rem);
+    aspect-ratio: auto;
+  }
+
+  .member-dashboard .portraitCaption {
+    align-content: center;
+    padding: 0.85rem;
+  }
+
+  .member-dashboard .memberPhotoFallback {
+    gap: 0.3rem;
+    padding: 0.35rem;
+    font-size: 0.7rem;
+  }
+
+  .member-dashboard .memberFallbackIcon {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .member-dashboard {
+    grid-template-columns: minmax(0, 0.34fr) minmax(0, 0.66fr);
+    gap: clamp(1.25rem, 2vw, 2rem);
+    align-items: start;
+  }
+
+  .member-dashboard .memberPhotoFrame {
+    min-height: 23rem;
+  }
+}

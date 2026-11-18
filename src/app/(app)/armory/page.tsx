@@ -4,13 +4,16 @@ import { requireAccount } from "@/lib/auth";
 import {
   ARMORY_CATEGORIES,
   categoryLabel,
+  deliveryEstimate,
   formatPrice,
+  isPremiumCategory,
   isCategory,
   isDisplayOnly,
   publicImageUrl,
 } from "@/lib/armory";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { getPlatformEntitlement } from "@/lib/platform-membership-server";
 import type { ArmoryItem } from "@/lib/types";
 import { T } from "@/i18n/t";
 import { getTr } from "@/i18n/server";
@@ -29,6 +32,9 @@ type CatalogItem = Pick<
   | "price_cents"
   | "image_path"
   | "visible_to_all"
+  | "made_to_order"
+  | "delivery_min_weeks"
+  | "delivery_max_weeks"
 > & { coach: { display_name: string } | null };
 
 export default async function ArmoryPage({
@@ -38,16 +44,24 @@ export default async function ArmoryPage({
 }) {
   const tr = await getTr();
   const { profile } = await requireAccount();
+  const entitlement = await getPlatformEntitlement(profile.id);
+  const hasPremium = entitlement.ok && entitlement.entitlement?.tier === "premium";
   const requested = (await searchParams).category;
-  const category = isCategory(requested) ? requested : null;
   const canAdd = profile.role === "coach" || profile.role === "admin";
+  const category =
+    isCategory(requested) && (requested !== "other" || canAdd)
+      ? requested
+      : null;
+  const categoryOptions = canAdd
+    ? ARMORY_CATEGORIES
+    : ARMORY_CATEGORIES.filter((option) => option.value !== "other");
 
   // Row security limits this to items from coaches the viewer joined, their own, and anything shared with everyone.
   const supabase = await createClient();
   let query = supabase
     .from("armory_items")
     .select(
-      "id, coach_id, kind, category, title, price_cents, image_path, visible_to_all, coach:profiles!coach_id(display_name)",
+      "id, coach_id, kind, category, title, price_cents, image_path, visible_to_all, made_to_order, delivery_min_weeks, delivery_max_weeks, coach:profiles!coach_id(display_name)",
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -66,9 +80,11 @@ export default async function ArmoryPage({
           <p className="mt-2 max-w-xl text-muted">
             {profile.role === "coach"
               ? tr(
-                  "Ebooks, gear and programs for your members. Sell them here, link to where you already sell, or share free downloads.",
+                  "Ebooks, gear, accessories and programs for your members. Premium adds supplements and doctor network products.",
                 )
-              : tr("Ebooks, gear and programs chosen by your coaches.")}
+              : tr(
+                  "Ebooks, gear, accessories and programs chosen by your coaches. Premium also includes supplements and doctor network products.",
+                )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -105,16 +121,30 @@ export default async function ArmoryPage({
         >
           <T>All</T>
         </Link>
-        {ARMORY_CATEGORIES.map((option) => (
-          <Link
-            key={option.value}
-            href={`/armory?category=${option.value}`}
-            className={`rounded-full border px-3 py-1 ${category === option.value ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-raised"}`}
-          >
-            <T>{option.label}</T>
-          </Link>
-        ))}
+        {categoryOptions.map((option) => {
+          const locked = isPremiumCategory(option.value) && !hasPremium;
+          const ownInventoryRole = profile.role === "coach" || profile.role === "admin";
+          return (
+            <Link
+              key={option.value}
+              href={locked && !ownInventoryRole ? "/membership?plan=premium" : `/armory?category=${option.value}`}
+              className={`rounded-full border px-3 py-1 ${category === option.value ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-raised"}`}
+            >
+              <T>{option.label}</T>
+              {locked && <span className="ml-2 text-xs text-muted"><T>Premium</T></span>}
+            </Link>
+          );
+        })}
       </nav>
+
+      {category && isPremiumCategory(category) && !hasPremium && items.length === 0 && (
+        <p className="rounded-lg border border-accent bg-surface p-4 text-sm">
+          <T>Premium membership is required to browse this category.</T>{" "}
+          <Link href="/membership?plan=premium" className="text-link">
+            <T>View Premium</T>
+          </Link>
+        </p>
+      )}
 
       {error ? (
         <p role="alert" className="text-danger">
@@ -138,6 +168,7 @@ export default async function ArmoryPage({
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => {
             const image = publicImageUrl(supabaseUrl, item.image_path);
+            const delivery = deliveryEstimate(item);
             const price =
               item.kind === "download"
                 ? tr("Free download")
@@ -180,6 +211,14 @@ export default async function ArmoryPage({
                     {isDisplayOnly(item) && (
                       <p className="text-sm font-semibold text-accent">
                         <T>Coming soon · Not for sale</T>
+                      </p>
+                    )}
+                    {delivery && (
+                      <p className="text-xs text-muted">
+                        {tr("Made to order. Estimated delivery: {min}–{max} weeks.", {
+                          min: delivery.minWeeks,
+                          max: delivery.maxWeeks,
+                        })}
                       </p>
                     )}
                     {item.coach_id === profile.id && (

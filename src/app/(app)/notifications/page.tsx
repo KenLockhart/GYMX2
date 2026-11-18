@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { NotificationList } from "@/components/notification-list";
 import { getT } from "@/i18n/server";
-import { requireAccount } from "@/lib/auth";
+import { requireAuthenticatedAccount } from "@/lib/auth";
 import { loadAuthors } from "@/lib/community-server";
 import type { NotificationDTO } from "@/lib/notifications";
 import { createClient } from "@/lib/supabase/server";
@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function NotificationsPage() {
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
   const t = (await getT()).notificationsPage;
   const supabase = await createClient();
   // Row security: only the signed-in person's own notifications.

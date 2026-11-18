@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getT } from "@/i18n/server";
+import { getLocale, getT } from "@/i18n/server";
 import { syncProgress } from "@/lib/achievements-data";
 import { requireAccount } from "@/lib/auth";
 import { CoachDashboard } from "@/components/coach-dashboard";
+import { MemberDashboard } from "@/components/member-dashboard";
 import { loadCoachDashboardData } from "@/lib/coach-dashboard-data";
+import { loadMemberDashboardData } from "@/lib/member-dashboard-data";
 import { weekStart } from "@/lib/checkins";
 import { todayKey } from "@/lib/reminders";
 import { createClient } from "@/lib/supabase/server";
@@ -40,24 +42,40 @@ export default async function DashboardPage() {
     );
   }
 
-  // From Thursday on, members with a coach see a nudge until they check in for the week.
-  let checkinDue = false;
-  const today = todayKey();
-  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
-  if (profile.role === "member" && (weekday === 0 || weekday >= 4)) {
-    const supabase = await createClient();
-    const [{ count: coaches }, { count: done }] = await Promise.all([
-      supabase
-        .from("coach_members")
-        .select("coach_id", { count: "exact", head: true })
-        .eq("member_id", profile.id),
-      supabase
+  if (profile.role === "member") {
+    const [data, locale] = await Promise.all([
+      loadMemberDashboardData(profile.id),
+      getLocale(),
+    ]);
+    let weeklyCheckinDue = false;
+    const today = todayKey();
+    const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+    if (
+      data.coachSelection === "selected" &&
+      (weekday === 0 || weekday >= 4)
+    ) {
+      const supabase = await createClient();
+      const { count: done, error } = await supabase
         .from("checkins")
         .select("id", { count: "exact", head: true })
         .eq("member_id", profile.id)
-        .eq("week_start", weekStart(today)),
-    ]);
-    checkinDue = (coaches ?? 0) > 0 && (done ?? 0) === 0;
+        .eq("week_start", weekStart(today));
+      weeklyCheckinDue = !error && (done ?? 0) === 0;
+    }
+
+    return (
+      <MemberDashboard
+        profile={profile}
+        data={data}
+        progress={progress}
+        tasksCopy={t.tasks}
+        locale={locale}
+        copy={d}
+        roleLabel={t.common.roles.member}
+        levels={t.options.levels}
+        weeklyCheckinDue={weeklyCheckinDue}
+      />
+    );
   }
 
   return (
@@ -69,21 +87,6 @@ export default async function DashboardPage() {
         <h1 className="mt-1 text-5xl">{d.welcome(profile.display_name)}</h1>
         <p className="mt-3 max-w-xl text-muted">{d.intro[profile.role]}</p>
       </div>
-
-      {checkinDue && (
-        <Link
-          href="/checkin"
-          className="flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-lg border border-accent bg-surface p-5 transition hover:bg-surface-raised"
-        >
-          <span>
-            <span className="block text-lg font-semibold">
-              {d.checkinTitle}
-            </span>
-            <span className="text-sm text-muted">{d.checkinBody}</span>
-          </span>
-          <span className="btn-primary">{d.checkinButton}</span>
-        </Link>
-      )}
 
       {progress && (
         <Link
@@ -139,22 +142,6 @@ export default async function DashboardPage() {
       )}
 
       <div className="flex flex-wrap gap-3">
-        {profile.role === "member" && (
-          <>
-            <Link href="/tasks" className="btn-primary">
-              {d.seeTasks}
-            </Link>
-            <Link href="/calendar" className="btn-secondary">
-              {d.openCalendar}
-            </Link>
-            <Link href="/armory" className="btn-secondary">
-              {d.visitArmory}
-            </Link>
-            <Link href="/coaches" className="btn-secondary">
-              {d.findCoach}
-            </Link>
-          </>
-        )}
         <Link
           href="/profile"
           className={profile.role === "admin" ? "btn-primary" : "btn-secondary"}

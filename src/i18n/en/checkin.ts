@@ -2,6 +2,22 @@ export const checkin = {
   title: "Weekly check-in",
   intro: (week: string) =>
     `A minute to tell your coaches how your week went. Only you and the coaches you've joined see it. Week of ${week}.`,
+  daily: {
+    title: "Daily wellbeing check-in",
+    intro: (date: string) => `How are you feeling today? ${date}.`,
+    alreadyDone: "You checked in today. You can update your answers any time today.",
+    backToDashboard: "Back to dashboard",
+    retry: "Try again",
+    memberOnly: "Daily check-ins are for members.",
+    invalidAnswers: "Choose a score from 1 to 5 for every question.",
+    stale: "The day changed while this page was open. Refresh before saving your check-in.",
+    submit: "Save today’s check-in",
+    update: "Update today’s check-in",
+    saving: "Saving...",
+    saved: "Your daily check-in is saved.",
+    loadError: "We couldn’t load today’s check-in. Refresh to try again.",
+    saveError: "We couldn’t save your check-in. Please try again.",
+  },
   joinFirst: "Join a coach first and your check-ins will go to them.",
   findCoach: "Find a coach",
   alreadyDone:

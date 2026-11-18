@@ -89,6 +89,17 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     visible_to_all: formData.get("visible_to_all") === "on",
     shipping_cents,
     sizes,
+    made_to_order:
+      (kind === "product" || kind === "preview") &&
+      formData.get("made_to_order") === "on",
+    delivery_min_weeks:
+      kind === "product" || kind === "preview"
+        ? String(formData.get("delivery_min_weeks") ?? "")
+        : "",
+    delivery_max_weeks:
+      kind === "product" || kind === "preview"
+        ? String(formData.get("delivery_max_weeks") ?? "")
+        : "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const item = parsed.data;
@@ -113,6 +124,17 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     visible_to_all: item.visible_to_all,
     sizes: (item.kind === "product" || item.kind === "preview") ? item.sizes : [],
     shipping_cents: (item.kind === "product" || item.kind === "preview") ? item.shipping_cents : 0,
+    made_to_order:
+      (item.kind === "product" || item.kind === "preview") &&
+      item.made_to_order,
+    delivery_min_weeks:
+      item.kind === "product" || item.kind === "preview"
+        ? item.delivery_min_weeks
+        : null,
+    delivery_max_weeks:
+      item.kind === "product" || item.kind === "preview"
+        ? item.delivery_max_weeks
+        : null,
   };
 
   const supabase = await createClient();
@@ -120,11 +142,14 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
   if (itemId) {
     const { data: before } = await supabase
       .from("armory_items")
-      .select("file_path, image_path")
+      .select("file_path, image_path, category")
       .eq("id", itemId)
       .eq("coach_id", profile.id)
-      .maybeSingle<Pick<ArmoryItem, "file_path" | "image_path">>();
+      .maybeSingle<Pick<ArmoryItem, "file_path" | "image_path" | "category">>();
     if (!before) return { error: "We couldn't find that item." };
+    if (item.category === "other" && before.category !== "other") {
+      return { error: "Legacy / Other is only available for existing legacy items." };
+    }
 
     const { error } = await supabase.from("armory_items").update(fields).eq("id", itemId).eq("coach_id", profile.id);
     if (error) return { error: "We couldn't save that item. Please try again." };

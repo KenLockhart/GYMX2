@@ -73,6 +73,13 @@ const SECTIONS: {
     order: "week_start",
   },
   {
+    name: "daily_check_ins",
+    table: "member_daily_checkins",
+    columns: "day, energy, sleep, stress, motivation, created_at, updated_at",
+    owner: "member_id",
+    order: "day",
+  },
+  {
     name: "tasks_assigned_to_you",
     table: "task_assignments",
     columns: "completed_at, created_at, task:tasks(title, instructions)",
@@ -259,6 +266,13 @@ const SECTIONS: {
     columns:
       "plan_name, price_cents, status, current_period_end, trial_end, cancel_at_period_end, created_at",
     owner: "member_id",
+  },
+  {
+    name: "platform_memberships",
+    table: "platform_memberships",
+    columns: "tier, status, current_period_end, cancel_at_period_end, created_at, updated_at",
+    owner: "member_id",
+    order: "created_at",
   },
   {
     name: "reviews_written",

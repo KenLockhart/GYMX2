@@ -1,4 +1,5 @@
 import { VIDEO_CATEGORIES } from "./video-library";
+import { ARMORY_CATEGORY_VALUES } from "./armory";
 import { z } from "zod";
 
 const email = z
@@ -197,10 +198,15 @@ const armoryDescription = z
   .string()
   .trim()
   .max(4000, "Use 4,000 characters or fewer for the description.");
-const armoryCategory = z.enum(["ebook", "gear", "program", "other"], {
+const armoryCategory = z.enum(ARMORY_CATEGORY_VALUES, {
   error: "Choose a category.",
 });
 const blankToNull = z.literal("").transform(() => null);
+const optionalDeliveryWeeks = z.union([
+  blankToNull,
+  z.null(),
+  z.coerce.number().int().min(1).max(52),
+]);
 // Stored paths look like "<owner id>/<random>-<name>". The owner part is checked again by the database.
 const storagePath = z
   .string()
@@ -292,6 +298,9 @@ export const armoryItemSchema = z
         .max(20, "Use 20 sizes or fewer."),
       image_path: z.union([blankToNull, storagePath]),
       visible_to_all: z.boolean(),
+      made_to_order: z.boolean(),
+      delivery_min_weeks: optionalDeliveryWeeks,
+      delivery_max_weeks: optionalDeliveryWeeks,
     }),
     z.object({
       kind: z.literal("preview"),
@@ -316,8 +325,27 @@ export const armoryItemSchema = z
         .max(20, "Use 20 sizes or fewer."),
       image_path: z.union([blankToNull, storagePath]),
       visible_to_all: z.boolean(),
+      made_to_order: z.boolean(),
+      delivery_min_weeks: optionalDeliveryWeeks,
+      delivery_max_weeks: optionalDeliveryWeeks,
     }),
   ])
+  .refine(
+    (item) =>
+      item.kind !== "product" && item.kind !== "preview"
+        ? true
+        : item.made_to_order
+          ? item.delivery_min_weeks !== null &&
+            item.delivery_max_weeks !== null &&
+            item.delivery_max_weeks >= item.delivery_min_weeks
+          : item.delivery_min_weeks === null &&
+            item.delivery_max_weeks === null,
+    {
+      error:
+        "Made-to-order items need a valid delivery window; clear the window if they are not made to order.",
+      path: ["delivery_min_weeks"],
+    },
+  )
   .refine(
     (item) =>
       !(
@@ -330,7 +358,11 @@ export const armoryItemSchema = z
         'Gear ships to the buyer, so it can\'t be a download. Choose "Sell gear" or "Buy it elsewhere".',
       path: ["category"],
     },
-  );
+  )
+  .refine((item) => item.category !== "other" || Boolean(item.id), {
+    error: "Legacy / Other is only available when editing an existing item.",
+    path: ["category"],
+  });
 
 export const purchaseRequestSchema = z.object({
   item_id: z.uuid(),
