@@ -155,11 +155,86 @@ export async function enableMediaOnlyWhileCurrent(options: {
   }
   try {
     if (!isEnabled()) throw new Error("media-enable-not-confirmed");
+    if (!(await authorize()) || !isCurrent()) {
+      await disable().catch(() => {});
+      return false;
+    }
+    if (!isEnabled()) throw new Error("media-enable-not-confirmed");
   } catch (error) {
     await disable().catch(() => {});
     throw error;
   }
   return true;
+}
+
+export type GroupCritiqueMediaKind = "audio" | "video";
+
+export function getGroupCritiqueMediaEligibility(options: {
+  roomOpen: boolean;
+  snapshotFresh: boolean;
+  hasConsented: boolean;
+  membershipEligible: boolean;
+  publisherReady: boolean;
+  canPublishAudio: boolean;
+  canPublishVideo: boolean;
+  isCoach: boolean;
+  memberIsMuted: boolean;
+}): { audio: boolean; video: boolean } {
+  const canUseDevices =
+    options.roomOpen &&
+    options.snapshotFresh &&
+    (options.isCoach ||
+      (options.hasConsented && options.membershipEligible));
+  const mayEnable = canUseDevices && options.publisherReady;
+  return {
+    audio:
+      mayEnable &&
+      options.canPublishAudio &&
+      (options.isCoach || !options.memberIsMuted),
+    video: mayEnable && options.canPublishVideo,
+  };
+}
+
+export type GroupCritiqueMediaEligibility = {
+  update: (next: { audio: boolean; video: boolean }) => void;
+  revision: (kind: GroupCritiqueMediaKind) => number;
+  isCurrent: (kind: GroupCritiqueMediaKind, revision: number) => boolean;
+};
+
+/** Track current per-media eligibility and invalidate in-flight enable attempts on policy changes. */
+export function createGroupCritiqueMediaEligibility(): GroupCritiqueMediaEligibility {
+  let current = { audio: false, video: false };
+  const revisions = { audio: 0, video: 0 };
+
+  return {
+    update(next) {
+      if (next.audio !== current.audio) revisions.audio += 1;
+      if (next.video !== current.video) revisions.video += 1;
+      current = next;
+    },
+    revision(kind) {
+      return revisions[kind];
+    },
+    isCurrent(kind, revision) {
+      return current[kind] && revisions[kind] === revision;
+    },
+  };
+}
+
+export function isGroupCritiqueMediaOperationCurrent(options: {
+  mounted: boolean;
+  meetingMatches: boolean;
+  currentJoinRevision: number;
+  joinRevision: number;
+  currentIntentRevision: number;
+  intentRevision: number;
+}): boolean {
+  return (
+    options.mounted &&
+    options.meetingMatches &&
+    options.currentJoinRevision === options.joinRevision &&
+    options.currentIntentRevision === options.intentRevision
+  );
 }
 
 export type GroupMutePolicy = {

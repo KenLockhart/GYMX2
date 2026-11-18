@@ -2,13 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import {
   canSelectSessionMember,
   countUniqueLiveParticipants,
+  createGroupCritiqueMediaEligibility,
   createGroupMutePolicy,
   enableMediaOnlyWhileCurrent,
+  getGroupCritiqueMediaEligibility,
   hasGroupCritiqueCapacity,
-  groupCritiqueParticipantEpochMatches,
   groupCritiqueCirclePositions,
   groupCritiqueCircleStyle,
   groupCritiqueMobilePage,
+  groupCritiqueParticipantEpochMatches,
+  isGroupCritiqueMediaOperationCurrent,
   partitionGroupCritiquePeers,
   queueGroupMutePolicy,
   shouldLeaveGroupMeeting,
@@ -56,6 +59,212 @@ describe("group critique SDK capacity", () => {
       expect(hasGroupCritiqueCapacity(limit)).toBe(false);
     },
   );
+});
+
+describe("group critique media eligibility", () => {
+  function createOperationIdentity() {
+    return {
+      mounted: true,
+      meetingMatches: true,
+      currentJoinRevision: 4,
+      joinRevision: 4,
+      currentIntentRevision: 9,
+      intentRevision: 9,
+    };
+  }
+
+  it("maps freshness, consent, stage, and coach mute to independent media eligibility", () => {
+    const member = {
+      roomOpen: true,
+      snapshotFresh: true,
+      hasConsented: true,
+      membershipEligible: true,
+      publisherReady: true,
+      canPublishAudio: true,
+      canPublishVideo: true,
+      isCoach: false,
+      memberIsMuted: false,
+    };
+
+    expect(getGroupCritiqueMediaEligibility(member)).toEqual({
+      audio: true,
+      video: true,
+    });
+    expect(
+      getGroupCritiqueMediaEligibility({ ...member, memberIsMuted: true }),
+    ).toEqual({ audio: false, video: true });
+    expect(
+      getGroupCritiqueMediaEligibility({ ...member, snapshotFresh: false }),
+    ).toEqual({ audio: false, video: false });
+    expect(
+      getGroupCritiqueMediaEligibility({ ...member, hasConsented: false }),
+    ).toEqual({ audio: false, video: false });
+    expect(
+      getGroupCritiqueMediaEligibility({ ...member, membershipEligible: false }),
+    ).toEqual({ audio: false, video: false });
+    expect(
+      getGroupCritiqueMediaEligibility({ ...member, publisherReady: false }),
+    ).toEqual({ audio: false, video: false });
+    expect(
+      getGroupCritiqueMediaEligibility({
+        ...member,
+        isCoach: true,
+        hasConsented: false,
+        membershipEligible: false,
+        memberIsMuted: true,
+      }),
+    ).toEqual({ audio: true, video: true });
+  });
+
+  it("does not start capture when mute arrives during fresh authorization", async () => {
+    const eligibility = createGroupCritiqueMediaEligibility();
+    eligibility.update({ audio: true, video: true });
+    const audioRevision = eligibility.revision("audio");
+    const videoRevision = eligibility.revision("video");
+    const identity = createOperationIdentity();
+    const operationIsCurrent = () =>
+      isGroupCritiqueMediaOperationCurrent(identity);
+    const isCurrent = () =>
+      operationIsCurrent() && eligibility.isCurrent("audio", audioRevision);
+    let resolveAuthorization!: (allowed: boolean) => void;
+    let markAuthorizationStarted!: () => void;
+    const authorizationStarted = new Promise<void>((resolve) => {
+      markAuthorizationStarted = resolve;
+    });
+    const authorization = new Promise<boolean>((resolve) => {
+      resolveAuthorization = resolve;
+    });
+    const enable = vi.fn(async () => {});
+    let busy = true;
+    const run = async () => {
+      try {
+        return await enableMediaOnlyWhileCurrent({
+          isCurrent,
+          authorize: () => {
+            markAuthorizationStarted();
+            return authorization;
+          },
+          enable,
+          isEnabled: () => false,
+          disable: vi.fn(async () => {}),
+        });
+      } finally {
+        if (operationIsCurrent()) busy = false;
+      }
+    };
+
+    const pending = run();
+    await authorizationStarted;
+    eligibility.update({ audio: false, video: true });
+    resolveAuthorization(true);
+
+    await expect(pending).resolves.toBe(false);
+    expect(enable).not.toHaveBeenCalled();
+    expect(busy).toBe(false);
+    expect(eligibility.isCurrent("video", videoRevision)).toBe(true);
+  });
+
+  it("does not revive late capture after mute and unmute, then allows an explicit retry", async () => {
+    const eligibility = createGroupCritiqueMediaEligibility();
+    eligibility.update({ audio: true, video: true });
+    const audioRevision = eligibility.revision("audio");
+    const videoRevision = eligibility.revision("video");
+    const identity = createOperationIdentity();
+    const operationIsCurrent = () =>
+      isGroupCritiqueMediaOperationCurrent(identity);
+    const isCurrent = () =>
+      operationIsCurrent() && eligibility.isCurrent("audio", audioRevision);
+    let audioEnabled = false;
+    let resolveEnable!: () => void;
+    let markEnableStarted!: () => void;
+    const enableStarted = new Promise<void>((resolve) => {
+      markEnableStarted = resolve;
+    });
+    const enablePromise = new Promise<void>((resolve) => {
+      resolveEnable = resolve;
+    });
+    const enable = vi.fn(async () => {
+      markEnableStarted();
+      await enablePromise;
+      audioEnabled = true;
+    });
+    const disable = vi.fn(async () => {
+      audioEnabled = false;
+    });
+    let busy = true;
+    const run = async () => {
+      try {
+        return await enableMediaOnlyWhileCurrent({
+          isCurrent,
+          authorize: async () => true,
+          enable,
+          isEnabled: () => audioEnabled,
+          disable,
+        });
+      } finally {
+        if (operationIsCurrent()) busy = false;
+      }
+    };
+
+    const pending = run();
+    await enableStarted;
+    eligibility.update({ audio: false, video: true });
+    eligibility.update({ audio: true, video: true });
+    resolveEnable();
+
+    await expect(pending).resolves.toBe(false);
+    expect(audioEnabled).toBe(false);
+    expect(enable).toHaveBeenCalledOnce();
+    expect(disable).toHaveBeenCalledOnce();
+    expect(busy).toBe(false);
+    expect(eligibility.isCurrent("video", videoRevision)).toBe(true);
+    expect(eligibility.isCurrent("audio", audioRevision)).toBe(false);
+    expect(eligibility.isCurrent("audio", eligibility.revision("audio"))).toBe(
+      true,
+    );
+
+    eligibility.update({ audio: true, video: true });
+    const retryRevision = eligibility.revision("audio");
+    const retry = await enableMediaOnlyWhileCurrent({
+      isCurrent: () =>
+        operationIsCurrent() && eligibility.isCurrent("audio", retryRevision),
+      authorize: async () => true,
+      enable: async () => {
+        audioEnabled = true;
+      },
+      isEnabled: () => audioEnabled,
+      disable: async () => {
+        audioEnabled = false;
+      },
+    });
+
+    expect(retry).toBe(true);
+    expect(audioEnabled).toBe(true);
+  });
+
+  it("stops an enabled device when the post-enable backend check denies it", async () => {
+    let audioEnabled = false;
+    const authorize = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const disable = vi.fn(async () => {
+      audioEnabled = false;
+    });
+
+    await expect(
+      enableMediaOnlyWhileCurrent({
+        isCurrent: () => true,
+        authorize,
+        enable: async () => {
+          audioEnabled = true;
+        },
+        isEnabled: () => audioEnabled,
+        disable,
+      }),
+    ).resolves.toBe(false);
+
+    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(disable).toHaveBeenCalledOnce();
+    expect(audioEnabled).toBe(false);
+  });
 });
 
 describe("group critique circle CSS", () => {

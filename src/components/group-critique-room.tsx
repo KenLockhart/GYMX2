@@ -4,6 +4,7 @@ import type { RTKParticipant } from "@cloudflare/realtimekit";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -27,12 +28,15 @@ import {
   GROUP_CRITIQUE_MOBILE_PAGE_SIZE,
   hasGroupCritiqueCapacity,
   countUniqueLiveParticipants,
+  createGroupCritiqueMediaEligibility,
   createGroupMutePolicy,
   enableMediaOnlyWhileCurrent,
+  getGroupCritiqueMediaEligibility,
   groupCritiqueCirclePositions,
   groupCritiqueCircleStyle,
   groupCritiqueMobilePage,
   groupCritiqueParticipantEpochMatches,
+  isGroupCritiqueMediaOperationCurrent,
   partitionGroupCritiquePeers,
   queueGroupMutePolicy,
   shouldLeaveGroupMeeting,
@@ -46,6 +50,9 @@ import {
   checkIn,
   type LiveChatMessage,
 } from "@/app/(app)/calendar/[id]/live/actions";
+
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 type RealtimeMeeting = Awaited<
   ReturnType<typeof import("@cloudflare/realtimekit").default.init>
@@ -464,6 +471,10 @@ function GroupCritiqueRoom({
   const joinRevision = useRef(0);
   const cameraIntent = useRef(0);
   const microphoneIntent = useRef(0);
+  const mediaEligibility = useMemo(
+    () => createGroupCritiqueMediaEligibility(),
+    [],
+  );
   const cameraBusyRef = useRef(false);
   const microphoneBusyRef = useRef(false);
   const mounted = useRef(false);
@@ -503,6 +514,33 @@ function GroupCritiqueRoom({
       // Ignore teardown errors; don't keep stale media attached in the UI.
     }
   }, []);
+
+  useClientLayoutEffect(() => {
+    mediaEligibility.update(
+      getGroupCritiqueMediaEligibility({
+        roomOpen,
+        snapshotFresh,
+        hasConsented,
+        membershipEligible: ownMember?.membershipState === "eligible",
+        publisherReady,
+        canPublishAudio: credentials?.canPublishAudio === true,
+        canPublishVideo: credentials?.canPublishVideo === true,
+        isCoach,
+        memberIsMuted,
+      }),
+    );
+  }, [
+    credentials?.canPublishAudio,
+    credentials?.canPublishVideo,
+    hasConsented,
+    isCoach,
+    ownMember?.membershipState,
+    mediaEligibility,
+    memberIsMuted,
+    publisherReady,
+    roomOpen,
+    snapshotFresh,
+  ]);
 
   useEffect(() => {
     mounted.current = true;
@@ -1014,11 +1052,19 @@ function GroupCritiqueRoom({
     if (!client || cameraBusyRef.current || !mounted.current) return;
     const sessionRevision = joinRevision.current;
     const intent = ++cameraIntent.current;
+    const eligibilityRevision = mediaEligibility.revision("video");
+    const isOperationCurrent = () =>
+      isGroupCritiqueMediaOperationCurrent({
+        mounted: mounted.current,
+        meetingMatches: meetingRef.current === client,
+        currentJoinRevision: joinRevision.current,
+        joinRevision: sessionRevision,
+        currentIntentRevision: cameraIntent.current,
+        intentRevision: intent,
+      });
     const isCurrent = () =>
-      mounted.current &&
-      meetingRef.current === client &&
-      joinRevision.current === sessionRevision &&
-      cameraIntent.current === intent;
+      isOperationCurrent() &&
+      mediaEligibility.isCurrent("video", eligibilityRevision);
     cameraBusyRef.current = true;
     setCameraBusy(true);
     setError(null);
@@ -1040,7 +1086,7 @@ function GroupCritiqueRoom({
     } catch {
       if (isCurrent()) setError(t.deviceError);
     } finally {
-      if (isCurrent()) {
+      if (isOperationCurrent()) {
         cameraBusyRef.current = false;
         setCameraBusy(false);
       }
@@ -1052,11 +1098,19 @@ function GroupCritiqueRoom({
     if (!client || microphoneBusyRef.current || !mounted.current) return;
     const sessionRevision = joinRevision.current;
     const intent = ++microphoneIntent.current;
+    const eligibilityRevision = mediaEligibility.revision("audio");
+    const isOperationCurrent = () =>
+      isGroupCritiqueMediaOperationCurrent({
+        mounted: mounted.current,
+        meetingMatches: meetingRef.current === client,
+        currentJoinRevision: joinRevision.current,
+        joinRevision: sessionRevision,
+        currentIntentRevision: microphoneIntent.current,
+        intentRevision: intent,
+      });
     const isCurrent = () =>
-      mounted.current &&
-      meetingRef.current === client &&
-      joinRevision.current === sessionRevision &&
-      microphoneIntent.current === intent;
+      isOperationCurrent() &&
+      mediaEligibility.isCurrent("audio", eligibilityRevision);
     microphoneBusyRef.current = true;
     setMicrophoneBusy(true);
     setError(null);
@@ -1083,7 +1137,7 @@ function GroupCritiqueRoom({
     } catch {
       if (isCurrent()) setError(t.deviceError);
     } finally {
-      if (isCurrent()) {
+      if (isOperationCurrent()) {
         microphoneBusyRef.current = false;
         setMicrophoneBusy(false);
       }
