@@ -5,6 +5,19 @@ Cloudflare Stream broadcasts and private one-to-one live rooms keep their curren
 feature is unavailable until its RealtimeKit configuration is present, bound to the database by
 the cleanup worker, and verified against the preset rules below.
 
+## Current readiness (2026-11-18)
+
+PR71 remains a draft because 31-person media capacity is not verified. The production checks at
+commit `2e04dfc` passed: 574 tests across 59 files, lint, typecheck, and production build; production
+source has not changed since those checks. A qualified three-person runtime probe passed with the
+RealtimeKit SDK, production media helpers, and synthetic persisted-mute policy. It does not verify
+hosted DOM/database authorization or establish a provider-enforced media hard lock.
+
+The latest 31-client attempt joined all 31 actors and staged all 30 members. Thirty actors published
+audio and video; the final actor, `member-30`, failed during publish before outbound media was
+confirmed. No receiver metrics ran, so none of the 930 directed audio or 930 directed video pairs
+were measured. This is not a capacity pass and does not establish a provider participant cap.
+
 ## Provider setup
 
 Create one RealtimeKit app in the verified GYMX2 Cloudflare account
@@ -25,7 +38,10 @@ environment variables; none may use a `NEXT_PUBLIC_` prefix:
 
 Configure all three presets as `WEBINAR` with stage enabled, no recording, no livestreaming, and
 screenshare production disabled. Set `max_video_streams` to 31 for both desktop and mobile on all
-three presets; the default limit is too low for a 30-member room plus its coach:
+three presets; the default limit is too low for a 30-member room plus its coach. Cloudflare defines
+this field as the maximum number of video streams visible per device, a receive-visibility setting
+([preset API reference](https://developers.cloudflare.com/api/resources/realtime_kit/subresources/presets/methods/get_preset_by_id/));
+it does not guarantee outbound publisher capacity:
 
 | Preset | Stage access | Audio/video production | Required extra permissions |
 | --- | --- | --- | --- |
@@ -99,6 +115,11 @@ confirmed no automatic capture, published synthetic audio/video, and decoded two
 each client. A preliminary mute check observed advancing RTP counters after mute; because RTP can
 continue while carrying silence, this alone was not an audio-mute result.
 
+The following three-person mute measurements are historical and came from the earlier QA path
+that manually called the provider permission update API. That unsupported probe has been removed;
+these measurements are not evidence for the production helper path or for provider-enforced
+microphone denial.
+
 A later three-person synthetic controls run joined/staged all participants and published synthetic
 audio/video with capture disabled at join. With unmuted audio sinks attached, inbound energy advanced
 for both member sources by approximately `0.000176` over 1.2 seconds. Host bulk mute set both member
@@ -141,3 +162,247 @@ passed. It loaded no RealtimeKit SDK and made no provider requests, so it does n
 capacity.
 The Cloudflare project account was used for provider control-plane verification; no real member
 profiles or physical camera/microphone media were used. Media in these probes was synthetic.
+
+2026-11-17: QA startup now compiles the five public harness pages and the server-only RealtimeKit
+adapter into separate ignored build directories. The local-only route check returned HTTP 200 for
+all five HTML routes and seven referenced JavaScript assets, with no setup-file read, provider
+request, or resource creation. The read-only live-server preflight verified the exact account, app,
+and presets, then returned HTTP 200 for the same pages and assets. Runtime static serving reads only
+the public client build; the server adapter bundle is outside that root. The previous Vite development
+server route timeouts are resolved by serving the prebuilt client files with the loopback Node HTTP
+server.
+
+Two bounded three-person controls attempts on 2026-11-17 joined three synthetic participants and
+published synthetic audio/video from all three. Both observed advancing inbound energy for both
+member sources before host mute (approximately 0.00018–0.00022 over 1.2 seconds with the audio sinks
+playing), then stopped at `remote-mute-state-timeout`; both cleaned up all three participants and
+verified the meeting inactive. A focused retry recorded that the host's public
+`canChangeParticipantPermissions` flag was true and its mute operation returned two updated peers.
+After 10 seconds, both members' public audio permission still read `ALLOWED`, although their audio
+was disabled and each live track's `enabled` flag was false. No reconnect denial attempt or
+explicit-allow positive control was reached. This does not establish settled `NOT_ALLOWED` behavior,
+and the harness's manual host provider permission operation does not test the application's persisted
+reconnect policy. No 31-person media run was authorized or performed.
+
+A third, focused three-person diagnostic on 2026-11-17 corrected the identity check to pair expected
+public user IDs with peers by `customParticipantId`, independent of SDK join order. Both identities
+matched their expected tags (2/2), the host still reported permission-change capability, and the
+public async error observer recorded no errors. After the bounded 10-second settlement window, both
+members still reported `ALLOWED`; audio remained disabled and each synthetic audio track remained
+live but disabled. The run stopped at the same `remote-mute-state-timeout`, so the post-settlement
+denial attempt and explicit-allow positive control were not reached. Cleanup deleted all three
+participants and verified the meeting inactive. The runner's initial process-shutdown wait returned
+false; a follow-up OS query found no Edge process tied to that run's isolated profile and no Node
+process tied to the QA harness. At that point, no further provider retry or 31-person media run had
+been performed.
+
+2026-11-17: the controls harness now imports the production group-critique media helpers and uses an
+in-memory server-held policy fixture that persists per-member mute state across synthetic leave and
+rejoin. This fixture does not exercise the hosted application DOM or database authorization. The
+harness uses the public RealtimeKit `peer.disableAudio()` method and confirms the public peer flags
+and local application-policy helper result; it does not change provider media permissions or claim
+a provider hard lock.
+
+One bounded three-person run passed its start and media baseline checks: all three synthetic actors
+joined with capture off, both members reached the stage, and all three published synthetic audio
+and video. The four member-source directed audio receiver pairs advanced inbound energy by roughly
+`0.000174`–`0.000282` over 1.2 seconds and their sink times advanced; all six directed video pairs
+advanced RTP packets, decoded-frame counters, and attached video sinks with stable receiver
+identities. The host applied the persisted group mute, the public host peer audio flags were off,
+the member-side production helper disabled each local mic without an extra capture, and video
+remained enabled.
+
+The run stopped at its first strict group-mute silence assertion. Over a 1.2026–1.2028 second sample,
+inbound `totalAudioEnergy` still rose on all four member-source receiver pairs while packet counters
+and sink time advanced. The deltas were `+0.0000056960` and `+0.0000102791` for member 01 at the coach
+and member 02 receivers, and `+0.0000170318` and `+0.0000242977` for member 02 at the coach and member
+01 receivers. Each receiving peer reported `audioEnabled=false`; its remote track was still live,
+reported `enabled=false`, and remained attached to a playing sink. The harness did not record exact
+wall-clock time since each disable confirmation, local outbound sender counter progression, or
+decoded playback samples, so this evidence cannot distinguish buffered decoder tail from continued
+encoded media and does not establish audible output. Selected allow, explicit re-enable, reconnect,
+and remute checks were not reached. The strict zero-energy criterion was not weakened.
+
+The run was cleaned up after the failed assertion: all three participants were deleted, the meeting
+was verified inactive, and the owned Edge/server processes stopped. The following local-only checks
+also passed before the run: the exact account, app, and preset definitions were read-only verified;
+the native static server returned HTTP 200 for five harness pages and seven referenced assets; and
+direct setup-file access returned HTTP 403. These preflights created no provider resources.
+
+After reviewing the measurement model, the harness was updated to add a per-receiver Web Audio
+time-domain analyser for the three-person controls only, plus sample timestamps, host/member disable
+request and confirmation times, local sender counters, and two 1.2-second windows after a bounded
+two-second settle. Its byte-domain output level requires exact zero for silence and a nonzero
+synthetic positive control; inbound RTP energy remains a separate reported counter. The analyser is
+disabled on the 31-client harness to avoid adding hundreds of nodes to a capacity measurement.
+
+One later bounded `--mute-only` run on 2026-11-18 exercised this measurement path. The three synthetic
+actors joined with capture off, both members staged, and all three published synthetic audio/video.
+All six directed audio and six directed video baseline pairs passed. After persisted group mute, all
+four member-source audio pairs passed both post-settle windows: exact receiver/report identities
+remained stable, public peer audio and remote-track enabled flags were off, packets and attached sink
+time continued advancing, and consumer PCM RMS stayed exactly zero. Coach-source audio also remained
+positive, and all six video receiver pairs continued decoding. Inbound RTP energy changes were
+collected as separate diagnostics and were not used as the playback-silence gate.
+
+The run then passed the selected-allow-without-auto-capture check and stopped at
+`selected-audio-enable-timeout` during the explicit microphone positive control. At that time, the
+wait predicate required audio enabled, a live enabled track, and a greater `getUserMedia` counter.
+The final action response and member state were not saved in a run artifact; the long console result
+was truncated by the tool. Therefore this run does not establish whether the enable helper rejected,
+whether the SDK re-enabled an existing track without another capture call, or whether the track failed
+to become live. Exact per-pair RTP energy deltas and sender-counter snapshots from this run are also
+unavailable. Individual mute/re-enable, member 02 reconnect, immediate stale-policy attempt, and
+reconnected remute were not reached. No 31-person media run was performed.
+
+The run took about 36 seconds end-to-end. Its manifest records meeting creation at
+`2026-11-18T03:56:01.731Z`, the meeting inactive after cleanup, and all three participants
+`deleted-confirmed`. The runner reported `owned-processes-stopped=true` and `cleanup=confirmed`.
+
+The local harness now treats an explicit audio enable as accepted when the production helper
+authorizes it and public self-audio state reports an enabled live track; the action's capture-call
+delta is retained as evidence but need not increase when the SDK reuses an existing track. The
+following exact mapped remote PCM/RTP positive control remains required. The preceding selected
+allow and reconnect checks still require no capture and devices off before the member's explicit
+action. Per-action diagnostics retain before/action/immediate-after state, policy and eligibility
+revision, hashed local track identity, capture delta, and mapped remote samples. The runner now writes
+the complete sanitized structured result and phase checkpoints to an ignored QA result artifact
+before emitting its concise console summary. Local round-trip tests verify that credential, raw
+message, peer-ID, and participant-ID fields are excluded while action states and media counters are
+retained. This diagnostic change does not revise the result of the prior timeout run.
+
+A later bounded run used the corrected live-track re-enable gate and wrote its full sanitized result
+before the console summary. It completed all three actors and all mute, selected explicit-enable,
+individual mute/re-enable, and reconnect checks in 50.68 seconds. The group-mute check observed zero
+consumer PCM RMS on all four member-source receiver pairs in both 1.2-second windows after the
+two-second settle; every pair retained its receiver/report identity while RTP packets and sink time
+advanced. Inbound RTP `totalAudioEnergy` was unchanged in these eight windows. Coach-source audio
+continued positive during the member mute, and video remained live.
+
+For member 01, selected allow did not capture or enable audio. The explicit action was authorized by
+the production helper; the public self track became enabled and remained live with the same hashed
+track identity and no additional capture call. Both mapped receivers then had positive PCM RMS and
+advancing RTP energy/packets/sink time. The same track-reuse behavior passed after individual mute.
+Member 02 rejoined with audio/video off and zero captures. A stale allowed snapshot attempt was
+blocked by fresh synthetic policy authorization with zero captures; the host re-applied the persisted
+mute, and selected allow again did not enable audio or capture. The later explicit action acquired a
+live enabled audio track and both mapped receivers passed the positive PCM/RTP check. Final member-02
+remute passed both receivers' consumer-silence check, while member 01 remained enabled and both of
+its receivers remained positive. Video also continued advancing after remute.
+
+The original structured artifact reported `partial` because the final `otherMemberStillSends` field
+contained its detailed result object where the summary gate expected a boolean. The artifact records
+that object as `passed=true` with 2/2 exact receivers; their track/report identities were stable, peer
+audio and track-enabled flags were true, PCM RMS was positive, and packets, energy, and sink time
+advanced. All other required controls were already recorded as true. The harness now stores the
+boolean under `otherMemberStillSends` and the receiver measurements separately under
+`otherMemberStillSendsReceivers`; a local regression covers this aggregation shape. The original
+artifact remains unchanged at
+`.vercel/group-critique-qa/results/run-148d6c6d-a83c-4633-b557-9e429e44e38a.json`. This supports a
+qualified three-person runtime result after offline reporter correction, not provider permission
+hard-lock behavior or hosted DOM/database authorization.
+
+The run completed cleanup with three participants deleted, the meeting inactive, and all owned
+processes stopped. No retry or 31-person run was made. The existing synthetic video source is
+160×90 at about 4 fps; this run does not establish production workout quality, fullscreen video
+quality, or 31-person capacity. The local single-host capacity run would also be limited by its six
+CPU cores.
+
+For the capacity probe, the isolated client stops its capacity operation window at 150 seconds from
+the beginning of the coach join operation. At 31 actors this caps the full-room measurement window
+at 77.5 participant-minutes. The client uses a 180-second provisioning request timeout, and the
+server adds room participants sequentially; cleanup marks the meeting inactive before deleting
+participant records. The runner's 240-second outer probe wait bounds browser observation before
+shutdown; if it expires, the runner closes the owned browser before posting the separate long-running
+cleanup request. A timeout is a failed or incomplete run and cannot pass on partial receiver
+coverage.
+
+One approved no-flag capacity run started on 2026-11-18. Its local preflight, setup-file 403,
+31/31 actor documents, and exact-account/app/preset checks passed. All 31 synthetic actors joined
+and all 30 members reached the stage. Sequential publishing completed for 23 actors. Publisher 24,
+`member-23`, timed out during `publish` with video enabled and audio not yet confirmed; its last
+recorded public operation phase was synthetic `getUserMedia` complete. At that point the run had
+48 synthetic capture calls, zero SDK error callbacks, and no safe public WebRTC or capture error
+entries. No receiver subscription or media-metric collection began (`activeRtpClients=0`), so the
+930 audio/video receiver pairs were not measured. This is a global capacity-window timeout during
+the 24th publisher, not evidence of a provider participant cap or successful 31-person media.
+
+The artifact records the operation start at `1794976251761` ms, publication beginning at 27.094 s,
+publisher 24 beginning at 143.168 s, and the deadline failure at 150.401 s. The first joined actor
+to browser close interval was 149.402 s. Sequential publishers 1–23 consumed 116.074 s; at that
+observed pace, publishing all 31 sequentially would exceed the 150-second operation window before
+the receive-coverage phase. The runner stopped at the timeout and did not retry.
+
+Cleanup deleted all 31 owned participants, confirmed the meeting inactive, and stopped the owned
+Edge and server processes. The full sanitized result and phase checkpoints are preserved at
+`.vercel/group-critique-qa/results/run-8553f3a2-9309-4dea-a154-b1670627e1b4.json`. No 31-person
+receiver-coverage result is established. Any future schedule change must preserve unchanged media
+quality and wait for separate approval; this run used the existing 160×90 synthetic video fixture.
+
+After these local changes, the static bundle build passed (`clientEntries=5`, server adapter kept in
+the server-only build). The local-only route check returned HTTP 200 for all five pages and seven
+assets, with no external requests, setup read, or provider resources created. The read-only live
+preflight verified the expected account/app/preset definitions and the same routes/assets; setup-file
+access returned HTTP 403. These checks were:
+
+```text
+node .vercel/group-critique-qa/build-static.mjs
+node .vercel/group-critique-qa/check-local-static-routes.mjs
+node .vercel/group-critique-qa/check-readonly-preflight.mjs
+node .vercel/group-critique-qa/check-status.mjs
+node .vercel/group-critique-qa/check-capacity-metrics.mjs
+node .vercel/group-critique-qa/check-mute-evidence.mjs
+node .vercel/group-critique-qa/check-publish-batches.mjs
+node .vercel/group-critique-qa/check-result-evidence.mjs
+node .vercel/group-critique-qa/check-synthetic-policy-fixture.mjs
+node .vercel/group-critique-qa/check-identity-diagnostics.mjs
+```
+
+All listed commands passed. The synthetic capacity fixture verifies 930 mapped, advancing audio
+pairs and 930 mapped, advancing video pairs; it is an assertion-logic test, not a 31-client provider
+result. Synthetic video remained 160×90 at roughly 4 fps in the three-person run, so these results
+do not establish workout-quality video at production scale or fullscreen fidelity. A single-host
+capacity result would also remain bounded by the local six-core test environment.
+
+After the incomplete 31-client run, the local-only capacity harness was changed to publish actors in
+batches of up to three concurrent requests. It awaits every request already in a batch before
+returning its first chronologically observed safe error and does not start a later batch after a
+failure. The preset, synthetic 160×90-at-about-4-fps media, and 150-second operation deadline are
+unchanged. A local mock regression verifies all 31 actors are called once at concurrency three; its
+failure case verifies that a later batch is not started, in-flight work is awaited, and the earlier
+failure is retained. The static client build, local route check, result evidence check, and 930-pair
+capacity assertion fixture passed after this edit. These local checks do not establish provider
+capacity; the subsequent approved provider attempt is recorded below.
+
+One final approved 31-client attempt used the three-at-a-time publisher harness and the same
+160×90-at-about-4-fps synthetic media. Preflight and setup-path denial passed; all 31 actor frames
+were ready, all 31 clients joined, all 30 members reached the stage, and the first 30 publishers
+completed. The final publisher, `member-30`, returned the sanitized `actor-command-failed` result
+after 22,272 ms in its publish operation. Its last public phase was synthetic `getUserMedia`
+complete; audio/video published flags and self audio/video enabled flags were false, stage status
+was `ON_STAGE`, and no safe public media errors or SDK error callbacks were recorded. The capacity
+operation failed at about 120.75 seconds from coach join start, before the 150-second deadline. The
+result does not identify a more specific provider/media cause.
+
+The harness stopped after that failed batch; receiver subscription and media metric collection did
+not start (`activeRtpClients=0`). No directed audio or video receiver pairs were measured, so the
+930-pair acceptance criteria were not reached and this does not establish full-room media or a
+provider participant cap. The run recorded 61 synthetic capture calls. Cleanup deleted all 31
+owned participants, confirmed the meeting inactive, and stopped the owned browser and server
+processes. The complete sanitized artifact and phase checkpoints are at
+`.vercel/group-critique-qa/results/run-cbe89ef8-02cc-418b-94eb-3a65c77b377a.json`; no further
+provider retries are authorized by this attempt.
+
+## Read-only provider diagnosis
+
+Read-only provider evidence showed positive outbound producer activity for a neighboring successful
+peer and none for the failed final peer. Both used the same preset and had the same
+`media_permission` metadata shape. The verified presets are `WEBINAR`, stage-enabled, and permit 31
+visible streams on desktop and mobile; Cloudflare documents `max_video_streams` as a receive-side
+visibility setting, not an outbound publishing quota. The public SDK result exposed no underlying
+exception. A read-only source comparison of SDK 2.0.4 with the reviewed 2.1.0 package found the same
+empty `VideoMediaHandler` catch, so there is no evidence here that 2.1.0 fixes this failure. The
+cause remains undetermined; these observations do not establish a provider cap or a browser-resource
+cause. A distributed/multi-device 31-client run or a Cloudflare SDK/provider diagnostic is needed
+before making a 31-person capacity claim. No such diagnostic or additional provider run was
+performed in this verification.
