@@ -7,17 +7,25 @@ the cleanup worker, and verified against the preset rules below.
 
 ## Current readiness (2026-11-18)
 
-PR71 remains a draft while capacity at the current 26-person application limit is verified. Before
-the cap reduction, production checks at commit `2e04dfc` passed: 574 tests across 59 files, lint,
-typecheck, and production build. A qualified three-person runtime probe passed with the RealtimeKit
-SDK, production media helpers, and synthetic persisted-mute policy. It does not verify hosted
-DOM/database authorization or establish a provider-enforced media hard lock.
+PR72 and PR73 are merged and deployed. Hosted migration history contains 49 applied migrations;
+latest is `20261117230000`. Platform migrations `20261117220000` and `20261117230000` are applied;
+group migration `20261116010000` is not applied.
+Five non-secret RealtimeKit settings are configured: account, app, and the three preset names. The
+RealtimeKit API token is still pending setup through the correct Vercel authentication. No group
+cleanup heartbeat has been recorded, so the feature remains unavailable until the database migration,
+secret, and real cleanup heartbeat are in place.
 
-The last historical 31-client attempt joined all 31 actors and staged all 30 members. Thirty actors
-published audio and video; the final actor, `member-30`, failed during publish before outbound media
-was confirmed. No receiver metrics ran, so none of the 930 directed audio or 930 directed video
-pairs were measured. This does not verify the current 26-person capacity or establish a provider
-participant cap.
+The latest 26-participant attempt joined all 26 actors, staged all 25 members, and completed publish
+for all 26 actors. Strict receive validation matched 0/650 audio pairs and 575/650 video pairs. All
+26 clients saw 25 participant tags. The run is not a capacity pass; the cause of the incomplete media
+measurements remains unconfirmed because the artifact does not include component diagnostics.
+Cleanup deleted all 26 participants, verified the meeting
+inactive, and stopped the owned processes. Evidence: `.vercel/group-critique-qa/results/run-9c1e7e19-2b3c-4420-966c-4892e4712eab.json`.
+
+The combined current tree passed `npm run lint`, `npx next typegen`, `npx tsc --noEmit --pretty false`,
+`npm test -- --maxWorkers=2` (673 tests across 69 files), and `npm run build` (75 static pages).
+PR71 remains unmerged; the current 25-member application cap still needs a successful media-capacity
+verification before rollout.
 
 ## Provider setup
 
