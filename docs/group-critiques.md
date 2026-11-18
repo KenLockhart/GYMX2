@@ -16,11 +16,23 @@ cleanup heartbeat has been recorded, so the feature remains unavailable until th
 secret, and real cleanup heartbeat are in place.
 
 The latest 26-participant attempt joined all 26 actors, staged all 25 members, and completed publish
-for all 26 actors. Strict receive validation matched 0/650 audio pairs and 575/650 video pairs. All
-26 clients saw 25 participant tags. The run is not a capacity pass; the cause of the incomplete media
-measurements remains unconfirmed because the artifact does not include component diagnostics.
-Cleanup deleted all 26 participants, verified the meeting
-inactive, and stopped the owned processes. Evidence: `.vercel/group-critique-qa/results/run-9c1e7e19-2b3c-4420-966c-4892e4712eab.json`.
+for all 26 actors. Final receive samples had 0/650 active audio pairs and 375/650 active video pairs.
+Fifteen receivers reported 25 active video pairs each; the other 11 reported none. Fifteen receivers
+also reported 346 mapped audio reports with advancing packet counters, while 11 reported no audio
+reports. Audio energy was zero. No mapping or missing-track error was established; the cause remains
+unconfirmed, and this is not a 26-participant capacity pass. Evidence:
+`.vercel/group-critique-qa/results/run-76ca0ad5-aa26-4ed2-bd2b-7b42dcd2f87f.json`.
+
+Provider cleanup deleted all 26 participants and verified the meeting inactive. The artifact reported
+`ownedProcessesStopped: false`; an independent observation around 15:17 UTC found no run-isolated Node
+runner or Edge process using the owned QA profile.
+
+A separate three-person control using the same capacity collector passed six audio and six video
+directions, with stable track/report identities and advancing media counters between baseline and
+final measurements, with the analyzer disabled. Cleanup of all three participants and the meeting was
+confirmed. Evidence:
+`.vercel/group-critique-qa/results/run-0b27a0df-b210-46f4-9ead-e18f85ed8593.json`. This control does
+not establish 26-participant capacity.
 
 The combined current tree passed `npm run lint`, `npx next typegen`, `npx tsc --noEmit --pretty false`,
 `npm test -- --maxWorkers=2` (673 tests across 69 files), and `npm run build` (75 static pages).
