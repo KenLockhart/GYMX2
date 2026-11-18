@@ -73,6 +73,13 @@ const SECTIONS: {
     order: "week_start",
   },
   {
+    name: "daily_check_ins",
+    table: "member_daily_checkins",
+    columns: "day, energy, sleep, stress, motivation, created_at, updated_at",
+    owner: "member_id",
+    order: "day",
+  },
+  {
     name: "tasks_assigned_to_you",
     table: "task_assignments",
     columns: "completed_at, created_at, task:tasks(title, instructions)",

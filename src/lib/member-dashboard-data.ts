@@ -97,6 +97,7 @@ export async function loadMemberDashboardData(
           .from("purchases")
           .select("id")
           .eq("member_id", memberId)
+          .eq("kind", "item")
           .limit(1),
       ),
       read<SessionRow[]>(() =>

@@ -34,7 +34,22 @@ function createDatabase(results: Record<string, Result>) {
       builder.then = (
         resolve: (value: Result) => unknown,
         reject: (reason: unknown) => unknown,
-      ) => Promise.resolve(results[table] ?? { data: [] }).then(resolve, reject);
+      ) => {
+        const result = results[table] ?? { data: [] };
+        if (table !== "purchases" || !Array.isArray(result.data))
+          return Promise.resolve(result).then(resolve, reject);
+
+        const kindFilter = record.operations.find(
+          ([method, column]) => method === "eq" && column === "kind",
+        )?.[2];
+        const data = result.data.filter(
+          (row) =>
+            typeof row === "object" &&
+            row !== null &&
+            (row as { kind?: unknown }).kind === kindFilter,
+        );
+        return Promise.resolve({ ...result, data }).then(resolve, reject);
+      };
       return builder;
     },
   };
@@ -105,6 +120,7 @@ describe("loadMemberDashboardData", () => {
 
     expect(builders.coach_members.operations).toContainEqual(["eq", "member_id", memberId]);
     expect(builders.purchases.operations).toContainEqual(["eq", "member_id", memberId]);
+    expect(builders.purchases.operations).toContainEqual(["eq", "kind", "item"]);
     expect(builders.calendar_sessions.operations).toContainEqual(["gt", "ends_at", "2026-11-17T18:00:00Z"]);
     expect(builders.calendar_sessions.operations).toContainEqual(["limit", 3]);
     expect(builders.task_assignments.operations).toContainEqual(["eq", "member_id", memberId]);
@@ -128,6 +144,41 @@ describe("loadMemberDashboardData", () => {
     expect(data.armoryPurchase).toBe("error");
     expect(data.sessions).toEqual({ items: [], error: true });
     expect(data.tasks).toEqual({ items: [], error: true });
+  });
+
+  it("does not count a coach membership invoice as an Armory item purchase", async () => {
+    const { db, builders } = createDatabase({
+      coach_members: { data: [] },
+      purchases: {
+        data: [{ id: "membership-invoice", kind: "membership", item_id: null }],
+      },
+      calendar_sessions: { data: [] },
+      task_assignments: { data: [] },
+      profile_photos: { data: null },
+    });
+    mockCreateClient.mockResolvedValue(db);
+
+    const data = await loadMemberDashboardData(memberId);
+
+    expect(data.armoryPurchase).toBe("missing");
+    expect(builders.purchases.operations).toContainEqual(["eq", "kind", "item"]);
+  });
+
+  it("counts completed Armory item history even when its inventory reference is gone", async () => {
+    const { db } = createDatabase({
+      coach_members: { data: [] },
+      purchases: {
+        data: [{ id: "deleted-item-purchase", kind: "item", item_id: null }],
+      },
+      calendar_sessions: { data: [] },
+      task_assignments: { data: [] },
+      profile_photos: { data: null },
+    });
+    mockCreateClient.mockResolvedValue(db);
+
+    const data = await loadMemberDashboardData(memberId);
+
+    expect(data.armoryPurchase).toBe("purchased");
   });
 
   it("never signs a photo path owned by someone else", async () => {
