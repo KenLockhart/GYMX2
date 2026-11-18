@@ -138,7 +138,7 @@ export default async function LivePage({
     readGroupCritiqueSnapshot(id),
   ]);
 
-  const invitees = inviteeIds.slice(0, 30).map((inviteeId) => ({
+  const invitees = inviteeIds.slice(0, 25).map((inviteeId) => ({
     id: inviteeId,
     name: names[inviteeId] ?? t.private.otherParticipant,
   }));

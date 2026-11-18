@@ -748,8 +748,8 @@ begin
   select count(*)::integer into invite_count
   from public.session_invites i
   where i.session_id = p_session_id;
-  if invite_count > 30 then
-    raise exception 'Group critique supports up to 30 invited members' using errcode = 'P0001';
+  if invite_count > 25 then
+    raise exception 'Group critique supports up to 25 invited members' using errcode = 'P0001';
   end if;
   if exists (select 1 from public.session_live l where l.session_id = p_session_id) then
     raise exception 'Remove the existing broadcast input before opening group critique'
@@ -1120,7 +1120,7 @@ begin
     or private.private_session_has_blockers(p_session_id) then
     return;
   end if;
-  if (select count(*) from public.session_invites i where i.session_id = p_session_id) > 30 then
+  if (select count(*) from public.session_invites i where i.session_id = p_session_id) > 25 then
     return;
   end if;
 
@@ -1216,7 +1216,7 @@ begin
     and public.group_critique_provider_ready()
     and not exists (select 1 from public.session_live l where l.session_id = p_session_id)
     and not private.private_session_has_blockers(p_session_id)
-    and (select count(*) from public.session_invites i where i.session_id = p_session_id) <= 30 then
+    and (select count(*) from public.session_invites i where i.session_id = p_session_id) <= 25 then
     valid_completion := true;
   end if;
 
@@ -1315,7 +1315,7 @@ begin
     or private.private_session_has_blockers(p_session_id) then
     return;
   end if;
-  if (select count(*) from public.session_invites i where i.session_id = p_session_id) > 30 then
+  if (select count(*) from public.session_invites i where i.session_id = p_session_id) > 25 then
     return;
   end if;
 
@@ -1377,8 +1377,8 @@ begin
   from public.group_critique_provider_participants p
   where p.session_id = p_session_id and p.generation = p_generation
     and p.actor_id <> p_actor_id and p.actor_kind = 'member' and p.state <> 'removed';
-  if actor_kind_value = 'member' and active_count >= 30 then
-    raise exception 'Group room has reached its 30 member limit' using errcode = 'P0001';
+  if actor_kind_value = 'member' and active_count >= 25 then
+    raise exception 'Group room has reached its 25 member limit' using errcode = 'P0001';
   end if;
 
   select * into provider_row from public.group_critique_provider_participants p
@@ -2137,7 +2137,7 @@ end;
 $$;
 
 -- Calendar guards close the race between opening a group room and legacy direct/RPC writes.
--- The invite trigger also enforces the 30-member cap under the calendar session row lock.
+-- The invite trigger also enforces the 25-member cap under the calendar session row lock.
 create function private.guard_group_critique_session_invites()
 returns trigger
 language plpgsql
@@ -2157,7 +2157,7 @@ begin
   end if;
 
   -- Lock old and new parent rows in a stable order. Concurrent invite inserts for one session
-  -- serialize here, so the count below cannot admit a 31st distinct member.
+  -- serialize here, so the count below cannot admit a 26th distinct member.
   for session_id_to_lock in
     select s.id
     from public.calendar_sessions s
@@ -2231,8 +2231,8 @@ begin
     select count(*)::integer into invite_count
     from public.session_invites i
     where i.session_id = case when tg_op = 'INSERT' then new.session_id else new.session_id end;
-    if invite_count >= 30 then
-      raise exception 'A session can have at most 30 invited members' using errcode = 'P0001';
+    if invite_count >= 25 then
+      raise exception 'A session can have at most 25 invited members' using errcode = 'P0001';
     end if;
   end if;
 
@@ -2250,8 +2250,8 @@ as $$
 begin
   if new.live_mode = 'broadcast'
     and old.live_mode is distinct from new.live_mode
-    and (select count(*) from public.session_invites i where i.session_id = old.id) > 30 then
-    raise exception 'A session can have at most 30 invited members' using errcode = 'P0001';
+    and (select count(*) from public.session_invites i where i.session_id = old.id) > 25 then
+    raise exception 'A session can have at most 25 invited members' using errcode = 'P0001';
   end if;
 
   if new.coach_id is distinct from old.coach_id

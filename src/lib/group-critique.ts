@@ -63,7 +63,7 @@ export const groupCritiqueSnapshotSchema = z.object({
   role: z.enum(["coach", "member"]),
   coachCustomParticipantId: z.string().min(1).max(160).nullable(),
   allMembersMuted: z.boolean(),
-  members: z.array(groupCritiqueSnapshotMemberSchema).max(30),
+  members: z.array(groupCritiqueSnapshotMemberSchema).max(25),
 });
 
 export const groupCritiqueJoinCredentialSchema = z.object({

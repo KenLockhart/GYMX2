@@ -1030,7 +1030,7 @@ function GroupCritiqueRoom({
             setError(t.connectionError);
         },
       });
-      // The pinned SDK setter rejects values above 24; the verified preset supplies 31.
+      // Require enough public SDK capacity for the coach and 25 invited members.
       if (
         !hasGroupCritiqueCapacity(
           created.participants.maxActiveParticipantsCount,

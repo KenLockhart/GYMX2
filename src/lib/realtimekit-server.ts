@@ -408,8 +408,9 @@ export function createRealtimeKitApi(
         : null;
       return {
         isWebinarStage: value.config.view_type === "WEBINAR" && permissions.stage_enabled === true,
-        hasThirtyOneVideoStreams: maxVideoStreams !== null &&
-          maxVideoStreams.desktop === 31 && maxVideoStreams.mobile === 31,
+        hasAtLeastTwentySixVideoStreams: maxVideoStreams !== null &&
+          typeof maxVideoStreams.desktop === "number" && maxVideoStreams.desktop >= 26 &&
+          typeof maxVideoStreams.mobile === "number" && maxVideoStreams.mobile >= 26,
         stageAccess: permissions.stage_access,
         audio: media && record(media.audio) ? media.audio.can_produce : null,
         video: media && record(media.video) ? media.video.can_produce : null,
@@ -427,17 +428,17 @@ export function createRealtimeKitApi(
     const o = definition(observer);
     const c = definition(consented);
     return (
-      h.isWebinarStage && h.hasThirtyOneVideoStreams && h.stageAccess === "ALLOWED" && h.audio === "ALLOWED" &&
+      h.isWebinarStage && h.hasAtLeastTwentySixVideoStreams && h.stageAccess === "ALLOWED" && h.audio === "ALLOWED" &&
       h.video === "ALLOWED" && h.screenshare === "NOT_ALLOWED" &&
       h.canRecord === false && h.canLivestream === false && h.canDisableAudio === true &&
       h.canDisableVideo === true && h.canKick === true && h.canAcceptProductionRequests === true &&
       h.canChangeParticipantPermissions === true &&
-      o.isWebinarStage && o.hasThirtyOneVideoStreams && o.stageAccess === "NOT_ALLOWED" && o.audio === "NOT_ALLOWED" &&
+      o.isWebinarStage && o.hasAtLeastTwentySixVideoStreams && o.stageAccess === "NOT_ALLOWED" && o.audio === "NOT_ALLOWED" &&
       o.video === "NOT_ALLOWED" && o.screenshare === "NOT_ALLOWED" &&
       o.canRecord === false && o.canLivestream === false &&
       o.canDisableAudio === false && o.canDisableVideo === false && o.canKick === false &&
       o.canAcceptProductionRequests === false && o.canChangeParticipantPermissions === false &&
-      c.isWebinarStage && c.hasThirtyOneVideoStreams && c.stageAccess === "CAN_REQUEST" && c.audio === "CAN_REQUEST" &&
+      c.isWebinarStage && c.hasAtLeastTwentySixVideoStreams && c.stageAccess === "CAN_REQUEST" && c.audio === "CAN_REQUEST" &&
       c.video === "CAN_REQUEST" && c.screenshare === "NOT_ALLOWED" &&
       c.canRecord === false && c.canLivestream === false && c.canDisableAudio === false &&
       c.canDisableVideo === false && c.canKick === false &&

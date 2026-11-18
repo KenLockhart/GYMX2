@@ -29,11 +29,11 @@ describe("group critique circle layout", () => {
     expect(positions[0]).toMatchObject({ x: 50, y: 16, diameter: 17 });
   });
 
-  it("uses two rings for 30 members and bounds every circle in the stage", () => {
-    const positions = groupCritiqueCirclePositions(30);
-    expect(positions).toHaveLength(30);
+  it("uses two rings for 25 members and bounds every circle in the stage", () => {
+    const positions = groupCritiqueCirclePositions(25);
+    expect(positions).toHaveLength(25);
     expect(positions.filter((position) => position.ring === "inner")).toHaveLength(10);
-    expect(positions.filter((position) => position.ring === "outer")).toHaveLength(20);
+    expect(positions.filter((position) => position.ring === "outer")).toHaveLength(15);
     for (const position of positions) {
       expect(position.x - position.diameter / 2).toBeGreaterThanOrEqual(2);
       expect(position.x + position.diameter / 2).toBeLessThanOrEqual(98);
@@ -42,22 +42,23 @@ describe("group critique circle layout", () => {
     }
   });
 
-  it("caps geometry at 30 and pages mobile attendees in groups of six", () => {
-    expect(groupCritiqueCirclePositions(45)).toHaveLength(30);
-    const attendees = Array.from({ length: 30 }, (_, index) => index);
+  it("caps geometry at 25 and pages mobile attendees in groups of six", () => {
+    expect(groupCritiqueCirclePositions(45)).toHaveLength(25);
+    const attendees = Array.from({ length: 25 }, (_, index) => index);
     expect(groupCritiqueMobilePage(attendees, 0)).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(groupCritiqueMobilePage(attendees, 4)).toEqual([24, 25, 26, 27, 28, 29]);
-    expect(groupCritiqueMobilePage(attendees, 99)).toEqual([24, 25, 26, 27, 28, 29]);
+    expect(groupCritiqueMobilePage(attendees, 4)).toEqual([24]);
+    expect(groupCritiqueMobilePage(attendees, 99)).toEqual([24]);
   });
 });
 
 describe("group critique SDK capacity", () => {
-  it("accepts the preset-provided 31-person limit", () => {
+  it("accepts SDK capacity at or above the 26-person application requirement", () => {
+    expect(hasGroupCritiqueCapacity(26)).toBe(true);
     expect(hasGroupCritiqueCapacity(31)).toBe(true);
   });
 
-  it.each([24, 30, undefined, null, Number.NaN, "31"])(
-    "fails closed when the preset active-stream limit is %s",
+  it.each([25, 24, undefined, null, Number.NaN, "26"])(
+    "fails closed when public SDK capacity is %s",
     (limit) => {
       expect(hasGroupCritiqueCapacity(limit)).toBe(false);
     },
@@ -283,16 +284,16 @@ describe("group critique circle CSS", () => {
 });
 
 describe("session invite cap", () => {
-  it("blocks new selections at 30 but allows deselection on an existing over-cap edit", () => {
-    const selected30 = new Set(Array.from({ length: 30 }, (_, index) => `m${index}`));
-    expect(canSelectSessionMember(selected30, "m0")).toBe(true);
-    expect(canSelectSessionMember(selected30, "new")).toBe(false);
-    expect(toggleSessionMemberSelection(selected30, "new", true).size).toBe(30);
+  it("blocks new selections at 25 but allows deselection on an existing over-cap edit", () => {
+    const selected25 = new Set(Array.from({ length: 25 }, (_, index) => `m${index}`));
+    expect(canSelectSessionMember(selected25, "m0")).toBe(true);
+    expect(canSelectSessionMember(selected25, "new")).toBe(false);
+    expect(toggleSessionMemberSelection(selected25, "new", true).size).toBe(25);
 
-    const selected31 = new Set(Array.from({ length: 31 }, (_, index) => `m${index}`));
-    expect(canSelectSessionMember(selected31, "m0")).toBe(true);
-    expect(canSelectSessionMember(selected31, "new")).toBe(false);
-    expect(toggleSessionMemberSelection(selected31, "m0", false).size).toBe(30);
+    const selected26 = new Set(Array.from({ length: 26 }, (_, index) => `m${index}`));
+    expect(canSelectSessionMember(selected26, "m0")).toBe(true);
+    expect(canSelectSessionMember(selected26, "new")).toBe(false);
+    expect(toggleSessionMemberSelection(selected26, "m0", false).size).toBe(25);
   });
 });
 

@@ -32,7 +32,7 @@ export default async function NewSessionPage() {
         </p>
       ) : (
         <>
-          {members.length > 30 && (
+          {members.length > 25 && (
             <p className="max-w-xl text-sm text-muted">
               {t.new.groupLimitHint}
             </p>
@@ -50,7 +50,7 @@ export default async function NewSessionPage() {
               starts_at: null,
               ends_at: null,
               member_ids:
-                members.length <= 30
+                members.length <= 25
                   ? members.map((member) => member.id)
                   : [],
             }}

@@ -1,11 +1,13 @@
-export const GROUP_CRITIQUE_MEMBER_LIMIT = 30;
+export const GROUP_CRITIQUE_MEMBER_LIMIT = 25;
 export const GROUP_CRITIQUE_TOTAL_PARTICIPANT_LIMIT =
   GROUP_CRITIQUE_MEMBER_LIMIT + 1;
 export const GROUP_CRITIQUE_MOBILE_PAGE_SIZE = 6;
 
-/** Require the published preset to supply capacity for the coach and 30 members. */
+/** Require the public SDK capacity to fit the coach and 25 invited members. */
 export function hasGroupCritiqueCapacity(maxActiveParticipantsCount: unknown): boolean {
-  return maxActiveParticipantsCount === GROUP_CRITIQUE_TOTAL_PARTICIPANT_LIMIT;
+  return typeof maxActiveParticipantsCount === "number" &&
+    Number.isSafeInteger(maxActiveParticipantsCount) &&
+    maxActiveParticipantsCount >= GROUP_CRITIQUE_TOTAL_PARTICIPANT_LIMIT;
 }
 
 export type CirclePosition = {

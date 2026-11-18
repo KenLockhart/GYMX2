@@ -36,7 +36,7 @@ export const calendar = {
       `Times are in your time zone (${zone}). Members see them in theirs.`,
     overnight:
       " The end time is before the start, so the session ends the next day.",
-    inviteLimitCount: (count: number) => `${count} of 30 members selected.`,
+    inviteLimitCount: (count: number) => `${count} of 25 members selected.`,
     inviteLimitReduce: (count: number) => `Remove ${count} to continue.`,
     previousMember: "Previously invited member",
     location: "Location (optional)",
@@ -52,7 +52,7 @@ export const calendar = {
     noMembers:
       "No members have joined you yet. They can join from their Coaches page.",
     groupLimitHint:
-      "Group sessions can invite up to 30 members. Choose the members for this session below.",
+      "Group sessions can invite up to 25 members. Choose the members for this session below.",
     submit: "Schedule session",
   },
   edit: {

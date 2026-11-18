@@ -39,7 +39,7 @@ export const calendar: Messages["calendar"] = {
       `Los horarios están en tu zona horaria (${zone}). Los miembros los ven en la suya.`,
     overnight:
       " La hora de fin es anterior a la de inicio, así que la sesión termina al día siguiente.",
-    inviteLimitCount: (count) => `${count} de 30 miembros seleccionados.`,
+    inviteLimitCount: (count) => `${count} de 25 miembros seleccionados.`,
     inviteLimitReduce: (count) => `Quita ${count} para continuar.`,
     previousMember: "Miembro invitado anteriormente",
     location: "Lugar (opcional)",
@@ -55,7 +55,7 @@ export const calendar: Messages["calendar"] = {
     noMembers:
       "Aún no se ha unido ningún miembro. Pueden unirse desde su página de Coaches.",
     groupLimitHint:
-      "Las sesiones grupales pueden invitar hasta 30 miembros. Elige los miembros de esta sesión abajo.",
+      "Las sesiones grupales pueden invitar hasta 25 miembros. Elige los miembros de esta sesión abajo.",
     submit: "Agendar sesión",
   },
   edit: {

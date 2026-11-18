@@ -259,7 +259,8 @@ export async function readGroupCritiqueSnapshot(
   if (data.length === 0) return { ok: true, featureEnabled, snapshot: null };
 
   const rows = data.filter(isRecord);
-  if (rows.length !== data.length || rows.length > 31) return fail("temporarily_unavailable");
+  // A coach can see at most 25 members plus the single empty-roster sentinel row.
+  if (rows.length !== data.length || rows.length > 26) return fail("temporarily_unavailable");
   const parsedRows = rows.map((row) => ({
     generation: Number(row.generation),
     roomState: row.room_state,

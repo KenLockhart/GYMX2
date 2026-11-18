@@ -7,16 +7,17 @@ the cleanup worker, and verified against the preset rules below.
 
 ## Current readiness (2026-11-18)
 
-PR71 remains a draft because 31-person media capacity is not verified. The production checks at
-commit `2e04dfc` passed: 574 tests across 59 files, lint, typecheck, and production build; production
-source has not changed since those checks. A qualified three-person runtime probe passed with the
-RealtimeKit SDK, production media helpers, and synthetic persisted-mute policy. It does not verify
-hosted DOM/database authorization or establish a provider-enforced media hard lock.
+PR71 remains a draft while capacity at the current 26-person application limit is verified. Before
+the cap reduction, production checks at commit `2e04dfc` passed: 574 tests across 59 files, lint,
+typecheck, and production build. A qualified three-person runtime probe passed with the RealtimeKit
+SDK, production media helpers, and synthetic persisted-mute policy. It does not verify hosted
+DOM/database authorization or establish a provider-enforced media hard lock.
 
-The latest 31-client attempt joined all 31 actors and staged all 30 members. Thirty actors published
-audio and video; the final actor, `member-30`, failed during publish before outbound media was
-confirmed. No receiver metrics ran, so none of the 930 directed audio or 930 directed video pairs
-were measured. This is not a capacity pass and does not establish a provider participant cap.
+The last historical 31-client attempt joined all 31 actors and staged all 30 members. Thirty actors
+published audio and video; the final actor, `member-30`, failed during publish before outbound media
+was confirmed. No receiver metrics ran, so none of the 930 directed audio or 930 directed video
+pairs were measured. This does not verify the current 26-person capacity or establish a provider
+participant cap.
 
 ## Provider setup
 
@@ -37,9 +38,9 @@ environment variables; none may use a `NEXT_PUBLIC_` prefix:
   `CLOUDFLARE_REALTIMEKIT_CONSENTED_PRESET`: exact preset names in that app.
 
 Configure all three presets as `WEBINAR` with stage enabled, no recording, no livestreaming, and
-screenshare production disabled. Set `max_video_streams` to 31 for both desktop and mobile on all
-three presets; the default limit is too low for a 30-member room plus its coach. Cloudflare defines
-this field as the maximum number of video streams visible per device, a receive-visibility setting
+screenshare production disabled. Set `max_video_streams` to at least 26 for both desktop and mobile
+on all three presets; the existing setting of 31 remains valid. Cloudflare defines this field as the
+maximum number of video streams visible per device, a receive-visibility setting
 ([preset API reference](https://developers.cloudflare.com/api/resources/realtime_kit/subresources/presets/methods/get_preset_by_id/));
 it does not guarantee outbound publisher capacity:
 
@@ -63,8 +64,8 @@ RealtimeKit meeting inactive and verifies the inactive status before cleanup com
 
 - A coach opens a room and then explicitly offers camera and microphone access to all current
   invitees or one selected invitee. Opening a room does not send offers.
-- A room supports up to 30 invited members plus the coach. Pending calendar RSVPs are included;
-  a “Going” RSVP is not required. New calendar invites beyond 30 are rejected for broadcast
+- A room supports up to 25 invited members plus the coach. Pending calendar RSVPs are included;
+  a “Going” RSVP is not required. New calendar invites beyond 25 are rejected for broadcast
   sessions while this cap applies.
 - While a group room is provisioning, open, or ending, ordinary calendar roster edits are locked.
   RSVP-only changes remain available. Coach/member unlink and account or role deletion follow the
@@ -100,11 +101,11 @@ a fresh group cleanup heartbeat before it will open a room or issue join credent
 adapter uses fully paginated reconciliation and exact meeting/custom participant tags before any
 delete; incomplete or inconsistent pagination leaves the cleanup job pending.
 
-Before rollout, run a real-account verification with one coach and 30 members. Confirm stage
+Before rollout, run a real-account verification with one coach and 25 members. Confirm stage
 requests, per-participant stage grants, selected/all mute behavior across reconnects, token expiry,
 participant removal/rejoin, and meeting deactivation. This implementation deliberately imposes an
-application cap of 30 members; provider account capacity and the browser's practical receive
-capacity still need runtime verification at that size.
+application cap of 25 members plus the coach; provider account capacity and the browser's practical
+receive capacity still need runtime verification at 26 total participants.
 
 ## Provider verification record
 

@@ -31,7 +31,11 @@ values ('82000000-0000-0000-0000-000000000208', '82000000-0000-0000-0000-0000000
 insert into public.session_invites (session_id, member_id)
 select '82000000-0000-0000-0000-000000000201',
   ('82000000-0000-0000-0000-' || lpad((100 + n)::text, 12, '0'))::uuid
-from generate_series(1, 30) n;
+from generate_series(1, 23) n;
+insert into public.session_invites (session_id, member_id)
+values
+  ('82000000-0000-0000-0000-000000000201', '82000000-0000-0000-0000-000000000129'),
+  ('82000000-0000-0000-0000-000000000201', '82000000-0000-0000-0000-000000000130');
 insert into public.session_invites (session_id, member_id) values
   ('82000000-0000-0000-0000-000000000203', '82000000-0000-0000-0000-000000000131'),
   ('82000000-0000-0000-0000-000000000204', '82000000-0000-0000-0000-000000000131'),
@@ -94,46 +98,46 @@ select is(public.group_critique_provider_ready(), true,
 update public.private_live_runtime set last_cleanup_at = now() where id is true;
 
 select is((select count(*)::integer from public.session_invites
-  where session_id = '82000000-0000-0000-0000-000000000201'), 30,
-  'fixture has the full 30-member invitation cap');
+  where session_id = '82000000-0000-0000-0000-000000000201'), 25,
+  'fixture has the full 25-member invitation cap');
 select lives_ok($$insert into public.session_invites (session_id, member_id)
   values ('82000000-0000-0000-0000-000000000201', '82000000-0000-0000-0000-000000000101')
   on conflict do nothing$$, 'duplicate existing invite is idempotent at capacity');
 select throws_ok($$insert into public.session_invites (session_id, member_id)
-  values ('82000000-0000-0000-0000-000000000201', '82000000-0000-0000-0000-000000000131')$$,
-  'P0001', 'A session can have at most 30 invited members', '31st invite is rejected');
+  values ('82000000-0000-0000-0000-000000000201', '82000000-0000-0000-0000-000000000126')$$,
+  'P0001', 'A session can have at most 25 invited members', '26th invite is rejected');
 select is((select count(*)::integer from public.session_invites
-  where session_id = '82000000-0000-0000-0000-000000000201'), 30,
-  'rejected 31st invite leaves the roster at 30');
+  where session_id = '82000000-0000-0000-0000-000000000201'), 25,
+  'rejected 26th invite leaves the roster at 25');
 
--- Simulate a private session created before the group cap existed, with a legacy 31-person roster.
+-- Simulate a private session created before the group cap existed, with a legacy 26-person roster.
 alter table public.session_invites disable trigger session_invites_group_critique_guard;
 insert into public.session_invites (session_id, member_id)
 select '82000000-0000-0000-0000-000000000208',
   ('82000000-0000-0000-0000-' || lpad((100 + n)::text, 12, '0'))::uuid
-from generate_series(1, 31) n;
+from generate_series(1, 26) n;
 alter table public.session_invites enable trigger session_invites_group_critique_guard;
 select is((select count(*)::integer from public.session_invites
-  where session_id = '82000000-0000-0000-0000-000000000208'), 31,
+  where session_id = '82000000-0000-0000-0000-000000000208'), 26,
   'fixture represents a grandfathered private roster above the new cap');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"82000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select throws_ok($$select public.set_session_live_mode(
   '82000000-0000-0000-0000-000000000208', 'broadcast', null)$$,
-  'P0001', 'A session can have at most 30 invited members',
-  'private session with a legacy 31-member roster cannot switch to broadcast');
+  'P0001', 'A session can have at most 25 invited members',
+  'private session with a legacy 26-member roster cannot switch to broadcast');
 select is((select live_mode from public.calendar_sessions
   where id = '82000000-0000-0000-0000-000000000208'), 'one_on_one',
   'failed mode switch preserves the private session mode');
 reset role;
 delete from public.session_invites
 where session_id = '82000000-0000-0000-0000-000000000208'
-  and member_id = '82000000-0000-0000-0000-000000000131';
+  and member_id = '82000000-0000-0000-0000-000000000126';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"82000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select lives_ok($$select public.set_session_live_mode(
   '82000000-0000-0000-0000-000000000208', 'broadcast', null)$$,
-  'private session switches to broadcast after trimming its roster to 30');
+  'private session switches to broadcast after trimming its roster to 25');
 select is((select live_mode from public.calendar_sessions
   where id = '82000000-0000-0000-0000-000000000208'), 'broadcast',
   'session mode changes only after the invite cap is satisfied');
@@ -148,14 +152,14 @@ insert into pg_temp.group_critique_test_data (label, session_id, generation, roo
 select 'main_room', '82000000-0000-0000-0000-000000000201', generation, state, join_expires_at
 from public.open_group_critique_room('82000000-0000-0000-0000-000000000201');
 select is((select room_state from pg_temp.group_critique_test_data where label = 'main_room'), 'provisioning',
-  'coach opens a group room for 30 invitees plus the coach');
+  'coach opens a group room for 25 invitees plus the coach');
 select is((select join_expires_at from pg_temp.group_critique_test_data where label = 'main_room'),
   (select ends_at + interval '60 minutes' from public.calendar_sessions where id = '82000000-0000-0000-0000-000000000201'),
   'room token expiry is bounded by the session end plus 60 minutes');
 select is((select count(*)::integer from public.read_group_critique_room('82000000-0000-0000-0000-000000000201', null)),
-  30, 'coach reads exactly the 30 current invited member rows');
+  25, 'coach reads exactly the 25 current invited member rows');
 select is((select count(*)::integer from public.group_critique_members
-  where session_id = '82000000-0000-0000-0000-000000000201'), 30,
+  where session_id = '82000000-0000-0000-0000-000000000201'), 25,
   'room snapshots only current invited members');
 select is(public.offer_group_critique_cameras('82000000-0000-0000-0000-000000000201',
   (select generation from pg_temp.group_critique_test_data where label = 'main_room'),
@@ -293,7 +297,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"82000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select is(public.offer_group_critique_cameras('82000000-0000-0000-0000-000000000201',
   (select generation from pg_temp.group_critique_test_data where label = 'main_room'), null),
-  30, 'coach can offer camera access to all 30 current invitees');
+  25, 'coach can offer camera access to all 25 current invitees');
 reset role;
 
 set local role authenticated;

@@ -30,6 +30,7 @@ import {
   joinGroupCritique,
   readGroupCritiqueSnapshot,
 } from "./group-critique-server";
+import { groupCritiqueSnapshotSchema } from "./group-critique";
 
 const sessionId = "d38fce57-073a-4d5a-9cad-73e4d75f28a1";
 const coachId = "31dc4305-d759-45a9-9df7-5a91bd681a34";
@@ -95,6 +96,35 @@ function makeAdmin(options: {
 function makeUser(rpcResult: unknown = { data: null, error: null }) {
   return { rpc: vi.fn(async () => rpcResult) };
 }
+
+describe("group critique snapshot capacity", () => {
+  it("accepts 25 members and rejects a 26th", () => {
+    const members = Array.from({ length: 26 }, (_, index) => ({
+      memberId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      displayName: `Member ${index + 1}`,
+      membershipState: "eligible",
+      offeredAt: null,
+      cameraAllowed: false,
+      microphoneAllowed: false,
+      coachMuted: false,
+      participantEpoch: 0,
+      customParticipantId: null,
+    }));
+    const snapshot = {
+      sessionId,
+      generation: 1,
+      state: "open",
+      joinExpiresAt: joinExpiry,
+      role: "coach",
+      coachCustomParticipantId: null,
+      allMembersMuted: false,
+    };
+
+    expect(groupCritiqueSnapshotSchema.safeParse({ ...snapshot, members: members.slice(0, 25) }).success)
+      .toBe(true);
+    expect(groupCritiqueSnapshotSchema.safeParse({ ...snapshot, members }).success).toBe(false);
+  });
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

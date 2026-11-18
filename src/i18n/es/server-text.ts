@@ -298,8 +298,8 @@ export const esServerText: Record<string, string> = {
   "Intro not found.": "No encontramos esa introducción.",
   "Invite at least one member.": "Invita al menos a un miembro.",
   "Invite at least one member": "Invita al menos a un miembro.",
-  "A session can invite at most 30 members.":
-    "Una sesión puede invitar hasta 30 miembros como máximo.",
+  "A session can invite at most 25 members.":
+    "Una sesión puede invitar hasta 25 miembros como máximo.",
   "Live video isn't set up yet.":
     "El video en vivo todavía no está configurado.",
   "Name the habit.": "Ponle nombre al hábito.",

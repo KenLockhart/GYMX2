@@ -218,7 +218,7 @@ describe("RealtimeKit REST adapter", () => {
     ]);
   });
 
-  it("requires 31-stream webinar presets with the intended publisher and moderation boundaries", async () => {
+  it("requires at least 26-stream webinar presets with the intended publisher and moderation boundaries", async () => {
     const presetDefinitions = new Map<string, Record<string, unknown>>([
       [uuidFrom(1), {
         id: uuidFrom(1),
@@ -287,7 +287,9 @@ describe("RealtimeKit REST adapter", () => {
     await expect(api.verifyPresetDefinitions()).resolves.toBe(true);
 
     const hostConfig = presetDefinitions.get(uuidFrom(1))?.config as Record<string, unknown>;
-    hostConfig.max_video_streams = { desktop: 24, mobile: 31 };
+    hostConfig.max_video_streams = { desktop: 26, mobile: 26 };
+    await expect(api.verifyPresetDefinitions()).resolves.toBe(true);
+    hostConfig.max_video_streams = { desktop: 25, mobile: 31 };
     await expect(api.verifyPresetDefinitions()).resolves.toBe(false);
     hostConfig.max_video_streams = { desktop: 31, mobile: 31 };
 
