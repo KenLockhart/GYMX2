@@ -4,6 +4,22 @@ export const checkin: Messages["checkin"] = {
   title: "Check-in semanal",
   intro: (week) =>
     `Un minuto para contarles a tus coaches cómo te fue en la semana. Solo tú y los coaches a los que te uniste lo ven. Semana del ${week}.`,
+  daily: {
+    title: "Check-in diario de bienestar",
+    intro: (date) => `¿Cómo te sientes hoy? ${date}.`,
+    alreadyDone: "Ya hiciste tu check-in de hoy. Puedes actualizar tus respuestas durante el día.",
+    backToDashboard: "Volver al inicio",
+    retry: "Intentar de nuevo",
+    memberOnly: "Los check-ins diarios son solo para miembros.",
+    invalidAnswers: "Elige una puntuación del 1 al 5 para cada pregunta.",
+    stale: "El día cambió mientras esta página estaba abierta. Actualízala antes de guardar tu check-in.",
+    submit: "Guardar check-in de hoy",
+    update: "Actualizar check-in de hoy",
+    saving: "Guardando...",
+    saved: "Tu check-in diario está guardado.",
+    loadError: "No pudimos cargar el check-in de hoy. Actualiza para intentarlo de nuevo.",
+    saveError: "No pudimos guardar tu check-in. Inténtalo de nuevo.",
+  },
   joinFirst: "Primero únete a un coach y tus check-ins le llegarán.",
   findCoach: "Encontrar un coach",
   alreadyDone:

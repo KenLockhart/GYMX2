@@ -9,7 +9,7 @@ import type { Message } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
 import { loadContacts } from "../contacts";
 import { T } from "@/i18n/t";
-import { getTr } from "@/i18n/server";
+import { getT, getTr } from "@/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTr())("Conversation") };
@@ -17,13 +17,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ConversationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const tr = await getTr();
+  const [tr, translations] = await Promise.all([getTr(), getT()]);
   const { profile } = await requireAccount();
   if (profile.role === "admin") redirect("/admin/messages");
   const { id } = await params;
+  const search = await searchParams;
   if (!idSchema.safeParse(id).success) notFound();
 
   const isCoach = profile.role === "coach";
@@ -73,6 +76,21 @@ export default async function ConversationPage({
     created_at: row.created_at,
   }));
   const messages = await attachPhotos(plain);
+  const requestedMessageId =
+    typeof search.request_id === "string" &&
+    idSchema.safeParse(search.request_id).success
+      ? search.request_id
+      : null;
+  const requestCopy = translations.calendar.request;
+  const requestMessage = requestedMessageId
+    ? plain.find((row) => row.id === requestedMessageId)
+    : null;
+  const showSessionRequestSent =
+    profile.role === "member" &&
+    search.session_request === "sent" &&
+    contact?.connected === true &&
+    requestMessage?.sender_id === profile.id &&
+    requestMessage.body.startsWith(requestCopy.messagePrefix);
 
   return (
     <div className="space-y-6">
@@ -90,6 +108,11 @@ export default async function ConversationPage({
           </Link>
         )}
       </div>
+      {showSessionRequestSent && (
+        <p role="status" className="rounded-lg border border-accent bg-accent/10 p-4 text-sm">
+          {requestCopy.sent(displayName)}
+        </p>
+      )}
       {messageResult.error ? (
         <p role="alert" className="text-danger">
           <T>
