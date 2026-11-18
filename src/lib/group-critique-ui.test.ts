@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   canSelectSessionMember,
+  applyGroupPeerMediaMutePolicy,
   countUniqueLiveParticipants,
   createGroupCritiqueMediaEligibility,
   createGroupMutePolicy,
+  disableGroupPeerMediaAndConfirm,
   enableMediaOnlyWhileCurrent,
   getGroupCritiqueMediaEligibility,
   hasGroupCritiqueCapacity,
@@ -11,6 +13,7 @@ import {
   groupCritiqueCircleStyle,
   groupCritiqueMobilePage,
   groupCritiqueParticipantEpochMatches,
+  getGroupMutePolicyKey,
   isGroupCritiqueMediaOperationCurrent,
   partitionGroupCritiquePeers,
   queueGroupMutePolicy,
@@ -538,5 +541,220 @@ describe("group participant identity helpers", () => {
     expect(policy.appliedKey).toBe("muted");
     expect(policy.pendingKey).toBeNull();
     expect(failures).toEqual([]);
+  });
+
+  it("subscribes before disabling and waits for the public off event and track state", async () => {
+    let audioEnabled = true;
+    let audioTrackEnabled = true;
+    let onAudioUpdate: (() => void) | null = null;
+    const unsubscribe = vi.fn(() => {
+      onAudioUpdate = null;
+    });
+    const disable = vi.fn(async () => {
+      expect(onAudioUpdate).toBeTypeOf("function");
+      audioEnabled = false;
+      audioTrackEnabled = false;
+      onAudioUpdate?.();
+    });
+
+    await disableGroupPeerMediaAndConfirm({
+      disable,
+      isDisabled: () => !audioEnabled && !audioTrackEnabled,
+      subscribe: (onUpdate) => {
+        onAudioUpdate = onUpdate;
+        return unsubscribe;
+      },
+    });
+
+    expect(disable).toHaveBeenCalledOnce();
+    expect(audioEnabled).toBe(false);
+    expect(audioTrackEnabled).toBe(false);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it("rechecks the track after an audio event clears public media state without another event", async () => {
+    let audioEnabled = true;
+    let audioTrackEnabled = true;
+    let onAudioUpdate: (() => void) | null = null;
+    const isDisabled = vi.fn(() => !audioEnabled && !audioTrackEnabled);
+    const unsubscribe = vi.fn(() => {
+      onAudioUpdate = null;
+    });
+    const disable = vi.fn(async () => {});
+    const pending = disableGroupPeerMediaAndConfirm({
+      disable,
+      isDisabled,
+      subscribe: (onUpdate) => {
+        onAudioUpdate = onUpdate;
+        return unsubscribe;
+      },
+    });
+
+    await Promise.resolve();
+    expect(disable).toHaveBeenCalledOnce();
+
+    audioEnabled = false;
+    const update = onAudioUpdate as (() => void) | null;
+    update?.();
+    expect(isDisabled).toHaveReturnedWith(false);
+    audioTrackEnabled = false;
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(isDisabled).toHaveReturnedWith(true);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it("fails bounded off confirmation and retries the same persisted mute policy", async () => {
+    vi.useFakeTimers();
+    try {
+      const policy = createGroupMutePolicy();
+      let audioEnabled = true;
+      let audioTrackEnabled = true;
+      let onAudioUpdate: (() => void) | null = null;
+      let attempts = 0;
+      const failures: string[] = [];
+      const key = getGroupMutePolicyKey({
+        participantEpoch: 8,
+        membershipState: "eligible",
+        shouldMuteAudio: true,
+        audioCurrentlyOn: true,
+        videoCurrentlyOn: false,
+      });
+      const enqueue = () =>
+        queueGroupMutePolicy(
+          policy,
+          key,
+          () =>
+            disableGroupPeerMediaAndConfirm({
+              disable: async () => {
+                attempts += 1;
+                if (attempts > 1) {
+                  audioEnabled = false;
+                  audioTrackEnabled = false;
+                  onAudioUpdate?.();
+                }
+              },
+              isDisabled: () => !audioEnabled && !audioTrackEnabled,
+              subscribe: (onUpdate) => {
+                onAudioUpdate = onUpdate;
+                return () => {
+                  onAudioUpdate = null;
+                };
+              },
+              timeoutMs: 20,
+            }),
+          () => failures.push("mute"),
+        );
+
+      enqueue();
+      await vi.advanceTimersByTimeAsync(20);
+      await policy.queue;
+      expect(attempts).toBe(1);
+      expect(failures).toEqual(["mute"]);
+      expect(onAudioUpdate).toBeNull();
+
+      enqueue();
+      await policy.queue;
+      expect(attempts).toBe(2);
+      expect(failures).toEqual(["mute"]);
+      expect(audioEnabled).toBe(false);
+      expect(audioTrackEnabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reapplies an unchanged persisted mute when a peer starts producing again", async () => {
+    const policy = createGroupMutePolicy();
+    let audioEnabled = false;
+    let audioTrackEnabled = false;
+    let onAudioUpdate: (() => void) | null = null;
+    const disable = vi.fn(async () => {
+      audioEnabled = false;
+      audioTrackEnabled = false;
+      onAudioUpdate?.();
+    });
+    const applyMute = () =>
+      applyGroupPeerMediaMutePolicy({
+        shouldMuteAudio: true,
+        shouldMuteVideo: false,
+        disableAudio: () =>
+          disableGroupPeerMediaAndConfirm({
+            disable,
+            isDisabled: () => !audioEnabled && !audioTrackEnabled,
+            subscribe: (onUpdate) => {
+              onAudioUpdate = onUpdate;
+              return () => {
+                onAudioUpdate = null;
+              };
+            },
+          }),
+        disableVideo: vi.fn(async () => {}),
+      });
+    const getKey = (audioCurrentlyOn: boolean) =>
+      getGroupMutePolicyKey({
+        participantEpoch: 8,
+        membershipState: "eligible",
+        shouldMuteAudio: true,
+        audioCurrentlyOn,
+        videoCurrentlyOn: false,
+      });
+
+    queueGroupMutePolicy(policy, getKey(false), applyMute, vi.fn());
+    await policy.queue;
+    expect(disable).not.toHaveBeenCalled();
+
+    audioEnabled = true;
+    audioTrackEnabled = true;
+    queueGroupMutePolicy(policy, getKey(true), applyMute, vi.fn());
+    await policy.queue;
+
+    expect(disable).toHaveBeenCalledOnce();
+    expect(audioEnabled).toBe(false);
+    expect(audioTrackEnabled).toBe(false);
+  });
+
+  it("keeps an audio-only mute scoped to audio and never enables devices on allow", async () => {
+    const disableAudio = vi.fn(async () => {});
+    const disableVideo = vi.fn(async () => {});
+
+    await applyGroupPeerMediaMutePolicy({
+      shouldMuteAudio: true,
+      shouldMuteVideo: false,
+      disableAudio,
+      disableVideo,
+    });
+    expect(disableAudio).toHaveBeenCalledOnce();
+    expect(disableVideo).not.toHaveBeenCalled();
+
+    disableAudio.mockClear();
+    await applyGroupPeerMediaMutePolicy({
+      shouldMuteAudio: false,
+      shouldMuteVideo: false,
+      disableAudio,
+      disableVideo,
+    });
+    expect(disableAudio).not.toHaveBeenCalled();
+    expect(disableVideo).not.toHaveBeenCalled();
+  });
+
+  it("cleans the listener and skips disabling when the peer leaves", async () => {
+    let cancelled = false;
+    const disable = vi.fn(async () => {});
+    const unsubscribe = vi.fn();
+
+    await disableGroupPeerMediaAndConfirm({
+      disable,
+      isDisabled: () => false,
+      isCancelled: () => cancelled,
+      subscribe: (onUpdate) => {
+        cancelled = true;
+        onUpdate();
+        return unsubscribe;
+      },
+    });
+
+    expect(disable).not.toHaveBeenCalled();
+    expect(unsubscribe).toHaveBeenCalledOnce();
   });
 });

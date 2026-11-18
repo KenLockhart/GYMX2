@@ -253,7 +253,142 @@ export function createGroupMutePolicy(): GroupMutePolicy {
   };
 }
 
-/** Serialize permission changes and always queue the newest desired policy behind in-flight work. */
+/** Reconcile a participant's latest public media state when a persisted mute policy is unchanged. */
+export function getGroupMutePolicyKey(options: {
+  participantEpoch: number;
+  membershipState: string;
+  shouldMuteAudio: boolean;
+  audioCurrentlyOn: boolean;
+  videoCurrentlyOn: boolean;
+}): string {
+  const shouldMuteVideo = options.membershipState !== "eligible";
+  return [
+    options.participantEpoch,
+    options.membershipState,
+    options.shouldMuteAudio,
+    options.shouldMuteAudio && options.audioCurrentlyOn,
+    shouldMuteVideo && options.videoCurrentlyOn,
+  ].join(":");
+}
+
+/** A selected allow only updates app policy; it never turns a participant's device on. */
+export async function applyGroupPeerMediaMutePolicy(options: {
+  shouldMuteAudio: boolean;
+  shouldMuteVideo: boolean;
+  disableAudio: () => Promise<void>;
+  disableVideo: () => Promise<void>;
+}): Promise<void> {
+  let failed = false;
+  let firstError: unknown;
+  if (options.shouldMuteAudio) {
+    try {
+      await options.disableAudio();
+    } catch (error) {
+      failed = true;
+      firstError = error;
+    }
+  }
+  if (options.shouldMuteVideo) {
+    try {
+      await options.disableVideo();
+    } catch (error) {
+      if (!failed) firstError = error;
+      failed = true;
+    }
+  }
+  if (failed) throw firstError;
+}
+
+/** Await a public peer disable, then confirm public state and track are off. */
+export async function disableGroupPeerMediaAndConfirm(options: {
+  disable: () => Promise<void>;
+  isDisabled: () => boolean;
+  subscribe: (onUpdate: () => void) => () => void;
+  isCancelled?: () => boolean;
+  timeoutMs?: number;
+}): Promise<void> {
+  if (options.isCancelled?.() || options.isDisabled()) return;
+
+  const timeoutMs = options.timeoutMs ?? 2_000;
+  await new Promise<void>((resolve, reject) => {
+    let unsubscribe: (() => void) | null = null;
+    let cleanupRequested = false;
+    let settled = false;
+    let disableStarted = false;
+    let disableCompleted = false;
+    let confirmedDisabled = false;
+    const timeout = setTimeout(() => {
+      finish(new Error("group-critique-media-off-confirmation-timeout"));
+    }, timeoutMs);
+
+    const finish = (error?: unknown) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (unsubscribe) {
+        try {
+          unsubscribe();
+        } catch {
+          // Cleanup errors must not hide the media policy result.
+        }
+        unsubscribe = null;
+      } else {
+        cleanupRequested = true;
+      }
+      if (error) reject(error);
+      else resolve();
+    };
+
+    const onUpdate = () => {
+      if (settled) return;
+      try {
+        if (options.isCancelled?.()) {
+          finish();
+          return;
+        }
+        confirmedDisabled = options.isDisabled();
+        if (disableStarted && disableCompleted && confirmedDisabled) finish();
+      } catch (error) {
+        finish(error);
+      }
+    };
+    const onPublicMediaUpdate = () => {
+      onUpdate();
+      queueMicrotask(onUpdate);
+    };
+
+    try {
+      unsubscribe = options.subscribe(onPublicMediaUpdate);
+      if (cleanupRequested) {
+        try {
+          unsubscribe();
+        } catch {
+          // The listener has already settled and cannot affect policy state.
+        }
+        unsubscribe = null;
+      }
+      onUpdate();
+      if (settled) return;
+      if (options.isCancelled?.() || confirmedDisabled) {
+        finish();
+        return;
+      }
+      disableStarted = true;
+      Promise.resolve(options.disable()).then(
+        () => {
+          if (settled) return;
+          disableCompleted = true;
+          onUpdate();
+        },
+        (error) => finish(error),
+      );
+    } catch (error) {
+      finish(error);
+    }
+  });
+}
+
+/** Serialize mute-policy changes and always queue the newest desired policy behind in-flight work. */
 export function queueGroupMutePolicy(
   policy: GroupMutePolicy,
   key: string,

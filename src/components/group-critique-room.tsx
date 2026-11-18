@@ -26,12 +26,15 @@ import { useT } from "@/i18n/client";
 import {
   GROUP_CRITIQUE_MEMBER_LIMIT,
   GROUP_CRITIQUE_MOBILE_PAGE_SIZE,
+  applyGroupPeerMediaMutePolicy,
   hasGroupCritiqueCapacity,
   countUniqueLiveParticipants,
   createGroupCritiqueMediaEligibility,
   createGroupMutePolicy,
+  disableGroupPeerMediaAndConfirm,
   enableMediaOnlyWhileCurrent,
   getGroupCritiqueMediaEligibility,
+  getGroupMutePolicyKey,
   groupCritiqueCirclePositions,
   groupCritiqueCircleStyle,
   groupCritiqueMobilePage,
@@ -57,9 +60,6 @@ const useClientLayoutEffect =
 type RealtimeMeeting = Awaited<
   ReturnType<typeof import("@cloudflare/realtimekit").default.init>
 >;
-// Numeric values from the SDK's public StreamPermissionType enum.
-const STREAM_PERMISSION_NOT_ALLOWED = 2;
-const STREAM_PERMISSION_CAN_REQUEST = 3;
 type SafeCredentials = Omit<GroupCritiqueJoinCredential, "authToken"> & {
   generation: number;
 };
@@ -787,28 +787,101 @@ function GroupCritiqueRoom({
       );
       if (!peer) continue;
       const shouldMute = member.coachMuted || member.membershipState !== "eligible";
-      const policyKey = `${member.participantEpoch}:${member.membershipState}:${shouldMute}`;
+      const policyKey = getGroupMutePolicyKey({
+        participantEpoch: member.participantEpoch,
+        membershipState: member.membershipState,
+        shouldMuteAudio: shouldMute,
+        audioCurrentlyOn:
+          peer.audioEnabled ||
+          Boolean(
+            peer.audioTrack?.readyState === "live" && peer.audioTrack.enabled,
+          ),
+        videoCurrentlyOn:
+          peer.videoEnabled ||
+          Boolean(
+            peer.videoTrack?.readyState === "live" && peer.videoTrack.enabled,
+          ),
+      });
       const policy = mutePolicies.current.get(peer.id) ?? createGroupMutePolicy();
       mutePolicies.current.set(peer.id, policy);
-      const canProduceAudio = shouldMute
-        ? STREAM_PERMISSION_NOT_ALLOWED
-        : STREAM_PERMISSION_CAN_REQUEST;
       queueGroupMutePolicy(
         policy,
         policyKey,
-        async () => {
-          await meeting.participants.updatePermissions([peer.id], {
-            media: {
-              audio: { canProduce: canProduceAudio },
-              ...(member.membershipState !== "eligible"
-                ? { video: { canProduce: STREAM_PERMISSION_NOT_ALLOWED } }
-                : {}),
-            },
-          });
-          if (shouldMute) await peer.disableAudio();
-          if (member.membershipState !== "eligible")
-            await peer.disableVideo();
-        },
+        () =>
+          applyGroupPeerMediaMutePolicy({
+            shouldMuteAudio: shouldMute,
+            shouldMuteVideo: member.membershipState !== "eligible",
+            disableAudio: () =>
+              disableGroupPeerMediaAndConfirm({
+                disable: () => peer.disableAudio(),
+                isDisabled: () =>
+                  !peer.audioEnabled &&
+                  (!peer.audioTrack ||
+                    !peer.audioTrack.enabled ||
+                    peer.audioTrack.readyState === "ended"),
+                isCancelled: () =>
+                  !mounted.current ||
+                  meetingRef.current !== meeting ||
+                  !meeting.self.roomJoined ||
+                  !meeting.participants.joined
+                    .toArray()
+                    .some((candidate) => candidate.id === peer.id),
+                subscribe: (onUpdate) => {
+                  const onAudioUpdate = () => onUpdate();
+                  const onRoomLeft = () => onUpdate();
+                  const onParticipantLeft = () => onUpdate();
+                  peer.on("audioUpdate", onAudioUpdate);
+                  meeting.self.on("roomLeft", onRoomLeft);
+                  meeting.participants.joined.on(
+                    "participantLeft",
+                    onParticipantLeft,
+                  );
+                  return () => {
+                    peer.off("audioUpdate", onAudioUpdate);
+                    meeting.self.off("roomLeft", onRoomLeft);
+                    meeting.participants.joined.off(
+                      "participantLeft",
+                      onParticipantLeft,
+                    );
+                  };
+                },
+              }),
+            disableVideo: () =>
+              disableGroupPeerMediaAndConfirm({
+                disable: () => peer.disableVideo(),
+                isDisabled: () =>
+                  !peer.videoEnabled &&
+                  (!peer.videoTrack ||
+                    !peer.videoTrack.enabled ||
+                    peer.videoTrack.readyState === "ended"),
+                isCancelled: () =>
+                  !mounted.current ||
+                  meetingRef.current !== meeting ||
+                  !meeting.self.roomJoined ||
+                  !meeting.participants.joined
+                    .toArray()
+                    .some((candidate) => candidate.id === peer.id),
+                subscribe: (onUpdate) => {
+                  const onVideoUpdate = () => onUpdate();
+                  const onRoomLeft = () => onUpdate();
+                  const onParticipantLeft = () => onUpdate();
+                  peer.on("videoUpdate", onVideoUpdate);
+                  meeting.self.on("roomLeft", onRoomLeft);
+                  meeting.participants.joined.on(
+                    "participantLeft",
+                    onParticipantLeft,
+                  );
+                  return () => {
+                    peer.off("videoUpdate", onVideoUpdate);
+                    meeting.self.off("roomLeft", onRoomLeft);
+                    meeting.participants.joined.off(
+                      "participantLeft",
+                      onParticipantLeft,
+                    );
+                  };
+                },
+              }),
+          }),
         () => {
           setError(t.actionError);
           window.setTimeout(() => {
