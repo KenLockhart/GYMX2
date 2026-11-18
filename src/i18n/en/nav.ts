@@ -12,6 +12,7 @@ export const nav = {
     "/coaches": "Coaches",
     "/profile": "Profile and settings",
     "/notifications": "Notifications",
+    "/membership": "Platform membership",
     "/armory/purchases": "Purchases",
     "/affiliate": "Affiliate program",
     "/profile/coach": "Coach profile",

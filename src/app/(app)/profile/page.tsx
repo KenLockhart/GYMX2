@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getLocale, getT } from "@/i18n/server";
 import { translateServerText } from "@/i18n/server-text";
 import { deletionBlocker } from "@/lib/account-deletion";
-import { requireAccount } from "@/lib/auth";
+import { requireAuthenticatedAccount } from "@/lib/auth";
 import { GoalsForm, SpecialtiesForm } from "@/components/goals-form";
 import { ProfilePhotoForm } from "@/components/profile-photo-form";
 import { PublicPageForm } from "@/components/public-page-form";
@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ProfilePage() {
-  const { profile, email } = await requireAccount();
+  const { profile, email } = await requireAuthenticatedAccount();
   const blocker = await deletionBlocker(profile);
   const t = await getT();
   const locale = await getLocale();

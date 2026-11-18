@@ -5,6 +5,8 @@ import {
   describeSize,
   fileExtension,
   addressLines,
+  canAccessArmoryCategory,
+  deliveryEstimate,
   formatMoney,
   formatPrice,
   orderStatusLabel,
@@ -53,12 +55,26 @@ describe("parsePrice", () => {
 describe("categories", () => {
   it("labels categories", () => {
     expect(categoryLabel("gear")).toBe("Gear");
+    expect(categoryLabel("accessories")).toBe("Accessories");
+    expect(categoryLabel("supplements")).toBe("Supplements");
+    expect(categoryLabel("doctor_network")).toBe("Doctor Network");
+    expect(categoryLabel("other")).toBe("Legacy / Other");
     expect(categoryLabel("unknown")).toBe("Other");
   });
 
   it("knows valid categories", () => {
     expect(isCategory("ebook")).toBe(true);
+    expect(isCategory("accessories")).toBe(true);
+    expect(isCategory("supplements")).toBe(true);
+    expect(isCategory("doctor_network")).toBe(true);
     expect(isCategory("weapons")).toBe(false);
+  });
+
+  it("keeps premium categories hidden from regular entitlements", () => {
+    expect(canAccessArmoryCategory("ebook", "regular")).toBe(true);
+    expect(canAccessArmoryCategory("supplements", "regular")).toBe(false);
+    expect(canAccessArmoryCategory("doctor_network", null)).toBe(false);
+    expect(canAccessArmoryCategory("supplements", "premium")).toBe(true);
   });
 });
 
@@ -146,6 +162,41 @@ describe("categoriesFor", () => {
   it("offers Gear for gear and shop links", () => {
     expect(categoriesFor("product").map((c) => c.value)).toContain("gear");
     expect(categoriesFor("link").map((c) => c.value)).toContain("gear");
+  });
+
+  it("offers the six current categories for new items and retains legacy Other only while editing it", () => {
+    expect(categoriesFor("link").map((category) => category.value)).toEqual([
+      "ebook",
+      "gear",
+      "accessories",
+      "program",
+      "supplements",
+      "doctor_network",
+    ]);
+    expect(categoriesFor("link", "other").at(-1)?.value).toBe("other");
+    expect(categoriesFor("paid", "other").map((category) => category.value)).not.toContain("gear");
+  });
+});
+
+describe("deliveryEstimate", () => {
+  it("shows a structured made-to-order delivery window", () => {
+    expect(
+      deliveryEstimate({
+        made_to_order: true,
+        delivery_min_weeks: 3,
+        delivery_max_weeks: 4,
+      }),
+    ).toEqual({ minWeeks: 3, maxWeeks: 4 });
+  });
+
+  it("does not show a delivery estimate for ordinary items", () => {
+    expect(
+      deliveryEstimate({
+        made_to_order: false,
+        delivery_min_weeks: null,
+        delivery_max_weeks: null,
+      }),
+    ).toBeNull();
   });
 });
 

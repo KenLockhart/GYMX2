@@ -6,6 +6,7 @@ import { requireAccount } from "@/lib/auth";
 import {
   PLATFORM_FEE_PERCENT,
   categoryLabel,
+  deliveryEstimate,
   orderStatusLabel,
   formatMoney,
   formatPrice,
@@ -63,6 +64,8 @@ export default async function ArmoryItemPage({
       })
     | null;
   if (!item) notFound();
+
+  const delivery = deliveryEstimate(item);
 
   const isOwner = item.coach_id === profile.id;
   const isSold = item.kind === "paid" || item.kind === "product";
@@ -193,6 +196,14 @@ export default async function ArmoryItemPage({
                     : "Free shipping"}
                 </span>
               </p>
+              {delivery && (
+                <p className="rounded-lg border border-accent bg-surface p-3 text-sm">
+                  {tr("Made to order. Estimated delivery: {min}–{max} weeks.", {
+                    min: delivery.minWeeks,
+                    max: delivery.maxWeeks,
+                  })}
+                </p>
+              )}
               {isDisplayOnly(item) ? (
                 <div className="space-y-2">
                   <p role="status" className="rounded-lg border border-accent bg-surface p-3 text-sm">

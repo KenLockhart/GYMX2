@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentAccount } from "@/lib/auth";
+import { getPlatformEntitlement } from "@/lib/platform-membership-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
@@ -14,6 +15,32 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!idSchema.safeParse(id).success) return new NextResponse("Not found", { status: 404 });
 
   const supabase = await createClient();
+  if (account.profile.role === "member") {
+    const access = await getPlatformEntitlement(account.profile.id);
+    if (!access.ok || !access.entitlement) {
+      // A paid, unrefunded download stays available after platform cancellation. The item RLS
+      // policy allows the purchased row through solely for this history path.
+      const { data: ownedRows } = await supabase
+        .from("purchases")
+        .select("id, item:armory_items(kind)")
+        .eq("item_id", id)
+        .eq("member_id", account.profile.id)
+        .is("refunded_at", null)
+        .limit(1);
+      const ownsPaidDownload = (ownedRows ?? []).some(
+        (purchase) =>
+          (purchase.item as { kind?: string } | null)?.kind === "paid",
+      );
+      if (!ownsPaidDownload) {
+        const reason = access.ok ? "required" : "check";
+        return NextResponse.redirect(
+          new URL(`/membership?issue=${reason}`, request.url),
+          { status: 303 },
+        );
+      }
+    }
+  }
+
   const { data: item } = await supabase
     .from("armory_items")
     .select("coach_id, kind, file_path, file_name")

@@ -261,6 +261,13 @@ const SECTIONS: {
     owner: "member_id",
   },
   {
+    name: "platform_memberships",
+    table: "platform_memberships",
+    columns: "tier, status, current_period_end, cancel_at_period_end, created_at, updated_at",
+    owner: "member_id",
+    order: "created_at",
+  },
+  {
     name: "reviews_written",
     table: "coach_reviews",
     columns:

@@ -99,5 +99,8 @@ export type ArmoryItem = {
   file_name: string | null;
   image_path: string | null;
   visible_to_all: boolean;
+  made_to_order: boolean;
+  delivery_min_weeks: number | null;
+  delivery_max_weeks: number | null;
   created_at: string;
 };

@@ -7,7 +7,7 @@ import {
   deletionBlocker,
   passwordMatches,
 } from "@/lib/account-deletion";
-import { requireAccount } from "@/lib/auth";
+import { requireAuthenticatedAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 import { profileSchema } from "@/lib/validation";
@@ -16,7 +16,7 @@ export async function updateProfile(
   _: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
 
   const parsed = profileSchema.safeParse({
     display_name: formData.get("display_name") ?? "",
@@ -50,7 +50,7 @@ export async function deleteMyAccount(
   _: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { profile, email } = await requireAccount();
+  const { profile, email } = await requireAuthenticatedAccount();
   const confirmation = String(formData.get("confirm") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   // DELETE, or ELIMINAR on the Spanish screen.

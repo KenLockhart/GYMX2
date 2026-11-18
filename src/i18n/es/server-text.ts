@@ -45,6 +45,32 @@ export const esServerText: Record<string, string> = {
   "We couldn't find that membership.": "No encontramos esa membresía.",
   "We couldn't update your membership. Please try again.":
     "No pudimos actualizar tu membresía. Inténtalo de nuevo.",
+  "We couldn't update your platform membership. Please try again.":
+    "No pudimos actualizar tu membresía de la plataforma. Inténtalo de nuevo.",
+  "Platform membership payments aren't available right now. Please try again later.":
+    "Los pagos de la membresía no están disponibles ahora. Inténtalo más tarde.",
+  "You already have a platform membership. Change or manage it below instead of starting another checkout.":
+    "Ya tienes una membresía de la plataforma. Cámbiala o adminístrala aquí en lugar de iniciar otro pago.",
+  "This account already has test access. No Stripe checkout was started.":
+    "Esta cuenta ya tiene acceso de prueba. No se inició ningún pago de Stripe.",
+  "A checkout is already open. Finish or close it before choosing another plan.":
+    "Ya hay un pago abierto. Termínalo o ciérralo antes de elegir otro plan.",
+  "We couldn't verify your platform membership. Please refresh and try again.":
+    "No pudimos verificar tu membresía de la plataforma. Actualiza la página e inténtalo de nuevo.",
+  "Checkout isn't available while your account is being closed.":
+    "El pago no está disponible mientras se cierra tu cuenta.",
+  "Stripe couldn't open billing management. Please try again later.":
+    "Stripe no pudo abrir la administración de pagos. Inténtalo más tarde.",
+  "We couldn't start checkout. Please try again later.":
+    "No pudimos iniciar el pago. Inténtalo más tarde.",
+  "Regular membership is available to members. Choose Premium to unlock the Premium Armory.":
+    "La membresía Regular está disponible para miembros. Elige Premium para desbloquear la Armería Premium.",
+  "Choose a platform plan.": "Elige un plan de la plataforma.",
+  "Choose a billing action.": "Elige una opción de pago.",
+  "Your platform membership will renew again.":
+    "Tu membresía de la plataforma volverá a renovarse.",
+  "Premium membership required to buy this item.":
+    "Necesitas la membresía Premium para comprar este artículo.",
   "Card updates aren't available right now. Email support@gymx2.com and we'll help.":
     "Por ahora no se puede actualizar la tarjeta. Escríbenos a support@gymx2.com y te ayudamos.",
   "Plan updated. Current subscribers keep their price.":

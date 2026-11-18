@@ -47,6 +47,9 @@ export default async function NewArmoryItemPage() {
           image_path: "",
           image_url: null,
           visible_to_all: profile.role === "admin",
+          made_to_order: false,
+          delivery_min_weeks: null,
+          delivery_max_weeks: null,
         }}
       />
     </div>

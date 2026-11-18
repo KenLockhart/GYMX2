@@ -1,6 +1,8 @@
+import "server-only";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getPlatformEntitlement } from "@/lib/platform-membership-server";
 import type { Profile } from "@/lib/types";
 
 export const getCurrentAccount = cache(async () => {
@@ -20,9 +22,21 @@ export const getCurrentAccount = cache(async () => {
   return profile ? { email: user.email ?? "", profile } : null;
 });
 
-export async function requireAccount() {
+// Use this only for the app shell, the membership flow, account/privacy/export/deletion, billing
+// management, My Purchases, and an owned paid download. Member features use requireAccount below.
+export async function requireAuthenticatedAccount() {
   const account = await getCurrentAccount();
   if (!account) redirect("/login");
+  return account;
+}
+
+export async function requireAccount() {
+  const account = await requireAuthenticatedAccount();
+  if (account.profile.role === "member") {
+    const access = await getPlatformEntitlement(account.profile.id);
+    if (!access.ok) redirect("/membership?issue=check");
+    if (!access.entitlement) redirect("/membership?issue=required");
+  }
   return account;
 }
 

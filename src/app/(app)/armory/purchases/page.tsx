@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { formatMoney, orderStatusLabel } from "@/lib/armory";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
-import { requireAccount } from "@/lib/auth";
+import { requireAuthenticatedAccount } from "@/lib/auth";
 import { hasAccess, membershipStatusLabel } from "@/lib/memberships";
 import {
   cancelMembership,
@@ -45,7 +45,7 @@ function formatDay(iso: string, locale: Locale) {
 export default async function MyPurchasesPage() {
   const locale = await getLocale();
   const tr = await getTr();
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -212,16 +212,7 @@ export default async function MyPurchasesPage() {
               >
                 <div className="min-w-0">
                   <p className="font-semibold">
-                    {purchase.item_id ? (
-                      <Link
-                        href={`/armory/${purchase.item_id}`}
-                        className="hover:text-accent"
-                      >
-                        {purchase.item_title}
-                      </Link>
-                    ) : (
-                      purchase.item_title
-                    )}
+                    {purchase.item_title}
                     {purchase.size && (
                       <span className="ml-2 text-sm font-normal text-muted">
                         Size {purchase.size}

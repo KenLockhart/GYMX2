@@ -69,6 +69,9 @@ export default async function EditArmoryItemPage({
           image_path: data.image_path ?? "",
           image_url: publicImageUrl(getSupabaseEnv().url, data.image_path),
           visible_to_all: data.visible_to_all,
+          made_to_order: data.made_to_order,
+          delivery_min_weeks: data.delivery_min_weeks,
+          delivery_max_weeks: data.delivery_max_weeks,
         }}
       />
     </div>
