@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentAccount } from "@/lib/auth";
+import { getPlatformEntitlement } from "@/lib/platform-membership-server";
 import { MAX_VIDEO_BYTES, MAX_VIDEO_SECONDS } from "@/lib/community";
 import { createUpload, isStreamConfigured } from "@/lib/stream";
 
@@ -12,6 +13,11 @@ function failure(message: string, status: number) {
 export async function POST(request: NextRequest) {
   const account = await getCurrentAccount();
   if (!account) return failure("Log in to upload a video.", 401);
+  if (account.profile.role === "member") {
+    const access = await getPlatformEntitlement(account.profile.id);
+    if (!access.ok) return failure("Membership status is unavailable. Please retry.", 503);
+    if (!access.entitlement) return failure("Choose a platform membership to use this feature.", 402);
+  }
   if (!isStreamConfigured())
     return failure("Video uploads aren't connected yet.", 503);
 

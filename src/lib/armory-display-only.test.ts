@@ -5,6 +5,7 @@ import { armoryItemSchema } from "./validation";
 const product = {
   kind: "product", id: "", category: "gear", title: "Cap", description: "",
   price_cents: 3844, shipping_cents: 0, sizes: [], image_path: "", visible_to_all: true,
+  made_to_order: false, delivery_min_weeks: null, delivery_max_weeks: null,
 };
 describe("display-only gear", () => {
   it("uses a separate kind, not a flag old code can ignore", () => {

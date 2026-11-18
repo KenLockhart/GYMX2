@@ -8,6 +8,13 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('50000000-0000-0000-0000-000000000004', 'arm-joined@example.test', '{"display_name":"Joined"}'),
   ('50000000-0000-0000-0000-000000000005', 'arm-outsider@example.test', '{"display_name":"Outsider"}');
 
+insert into public.platform_memberships (
+  member_id, tier, stripe_subscription_id, stripe_customer_id, stripe_price_id,
+  status, current_period_end, last_event_created, last_event_id
+) values
+  ('50000000-0000-0000-0000-000000000004', 'regular', 'sub_armory_joined', 'cus_armory_joined', 'price_regular_test', 'active', now() + interval '30 days', 1, 'evt_armory_joined'),
+  ('50000000-0000-0000-0000-000000000005', 'regular', 'sub_armory_outsider', 'cus_armory_outsider', 'price_regular_test', 'active', now() + interval '30 days', 1, 'evt_armory_outsider');
+
 update public.profiles set role = 'admin' where id = '50000000-0000-0000-0000-000000000001';
 update public.profiles set role = 'coach'
 where id in ('50000000-0000-0000-0000-000000000002', '50000000-0000-0000-0000-000000000003');

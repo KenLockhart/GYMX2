@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { requireAccount } from "@/lib/auth";
+import { requireAccount, requireAuthenticatedAccount } from "@/lib/auth";
 import { sendPush } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 
@@ -60,10 +60,14 @@ export async function savePushSubscription(
 }
 
 export async function removePushSubscription(endpoint: string): Promise<void> {
-  await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
   if (typeof endpoint !== "string" || endpoint.length > 1000) return;
   const supabase = await createClient();
-  await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  await supabase
+    .from("push_subscriptions")
+    .delete()
+    .eq("endpoint", endpoint)
+    .eq("user_id", profile.id);
 }
 
 export async function sendTestPush(): Promise<{ error?: string }> {

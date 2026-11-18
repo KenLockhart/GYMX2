@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { requireAccount } from "@/lib/auth";
+import { requireAccount, requireAuthenticatedAccount } from "@/lib/auth";
 import {
   cancelProfilePhotoUpload,
   finalizeProfilePhotoUpload,
@@ -150,7 +150,7 @@ export async function finishMyProfilePhotoUpload(
 export async function cancelMyProfilePhotoUpload(
   path: unknown,
 ): Promise<{ error?: string }> {
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
   if (!isOwnedProfilePhotoPath(profile.id, path)) return { error: "invalid-path" };
   const result = await cancelProfilePhotoUpload(
     profile.id,
@@ -164,7 +164,7 @@ export async function removeMyProfilePhoto(): Promise<{
   error?: string;
   photoUrl?: string | null;
 }> {
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
   const admin = createAdminClient();
   const result = await removeProfilePhoto(
     profile.id,

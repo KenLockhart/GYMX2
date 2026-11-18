@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentAccount } from "@/lib/auth";
+import { getPlatformEntitlement } from "@/lib/platform-membership-server";
 import { getThumbnailUrl, isStreamConfigured } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +15,11 @@ export async function GET(
   const notFound = new NextResponse(null, { status: 404 });
   const account = await getCurrentAccount();
   if (!account) return new NextResponse(null, { status: 401 });
+  if (account.profile.role === "member") {
+    const access = await getPlatformEntitlement(account.profile.id);
+    if (!access.ok) return new NextResponse(null, { status: 503 });
+    if (!access.entitlement) return new NextResponse(null, { status: 402 });
+  }
   const id = idSchema.safeParse((await params).id);
   if (!id.success || !isStreamConfigured()) return notFound;
 

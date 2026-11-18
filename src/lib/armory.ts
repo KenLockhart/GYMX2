@@ -1,10 +1,36 @@
 // Armory helpers shared by the server and the browser.
 
-export const ARMORY_CATEGORIES = [
+export const REGULAR_ARMORY_CATEGORIES = [
   { value: "ebook", label: "Ebooks" },
   { value: "gear", label: "Gear" },
+  { value: "accessories", label: "Accessories" },
   { value: "program", label: "Programs" },
-  { value: "other", label: "Other" },
+] as const;
+
+export const PREMIUM_ARMORY_CATEGORIES = [
+  { value: "supplements", label: "Supplements" },
+  { value: "doctor_network", label: "Doctor Network" },
+] as const;
+
+// Retained so items created before the category expansion stay readable and editable.
+export const LEGACY_ARMORY_CATEGORIES = [
+  { value: "other", label: "Legacy / Other" },
+] as const;
+
+export const ARMORY_CATEGORIES = [
+  ...REGULAR_ARMORY_CATEGORIES,
+  ...PREMIUM_ARMORY_CATEGORIES,
+  ...LEGACY_ARMORY_CATEGORIES,
+] as const;
+
+export const ARMORY_CATEGORY_VALUES = [
+  "ebook",
+  "gear",
+  "accessories",
+  "program",
+  "supplements",
+  "doctor_network",
+  "other",
 ] as const;
 
 export type ArmoryCategory = (typeof ARMORY_CATEGORIES)[number]["value"];
@@ -14,11 +40,24 @@ export function categoryLabel(category: string) {
   return ARMORY_CATEGORIES.find((item) => item.value === category)?.label ?? "Other";
 }
 
+export function isPremiumCategory(category: string) {
+  return PREMIUM_ARMORY_CATEGORIES.some((item) => item.value === category);
+}
+
+export function canAccessArmoryCategory(
+  category: string,
+  tier: "regular" | "premium" | null,
+) {
+  return !isPremiumCategory(category) || tier === "premium";
+}
+
 // Gear is shipped, never downloaded, so digital items can't use the Gear category.
-export function categoriesFor(kind: ArmoryKind) {
-  return kind === "download" || kind === "paid"
-    ? ARMORY_CATEGORIES.filter((category) => category.value !== "gear")
-    : ARMORY_CATEGORIES;
+export function categoriesFor(kind: ArmoryKind, currentCategory?: string) {
+  return ARMORY_CATEGORIES.filter((category) => {
+    if ((kind === "download" || kind === "paid") && category.value === "gear")
+      return false;
+    return category.value !== "other" || currentCategory === "other";
+  });
 }
 
 export function isCategory(value: unknown): value is ArmoryCategory {
@@ -100,6 +139,24 @@ export const MIN_PAID_PRICE_CENTS = 100;
 // Money amounts in reports, where zero shows as $0.00 rather than "Free".
 export function formatMoney(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+}
+
+export function deliveryEstimate(item: {
+  made_to_order: boolean;
+  delivery_min_weeks: number | null;
+  delivery_max_weeks: number | null;
+}) {
+  if (
+    !item.made_to_order ||
+    !item.delivery_min_weeks ||
+    !item.delivery_max_weeks
+  ) {
+    return null;
+  }
+  return {
+    minWeeks: item.delivery_min_weeks,
+    maxWeeks: item.delivery_max_weeks,
+  };
 }
 
 export const DEFAULT_SIZES = "S, M, L, XL, 2XL";

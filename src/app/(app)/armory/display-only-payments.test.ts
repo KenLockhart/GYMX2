@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createCheckout: vi.fn(),
   createAdminClient: vi.fn(),
 }));
+vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
@@ -42,7 +43,9 @@ import { buyArmoryItem } from "./payments";
 const baseItem = {
   id: "00000000-0000-4000-8000-000000000001",
   coach_id: "00000000-0000-4000-8000-000000000003",
-  kind: "product", title: "GYMX2 Cap", price_cents: 3844, sizes: [], shipping_cents: 0,
+  kind: "product", category: "gear", title: "GYMX2 Cap", price_cents: 3844,
+  sizes: [], shipping_cents: 0, made_to_order: false,
+  delivery_min_weeks: null, delivery_max_weeks: null,
 };
 function request() {
   const data = new FormData();

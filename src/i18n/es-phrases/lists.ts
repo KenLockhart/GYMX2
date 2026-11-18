@@ -21,10 +21,90 @@ export const lists: Record<string, string> = {
   Communication: "Comunicación",
   "Experience with your needs": "Experiencia con tus necesidades",
   Budget: "Presupuesto",
+  Regular: "Regular",
+  Premium: "Premium",
+  "Platform membership": "Membresía de la plataforma",
+  "Choose a paid platform membership to use GYMX2.":
+    "Elige una membresía de pago para usar GYMX2.",
+  "Premium membership unlocks the Premium Armory categories for shoppers.":
+    "La membresía Premium desbloquea las categorías Premium de la Armería.",
+  "Choose a paid platform membership to continue using member features.":
+    "Elige una membresía de pago para seguir usando las funciones para miembros.",
+  "We couldn't verify your membership status. Please refresh and try again.":
+    "No pudimos verificar tu membresía. Actualiza la página e inténtalo de nuevo.",
+  "Checkout was closed. No membership was created.":
+    "Se cerró el pago. No se creó ninguna membresía.",
+  "Checkout wasn't completed. No membership was created.":
+    "No se completó el pago. No se creó ninguna membresía.",
+  "We're waiting for Stripe to confirm your payment. Refresh this page in a moment.":
+    "Esperamos la confirmación de Stripe. Actualiza esta página en un momento.",
+  "Your plan change was confirmed by Stripe.":
+    "Stripe confirmó el cambio de plan.",
+  "Your membership is scheduled to end at the end of the paid period.":
+    "Tu membresía terminará al final del periodo pagado.",
+  "Current plan": "Plan actual",
+  "/month": "/mes",
+  "Your plan ends on {date}. You keep access until then.":
+    "Tu plan termina el {date}. Conservas el acceso hasta entonces.",
+  "Your plan renews on {date}.": "Tu plan se renueva el {date}.",
+  "Your membership is active.": "Tu membresía está activa.",
+  "Manage billing": "Administrar pagos",
+  "Opening...": "Abriendo...",
+  "Resume your platform membership and monthly billing?":
+    "¿Reactivar tu membresía de la plataforma y los pagos mensuales?",
+  "Saving...": "Guardando...",
+  "Resume membership": "Reactivar membresía",
+  "Continue to Stripe to review cancellation. Your paid access lasts through the period end.":
+    "Continúa a Stripe para revisar la cancelación. Conservas el acceso pagado hasta el final del periodo.",
+  "Cancel membership": "Cancelar membresía",
+  "Stripe will show the new amount and any proration before you confirm the plan change.":
+    "Stripe mostrará el nuevo importe y cualquier prorrateo antes de que confirmes el cambio.",
+  "Review Premium plan": "Revisar plan Premium",
+  "Review Regular plan": "Revisar plan Regular",
+  "Stripe asks you to confirm plan changes before applying them.":
+    "Stripe te pedirá que confirmes los cambios de plan antes de aplicarlos.",
+  "Access provided by GYMX2": "Acceso proporcionado por GYMX2",
+  "This access is managed by GYMX2 and does not include a Stripe subscription or bill.":
+    "GYMX2 administra este acceso; no incluye una suscripción ni un cobro de Stripe.",
+  "Checkout in progress": "Pago en curso",
+  "A {plan} checkout is already open. Continue it to avoid starting a second subscription.":
+    "Ya tienes abierto el pago del plan {plan}. Continúa para evitar iniciar otra suscripción.",
+  "Continue Premium checkout": "Continuar con el pago Premium",
+  "Continue Regular checkout": "Continuar con el pago Regular",
+  "Your billing status is being verified. Please refresh in a moment.":
+    "Estamos verificando tus pagos. Actualiza la página en un momento.",
+  "Payment status needs attention": "El estado del pago requiere atención",
+  "Your Stripe membership is not currently active. Update billing details or contact support before starting another subscription.":
+    "Tu membresía de Stripe no está activa. Actualiza tus datos de pago o contacta a soporte antes de iniciar otra suscripción.",
+  "Renews monthly until you cancel. No free trial.":
+    "Se renueva cada mes hasta que canceles. No hay prueba gratis.",
+  "Choose Regular": "Elegir Regular",
+  "Choose Premium": "Elegir Premium",
+  "Browse the Armory": "Ver la Armería",
+  "Account and privacy settings": "Cuenta y privacidad",
+  "Made to order": "Hecho por encargo",
+  "Prepared separately for each order.": "Se prepara por separado para cada pedido.",
+  "Estimated delivery, minimum weeks": "Entrega estimada, mínimo de semanas",
+  "Estimated delivery, maximum weeks": "Entrega estimada, máximo de semanas",
+  "Made to order. Estimated delivery: {min}–{max} weeks.":
+    "Hecho por encargo. Entrega estimada: {min}–{max} semanas.",
+  "Ebooks, gear, accessories and programs for your members. Premium adds supplements and doctor network products.":
+    "Ebooks, equipo, accesorios y programas para tus miembros. Premium agrega suplementos y productos de la red médica.",
+  "Ebooks, gear, accessories and programs chosen by your coaches. Premium also includes supplements and doctor network products.":
+    "Ebooks, equipo, accesorios y programas elegidos por tus coaches. Premium también incluye suplementos y productos de la red médica.",
+  "Premium membership is required to browse this category.":
+    "Necesitas la membresía Premium para ver esta categoría.",
+  "View Premium": "Ver Premium",
   Ebooks: "Ebooks",
   Gear: "Equipo",
+  Accessories: "Accesorios",
   Programs: "Programas",
   Other: "Otros",
+  "Legacy / Other": "Anterior / Otros",
+  Supplements: "Suplementos",
+  "Doctor Network": "Red médica",
+  "Premium membership required to buy this item.":
+    "Necesitas la membresía Premium para comprar este artículo.",
   Digital: "Digital",
   "To ship": "Por enviar",
   Shipped: "Enviado",

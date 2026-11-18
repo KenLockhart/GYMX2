@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAccount } from "@/lib/auth";
+import { requireAccount, requireAuthenticatedAccount } from "@/lib/auth";
 import { NOTIFICATION_SETTINGS } from "@/lib/notifications";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
@@ -66,7 +66,7 @@ const settingsSchema = z
 export async function saveNotificationSettings(
   input: unknown,
 ): Promise<{ error?: string }> {
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
   const parsed = settingsSchema.safeParse(input);
   if (!parsed.success) return { error: "Those settings didn't look right." };
   const supabase = await createClient();

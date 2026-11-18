@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ item: {} as Record<string, unknown>, role: "member" }));
+vi.mock("server-only", () => ({}));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("not found"); } }));
 vi.mock("@/lib/auth", () => ({ requireAccount: async () => ({ profile: { id: "00000000-0000-4000-8000-000000000002", role: mocks.role } }) }));
@@ -36,6 +37,7 @@ beforeEach(() => {
   mocks.item = {
     id: "00000000-0000-4000-8000-000000000001", coach_id: "00000000-0000-4000-8000-000000000003", kind: "preview", category: "gear", title: "GYMX2 Cap", description: "Preview item", price_cents: 3844,
     shipping_cents: 0, sizes: ["S", "M"], image_path: null, visible_to_all: true, coach: null,
+    made_to_order: false, delivery_min_weeks: null, delivery_max_weeks: null,
   };
 });
 
@@ -64,7 +66,7 @@ describe("display-only rendering", () => {
     expect(html).toContain("$38.44");
   });
   it("keeps preview selected when editing rather than switching to sell gear", () => {
-    const html = renderToStaticMarkup(<ArmoryForm payouts="platform" submitLabel="Save changes" initial={{ id: String(mocks.item.id), kind: "preview", category: "gear", title: "GYMX2 Cap", description: "", price: "38.44", shipping: "0", sizes: "S, M", buy_url: "", file_path: "", file_name: "", image_path: "", image_url: null, visible_to_all: true }} />);
+    const html = renderToStaticMarkup(<ArmoryForm payouts="platform" submitLabel="Save changes" initial={{ id: String(mocks.item.id), kind: "preview", category: "gear", title: "GYMX2 Cap", description: "", price: "38.44", shipping: "0", sizes: "S, M", buy_url: "", file_path: "", file_name: "", image_path: "", image_url: null, visible_to_all: true, made_to_order: false, delivery_min_weeks: null, delivery_max_weeks: null }} />);
     expect(html).toContain('name="kind" value="preview"');
     expect(html).toContain("Display only: members can view this product, but cannot purchase it.");
     expect(html).toContain('name="sizes" value="S, M"');

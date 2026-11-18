@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAccount, requireCoach } from "@/lib/auth";
+import { requireAccount, requireAuthenticatedAccount, requireCoach } from "@/lib/auth";
 import {
   startMembershipCheckout,
   syncPlanWithStripe,
@@ -137,7 +137,7 @@ async function setCancelAtPeriodEnd(
   formData: FormData,
   cancel: boolean,
 ): Promise<ActionState> {
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
   const membership = await ownMembership(profile.id, formData);
   if (!membership) return { error: "We couldn't find that membership." };
   try {
@@ -173,7 +173,7 @@ export async function openBillingPortal(
   _: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
   const membership = await ownMembership(profile.id, formData);
   if (!membership?.stripe_customer_id)
     return { error: "We couldn't find that membership." };

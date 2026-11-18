@@ -37,6 +37,9 @@ export type ArmoryFormValues = {
   image_path: string;
   image_url: string | null;
   visible_to_all: boolean;
+  made_to_order: boolean;
+  delivery_min_weeks: number | null;
+  delivery_max_weeks: number | null;
 };
 
 type Upload = {
@@ -162,13 +165,14 @@ export function ArmoryForm({
   const tr = useTr();
   const [kind, setKind] = useState<ArmoryKind>(initial.kind);
   const [category, setCategory] = useState(initial.category);
-  const categories = categoriesFor(kind);
+  const [madeToOrder, setMadeToOrder] = useState(initial.made_to_order);
+  const categories = categoriesFor(kind, category);
   // Choosing gear picks the Gear category; a digital file can't stay in Gear.
   function chooseKind(next: ArmoryKind) {
     setKind(next);
     if (next === "product" || next === "preview") setCategory("gear");
     else if ((next === "download" || next === "paid") && category === "gear")
-      setCategory("other");
+      setCategory("ebook");
   }
   const [filePath, setFilePath] = useState(initial.file_path);
   const [fileName, setFileName] = useState(initial.file_name);
@@ -348,6 +352,43 @@ export function ArmoryForm({
               "Separate with commas. Buyers must pick one. Leave blank if there's only one version.",
             )}
           />
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              name="made_to_order"
+              checked={madeToOrder}
+              onChange={(event) => setMadeToOrder(event.target.checked)}
+              className="mt-0.5 size-4 accent-accent"
+            />
+            <span>
+              <T>Made to order</T>
+              <span className="block text-muted">
+                <T>Prepared separately for each order.</T>
+              </span>
+            </span>
+          </label>
+          {madeToOrder && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label={tr("Estimated delivery, minimum weeks")}
+                name="delivery_min_weeks"
+                type="number"
+                min={1}
+                max={52}
+                required
+                defaultValue={initial.delivery_min_weeks ?? ""}
+              />
+              <Field
+                label={tr("Estimated delivery, maximum weeks")}
+                name="delivery_max_weeks"
+                type="number"
+                min={1}
+                max={52}
+                required
+                defaultValue={initial.delivery_max_weeks ?? ""}
+              />
+            </div>
+          )}
         </>
       ) : kind === "link" ? (
         <>

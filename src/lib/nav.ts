@@ -84,6 +84,7 @@ export function menuGroups(role: Role): NavGroup[] {
     items: [
       item("/profile", "Profile and settings", "profile"),
       item("/notifications", "Notifications", "notifications"),
+      item("/membership", "Platform membership", "memberships"),
       ...(role === "admin"
         ? []
         : [item("/armory/purchases", "Purchases", "purchases")]),

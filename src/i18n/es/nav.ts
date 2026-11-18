@@ -13,6 +13,7 @@ export const nav: Messages["nav"] = {
     "/coaches": "Coaches",
     "/profile": "Perfil y configuración",
     "/notifications": "Notificaciones",
+    "/membership": "Membresía de GYMX2",
     "/armory/purchases": "Compras",
     "/affiliate": "Programa de afiliados",
     "/profile/coach": "Perfil de coach",

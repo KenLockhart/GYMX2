@@ -3,7 +3,7 @@ import { MainContainer } from "@/components/main-container";
 import { I18nProvider } from "@/i18n/client";
 import { getLocale, getT } from "@/i18n/server";
 import { loadAdminCounts, sidebarBadges } from "@/lib/admin-console-server";
-import { requireAccount } from "@/lib/auth";
+import { requireAuthenticatedAccount } from "@/lib/auth";
 import {
   allDestinations,
   initials,
@@ -21,7 +21,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile } = await requireAccount();
+  const { profile } = await requireAuthenticatedAccount();
 
   // Unread messages are ones the other person sent. Row security limits this to the viewer's conversations.
   let unread = 0;
