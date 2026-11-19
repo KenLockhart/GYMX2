@@ -62,6 +62,14 @@ describe("menus", () => {
     ].map((i) => i.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
+  it("lists Form Coach pricing under admin Commerce and never exposes it to other roles", () => {
+    const href = "/admin/monetization/feature-pricing";
+    expect(ADMIN_NAV.groups.find((group) => group.title === "Commerce")?.items.map((item) => item.href)).toContain(href);
+    expect(allDestinations("admin").some((item) => item.href === href)).toBe(true);
+    for (const role of ["member", "coach", "moderator"] as const) {
+      expect(allDestinations(role).some((item) => item.href === href)).toBe(false);
+    }
+  });
 });
 
 describe("isActive", () => {

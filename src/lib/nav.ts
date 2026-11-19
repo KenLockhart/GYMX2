@@ -198,7 +198,10 @@ export const ADMIN_NAV: { overview: NavItem; groups: NavGroup[] } = {
     },
     {
       title: "Commerce",
-      items: [item("/armory/sales", "Armory sales", "sales")],
+      items: [
+        item("/armory/sales", "Armory sales", "sales"),
+        item("/admin/monetization/feature-pricing", "Form Coach pricing", "sales"),
+      ],
     },
   ],
 };

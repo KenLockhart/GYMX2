@@ -13,6 +13,7 @@ import { tasks } from "./tasks";
 import { track } from "./track";
 import { welcome } from "./welcome";
 import { intake } from "./intake";
+import { featurePricing } from "./feature-pricing";
 
 export const en = {
   auth,
@@ -33,4 +34,5 @@ export const en = {
   track,
   welcome,
   intake,
+  featurePricing,
 };

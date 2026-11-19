@@ -7,6 +7,7 @@ export const nav = {
     "/library": "Library",
     "/library/daily-content": "Daily content",
     "/admin/daily-content": "Daily content",
+    "/admin/monetization/feature-pricing": "Form Coach pricing",
     "/community": "Community",
     "/programs": "Programs",
     "/members": "Members",
