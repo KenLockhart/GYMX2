@@ -25,6 +25,8 @@ export const esServerText: Record<string, string> = {
   "We couldn't save. Check your connection.":
     "No pudimos guardar. Revisa tu conexión.",
   "Photos can be up to 5 MB.": "Las fotos pueden pesar hasta 5 MB.",
+  "Only today's tracking can be changed.":
+    "Solo se puede cambiar el registro de hoy.",
   "That photo upload didn't work.": "La subida de esa foto no funcionó.",
   "The photo didn't finish uploading. Please try again.":
     "La foto no terminó de subirse. Inténtalo de nuevo.",
@@ -476,11 +478,8 @@ export const esServerText: Record<string, string> = {
   "Write a note first.": "Primero escribe una nota.",
   "Write a reply first": "Primero escribe una respuesta.",
   "Write something first": "Primero escribe algo.",
-  "You can add photos for the last 7 days.":
-    "Puedes agregar fotos de los últimos 7 días.",
   "You can go live from 30 minutes before the start until an hour after the end.":
     "Puedes transmitir en vivo desde 30 minutos antes del inicio hasta una hora después del final.",
-  "You can log the last 7 days.": "Puedes registrar los últimos 7 días.",
   "You can only update the last 7 days.":
     "Solo puedes actualizar los últimos 7 días.",
   "You can't remove that message.": "No puedes eliminar ese mensaje.",

@@ -16,10 +16,30 @@ describe("days", () => {
     expect(lastDays(3, now)).toEqual(["2026-11-09", "2026-11-10", "2026-11-11"]);
   });
 
-  it("allows editing the last week only", () => {
-    expect(isEditableDay("2026-11-05", now)).toBe(true);
-    expect(isEditableDay("2026-11-04", now)).toBe(false);
+  it("allows editing today only", () => {
+    expect(isEditableDay("2026-11-11", now)).toBe(true);
+    expect(isEditableDay("2026-11-10", now)).toBe(false);
     expect(isEditableDay("2026-11-12", now)).toBe(false);
+  });
+
+  it("keeps the existing seven-day action window for coaches", () => {
+    expect(isEditableDay("2026-11-10", now, "coach")).toBe(true);
+    expect(isEditableDay("2026-11-04", now, "coach")).toBe(false);
+    expect(isEditableDay("2026-11-12", now, "coach")).toBe(false);
+  });
+
+  it("rejects malformed day keys", () => {
+    expect(isEditableDay("2026-11-11T00:00:00Z", now)).toBe(false);
+    expect(isEditableDay("2026-02-30", now)).toBe(false);
+  });
+
+  it("uses the Eastern calendar day consistently across midnight", () => {
+    const beforeEasternMidnight = new Date("2026-11-11T04:59:59.999Z");
+    const afterEasternMidnight = new Date("2026-11-11T05:00:00.000Z");
+    expect(isEditableDay("2026-11-10", beforeEasternMidnight)).toBe(true);
+    expect(isEditableDay("2026-11-11", beforeEasternMidnight)).toBe(false);
+    expect(isEditableDay("2026-11-11", afterEasternMidnight)).toBe(true);
+    expect(isEditableDay("2026-11-10", afterEasternMidnight)).toBe(false);
   });
 });
 

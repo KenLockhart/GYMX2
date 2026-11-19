@@ -7,6 +7,8 @@ export const track = {
   habits: "Daily habits",
   habitsHint:
     "Tick off what you did. Each one is +1 point and keeps your streak going. You can fix the last 7 days.",
+  habitsHintMember:
+    "Tick off what you did today. Each one is +1 point and keeps your streak going. Past entries stay readable but can't be changed.",
   today: "Today",
   todayCount: (done: number, total: number) => `${done} of ${total}`,
   thisWeek: (pillar: string) => `${pillar} this week`,
@@ -44,10 +46,13 @@ export const track = {
     todayLower: "today",
     done: "done",
     notDone: "not done",
+    readOnly: "read only",
   },
   body: "Body",
   bodyHint:
     "Log as often as you like; weekly is plenty. Progress is more than a number, so use what helps you.",
+  bodyHintMember:
+    "Add or update today's measurements. Past entries remain available to view.",
   todayDate: (date: string) => `Today, ${date}`,
   weight: "Weight (lb)",
   bodyFat: "Body fat (%)",
@@ -74,12 +79,15 @@ export const track = {
   },
   photos: "Progress photos",
   photosHint:
-    "Private by default. Same pose, same light, every few weeks shows change the scale can't.",
+    "Private by default. The same pose and light every few weeks can show change the scale can't.",
+  photosHintMember:
+    "Private by default. Add photos today; past photos stay readable but can't be changed. The same pose and light every few weeks can show change the scale can't.",
   photosShared: " Your coaches can see these.",
   noPhotos:
     "No photos yet. Add a front photo to start; after your second, you'll see first and latest side by side.",
   share: "Share",
   confirmDeletePhoto: "Delete this photo for good?",
+  readOnly: "Read only.",
   deleting: "Deleting...",
   delete: "Delete",
   poses: {

@@ -9,6 +9,8 @@ export const track: Messages["track"] = {
   habits: "Hábitos diarios",
   habitsHint:
     "Marca lo que hiciste. Cada uno vale +1 punto y mantiene tu racha. Puedes corregir los últimos 7 días.",
+  habitsHintMember:
+    "Marca lo que hiciste hoy. Cada uno vale +1 punto y mantiene tu racha. Los registros anteriores siguen visibles, pero no se pueden cambiar.",
   today: "Hoy",
   todayCount: (done, total) => `${done} de ${total}`,
   thisWeek: (pillar) => `${pillar} esta semana`,
@@ -47,10 +49,13 @@ export const track: Messages["track"] = {
     todayLower: "hoy",
     done: "hecho",
     notDone: "sin hacer",
+    readOnly: "solo lectura",
   },
   body: "Cuerpo",
   bodyHint:
     "Registra con la frecuencia que quieras; una vez por semana es suficiente. El progreso es más que un número, así que usa lo que te sirva.",
+  bodyHintMember:
+    "Agrega o actualiza las medidas de hoy. Los registros anteriores siguen disponibles para consultar.",
   todayDate: (date) => `Hoy, ${date}`,
   weight: "Peso (lb)",
   bodyFat: "Grasa corporal (%)",
@@ -72,12 +77,15 @@ export const track: Messages["track"] = {
   },
   photos: "Fotos de progreso",
   photosHint:
-    "Privadas por defecto. La misma pose y la misma luz cada pocas semanas muestran cambios que la báscula no ve.",
+    "Privadas por defecto. La misma pose y luz cada pocas semanas pueden mostrar cambios que la báscula no ve.",
+  photosHintMember:
+    "Privadas por defecto. Agrega fotos hoy; las anteriores siguen visibles, pero no se pueden cambiar. La misma pose y luz cada pocas semanas pueden mostrar cambios que la báscula no ve.",
   photosShared: " Tus coaches pueden verlas.",
   noPhotos:
     "Aún no hay fotos. Agrega una foto de frente para empezar; después de la segunda, verás la primera y la más reciente lado a lado.",
   share: "Compartir",
   confirmDeletePhoto: "¿Eliminar esta foto para siempre?",
+  readOnly: "Solo lectura.",
   deleting: "Eliminando...",
   delete: "Eliminar",
   poses: {

@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   HABIT_SUGGESTIONS,
   MAX_HABITS,
+  isEditableDay,
   lastDays,
   nutritionAverages,
   pillarSummary,
@@ -74,10 +75,11 @@ export default async function TrackPage() {
   const pillarName = (value: string) => all.options.pillars[value] ?? value;
   const suggestion = (name: string) => t.suggestions[name] ?? name;
 
-  const week = lastDays(7);
+  const now = new Date();
+  const week = lastDays(7, now);
   const today = week[week.length - 1];
-  const ninetyDaysAgo = lastDays(90)[0];
-  const thirtyDaysAgo = lastDays(30)[0];
+  const ninetyDaysAgo = lastDays(90, now)[0];
+  const thirtyDaysAgo = lastDays(30, now)[0];
 
   const supabase = await createClient();
   const [
@@ -150,7 +152,9 @@ export default async function TrackPage() {
             <h2 id="habits" className="text-3xl">
               {t.habits}
             </h2>
-            <p className="text-sm text-muted">{t.habitsHint}</p>
+            <p className="text-sm text-muted">
+              {profile.role === "member" ? t.habitsHintMember : t.habitsHint}
+            </p>
           </div>
           {habits.length > 0 && (
             <p className="text-sm">
@@ -213,6 +217,9 @@ export default async function TrackPage() {
                   days={week}
                   dayLabels={dayLabels}
                   today={today}
+                  editableDays={week.filter((day) =>
+                    isEditableDay(day, now, profile.role),
+                  )}
                   done={logs.map((log) => `${log.habit_id}:${log.day}`)}
                 />
               ) : (
@@ -322,7 +329,9 @@ export default async function TrackPage() {
           <h2 id="body" className="text-3xl">
             {t.body}
           </h2>
-          <p className="text-sm text-muted">{t.bodyHint}</p>
+          <p className="text-sm text-muted">
+            {profile.role === "member" ? t.bodyHintMember : t.bodyHint}
+          </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
           <ActionForm
@@ -425,7 +434,7 @@ export default async function TrackPage() {
             {t.photos}
           </h2>
           <p className="text-sm text-muted">
-            {t.photosHint}
+            {profile.role === "member" ? t.photosHintMember : t.photosHint}
             {profile.share_tracking ? t.photosShared : ""}
           </p>
         </div>
@@ -446,18 +455,22 @@ export default async function TrackPage() {
                 >
                   {t.share}
                 </Link>
-                <ActionForm
-                  action={deleteProgressPhoto}
-                  confirmMessage={t.confirmDeletePhoto}
-                >
-                  <input type="hidden" name="photo_id" value={photo.id} />
-                  <SubmitButton
-                    pendingText={t.deleting}
-                    className="text-xs text-muted hover:text-danger"
+                {isEditableDay(photo.day, now, profile.role) ? (
+                  <ActionForm
+                    action={deleteProgressPhoto}
+                    confirmMessage={t.confirmDeletePhoto}
                   >
-                    {t.delete}
-                  </SubmitButton>
-                </ActionForm>
+                    <input type="hidden" name="photo_id" value={photo.id} />
+                    <SubmitButton
+                      pendingText={t.deleting}
+                      className="text-xs text-muted hover:text-danger"
+                    >
+                      {t.delete}
+                    </SubmitButton>
+                  </ActionForm>
+                ) : (
+                  <span className="text-xs text-muted">{t.readOnly}</span>
+                )}
               </div>
             )}
           />

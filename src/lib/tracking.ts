@@ -1,6 +1,7 @@
 import { LOCALE_TAG, type Locale } from "../i18n/config";
 // Mind, Body and Spirit tracking: habit suggestions, weeks, and summaries. Days follow Eastern time.
 import { dayKey, type Pillar } from "./achievements";
+import type { UserRole } from "./types";
 
 export const HABIT_SUGGESTIONS: Record<Pillar, string[]> = {
   mind: [
@@ -25,8 +26,6 @@ export const HABIT_SUGGESTIONS: Record<Pillar, string[]> = {
 };
 
 export const MAX_HABITS = 12;
-// Members can check off today and the six days before, but not the future.
-export const EDITABLE_DAYS = 7;
 
 function shiftDay(key: string, days: number) {
   const date = new Date(`${key}T12:00:00Z`);
@@ -42,8 +41,22 @@ export function lastDays(count: number, now = new Date()) {
   );
 }
 
-export function isEditableDay(day: string, now = new Date()) {
-  return lastDays(EDITABLE_DAYS, now).includes(day);
+export function isEditableDay(
+  day: string,
+  now = new Date(),
+  role: UserRole = "member",
+) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  const parsedDay = new Date(`${day}T00:00:00.000Z`);
+  if (!Number.isFinite(parsedDay.getTime()) || parsedDay.toISOString().slice(0, 10) !== day)
+    return false;
+
+  const today = dayKey(now.toISOString());
+  if (day === today) return true;
+
+  // Members can only change today's entries. Coaches keep the existing seven-day window.
+  if (role === "member") return false;
+  return day >= shiftDay(today, -6) && day < today;
 }
 
 export function weekdayLabel(day: string, locale: Locale = "en") {
