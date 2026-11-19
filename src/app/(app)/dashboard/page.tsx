@@ -6,8 +6,11 @@ import { syncProgress } from "@/lib/achievements-data";
 import { requireAccount } from "@/lib/auth";
 import { CoachDashboard } from "@/components/coach-dashboard";
 import { MemberDashboard } from "@/components/member-dashboard";
+import { PendingMemberIntakeBanner } from "@/components/pending-member-intake-banner";
 import { loadCoachDashboardData } from "@/lib/coach-dashboard-data";
 import { loadMemberDashboardData } from "@/lib/member-dashboard-data";
+import { loadMemberDailyFuel } from "@/lib/member-daily-fuel-data";
+import { loadMemberIntakeBanner } from "@/lib/member-intake-server";
 import { weekStart } from "@/lib/checkins";
 import { todayKey } from "@/lib/reminders";
 import { createClient } from "@/lib/supabase/server";
@@ -43,12 +46,16 @@ export default async function DashboardPage() {
   }
 
   if (profile.role === "member") {
-    const [data, locale] = await Promise.all([
-      loadMemberDashboardData(profile.id),
+    const asOf = new Date();
+    const now = asOf.toISOString();
+    const today = todayKey(asOf);
+    const [data, dailyFuel, locale, intake] = await Promise.all([
+      loadMemberDashboardData(profile.id, now),
+      loadMemberDailyFuel(profile.id, today, asOf),
       getLocale(),
+      loadMemberIntakeBanner().catch(() => ({ coaches: [], error: true })),
     ]);
     let weeklyCheckinDue = false;
-    const today = todayKey();
     const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
     if (
       data.coachSelection === "selected" &&
@@ -67,13 +74,24 @@ export default async function DashboardPage() {
       <MemberDashboard
         profile={profile}
         data={data}
+        dailyFuel={dailyFuel}
         progress={progress}
         tasksCopy={t.tasks}
+        libraryCopy={t.library}
         locale={locale}
         copy={d}
         roleLabel={t.common.roles.member}
         levels={t.options.levels}
         weeklyCheckinDue={weeklyCheckinDue}
+        intakeBanner={
+          intake.error ? (
+            <p className="statusError" role="alert">
+              {d.dashboardLoadError} <Link href="/dashboard">{d.retryDashboard}</Link>
+            </p>
+          ) : (
+            <PendingMemberIntakeBanner coaches={intake.coaches} />
+          )
+        }
       />
     );
   }

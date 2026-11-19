@@ -3,10 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
+import { loadDailyFuelAssignmentOptions } from "@/lib/member-daily-fuel-data";
 import { getPlayerUrl, isStreamConfigured } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Video } from "@/lib/types";
+import { DailyFuelAssignmentForm } from "@/components/daily-fuel-assignment-form";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT()).library.video };
@@ -36,7 +38,7 @@ export default async function VideoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAccount();
+  const { profile } = await requireAccount();
   const { id } = await params;
   const t = (await getT()).library;
 
@@ -54,6 +56,10 @@ export default async function VideoPage({
 
   const playerUrl =
     video.status === "ready" ? await loadPlayerUrl(video.id) : null;
+  const assignmentOptions =
+    video.status === "ready" && (profile.role === "coach" || profile.role === "admin")
+      ? await loadDailyFuelAssignmentOptions(video.id)
+      : null;
 
   return (
     <div className="space-y-6">
@@ -91,6 +97,15 @@ export default async function VideoPage({
           </p>
         )}
       </div>
+
+      {assignmentOptions?.videoReady && (
+        <DailyFuelAssignmentForm
+          videoId={video.id}
+          members={assignmentOptions.members}
+          error={assignmentOptions.error}
+          copy={t}
+        />
+      )}
     </div>
   );
 }

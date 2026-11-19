@@ -67,4 +67,43 @@ export const dashboard = {
   addToArmory: "Add to the Armory",
   editProfile: "Edit your profile",
   openAdmin: "Open admin",
+  dailyFuel: {
+    section: "Daily Fuel",
+    tagline: "Mind · Body · Motivation",
+    videoTitle: "Video of the day",
+    viewLibrary: "View Library",
+    today: "Today",
+    noVideo: "No video has been selected for today yet.",
+    videoLoadError: "We couldn’t load today’s video. Please refresh to try again.",
+    playerUnavailable: "This video is unavailable right now.",
+    retryPlayer: "Retry video",
+    loadingPlayer: "Loading video…",
+    playVideo: "Play video",
+    pauseVideo: "Pause video",
+    saveForLater: "Save for later",
+    savedForLater: "Saved for later",
+    saveFailed: "We couldn’t update your saved videos. Please try again.",
+    quoteTitle: "Quote of the day",
+    anotherQuote: "Show another quote",
+    affirmationTitle: "Today’s affirmation",
+    affirmationText:
+      "I am stronger than I was yesterday. Every rep, every meal and every choice I make today moves me forward.",
+    affirmationOff: "I own this today",
+    affirmationOn: "Affirmed today",
+    affirmationFailed: "We couldn’t save that just now. Please try again.",
+    quotes: [
+      {
+        text: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.",
+        author: "Will Durant",
+      },
+      {
+        text: "It does not matter how slowly you go as long as you do not stop.",
+        author: "Attributed to Confucius",
+      },
+      {
+        text: "The secret of getting ahead is getting started.",
+        author: "Attributed to Mark Twain",
+      },
+    ],
+  },
 };

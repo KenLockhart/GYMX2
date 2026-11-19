@@ -2,6 +2,17 @@ import type { Messages } from "../messages";
 
 export const library: Messages["library"] = {
   title: "Biblioteca",
+  savedVideos: "Guardados para después",
+  savedTitle: "Videos guardados",
+  savedIntro:
+    "Vuelve a ver videos que te asignaron anteriormente. El acceso se verifica cada vez que reproduces uno.",
+  savedEmpty: "Todavía no has guardado videos de Combustible diario.",
+  savedLoadError: "No pudimos cargar tus videos guardados. Inténtalo de nuevo.",
+  savedBack: "Volver a los videos guardados",
+  savedVideoBadge: "Combustible diario guardado",
+  savedPlaybackUnavailable:
+    "Este video no está disponible temporalmente. Inténtalo más tarde.",
+  savedWatch: (title) => `Ver ${title}`,
   introCoach:
     "Tus videos, por categoría. Los miembros que se unen a ti pueden ver todo lo que esté listo y no sea privado.",
   introAdmin: "Todos los videos de GYMX2.",
@@ -81,4 +92,13 @@ export const library: Messages["library"] = {
   uploadingProgress: (n) => `Subiendo: ${n}%`,
   uploading: "Subiendo...",
   submit: "Subir video",
+  dailyFuelAssignmentTitle: "Destacar este video para un miembro",
+  dailyFuelAssignmentHint: "Esto asigna el video listo a un miembro por hoy.",
+  dailyFuelMember: "Miembro",
+  dailyFuelChooseMember: "Elige un miembro",
+  dailyFuelAssign: "Destacar hoy",
+  dailyFuelAssigned: "Este video está destacado para el miembro de hoy.",
+  dailyFuelAssignmentError: "No pudimos destacar este video. Revisa el miembro e inténtalo de nuevo.",
+  dailyFuelNoMembers: "No hay miembros conectados disponibles para asignar este video.",
+  dailyFuelNotReady: "Solo se pueden destacar videos listos.",
 };

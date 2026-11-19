@@ -89,9 +89,15 @@ export default async function AppLayout({
           }
           unreadMessages={unread}
           unreadNotifications={unreadNotifications ?? 0}
+          memberDashboard={profile.role === "member"}
           badges={openReports > 0 ? { "/moderation": openReports } : {}}
         />
-        <MainContainer adminBadges={adminBadges}>{children}</MainContainer>
+        <MainContainer
+          adminBadges={adminBadges}
+          memberDashboard={profile.role === "member"}
+        >
+          {children}
+        </MainContainer>
       </div>
     </I18nProvider>
   );

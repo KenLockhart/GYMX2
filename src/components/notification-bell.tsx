@@ -12,9 +12,11 @@ import { createBrowserSupabase } from "@/lib/supabase/client";
 export function NotificationBell({
   me,
   initialCount,
+  memberDashboard = false,
 }: {
   me: string;
   initialCount: number;
+  memberDashboard?: boolean;
 }) {
   const t = useT();
   const [count, setCount] = useState(initialCount);
@@ -56,6 +58,7 @@ export function NotificationBell({
     <Link
       href="/notifications"
       aria-current={active ? "page" : undefined}
+      data-member-header-control={memberDashboard ? "true" : undefined}
       className={`relative grid size-10 place-items-center rounded-full hover:bg-surface-raised ${
         active ? "text-accent" : "text-foreground/85 hover:text-foreground"
       }`}

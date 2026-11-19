@@ -14,15 +14,19 @@ const CONSOLE_PAGES = [
 export function MainContainer({
   children,
   adminBadges,
+  memberDashboard = false,
 }: {
   children: React.ReactNode;
   adminBadges?: Record<string, number>;
+  memberDashboard?: boolean;
 }) {
   const pathname = usePathname();
   const inConsole =
     adminBadges !== undefined &&
     (pathname.startsWith("/admin") ||
       CONSOLE_PAGES.some((href) => isActive(pathname, href)));
+  if (memberDashboard && pathname === "/dashboard")
+    return <main className="app-main-member-dashboard flex-1">{children}</main>;
   if (!inConsole)
     return (
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
