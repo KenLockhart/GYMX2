@@ -71,4 +71,43 @@ export const dashboard: Messages["dashboard"] = {
   addToArmory: "Agregar a la Armory",
   editProfile: "Editar tu perfil",
   openAdmin: "Abrir administración",
+  dailyFuel: {
+    section: "Impulso diario",
+    tagline: "Mente · Cuerpo · Motivación",
+    videoTitle: "Video del día",
+    viewLibrary: "Ver biblioteca",
+    today: "Hoy",
+    noVideo: "Todavía no se ha elegido un video para hoy.",
+    videoLoadError: "No pudimos cargar el video de hoy. Actualiza para intentarlo de nuevo.",
+    playerUnavailable: "Este video no está disponible ahora.",
+    retryPlayer: "Reintentar video",
+    loadingPlayer: "Cargando video…",
+    playVideo: "Reproducir video",
+    pauseVideo: "Pausar video",
+    saveForLater: "Guardar para después",
+    savedForLater: "Guardado para después",
+    saveFailed: "No pudimos actualizar tus videos guardados. Inténtalo de nuevo.",
+    quoteTitle: "Frase del día",
+    anotherQuote: "Mostrar otra frase",
+    affirmationTitle: "Afirmación de hoy",
+    affirmationText:
+      "Soy más fuerte que ayer. Cada repetición, cada comida y cada decisión que tomo hoy me impulsa hacia adelante.",
+    affirmationOff: "Hoy me comprometo",
+    affirmationOn: "Afirmado hoy",
+    affirmationFailed: "No pudimos guardar esto ahora. Inténtalo de nuevo.",
+    quotes: [
+      {
+        text: "Somos lo que hacemos repetidamente. La excelencia, entonces, no es un acto, sino un hábito.",
+        author: "Will Durant",
+      },
+      {
+        text: "No importa lo lento que avances mientras no te detengas.",
+        author: "Atribuida a Confucio",
+      },
+      {
+        text: "El secreto para avanzar es comenzar.",
+        author: "Atribuida a Mark Twain",
+      },
+    ],
+  },
 };

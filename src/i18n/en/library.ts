@@ -1,5 +1,16 @@
 export const library = {
   title: "Library",
+  savedVideos: "Saved for later",
+  savedTitle: "Saved videos",
+  savedIntro:
+    "Revisit videos previously assigned to you. Access is checked each time you watch.",
+  savedEmpty: "You haven’t saved any Daily Fuel videos yet.",
+  savedLoadError: "We couldn’t load your saved videos. Please try again.",
+  savedBack: "Back to saved videos",
+  savedVideoBadge: "Saved Daily Fuel",
+  savedPlaybackUnavailable:
+    "This video is temporarily unavailable. Please try again later.",
+  savedWatch: (title: string) => `Watch ${title}`,
   introCoach:
     "Your videos, by category. Members who join you can watch anything that's ready and not private.",
   introAdmin: "Every video on GYMX2.",
@@ -76,4 +87,13 @@ export const library = {
   uploadingProgress: (n: number) => `Uploading: ${n}%`,
   uploading: "Uploading...",
   submit: "Upload video",
+  dailyFuelAssignmentTitle: "Feature this video for a member",
+  dailyFuelAssignmentHint: "This assigns the ready video to one member for today.",
+  dailyFuelMember: "Member",
+  dailyFuelChooseMember: "Choose a member",
+  dailyFuelAssign: "Feature for today",
+  dailyFuelAssigned: "This video is featured for the member today.",
+  dailyFuelAssignmentError: "We couldn’t feature this video. Check the member and try again.",
+  dailyFuelNoMembers: "No connected members are available to assign this video to.",
+  dailyFuelNotReady: "Only ready videos can be featured.",
 };

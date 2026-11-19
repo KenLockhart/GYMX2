@@ -6,6 +6,7 @@ import type { MemberDashboardData } from "@/lib/member-dashboard-data";
 import type { Profile } from "@/lib/types";
 import { MemberDashboard } from "./member-dashboard";
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/components/calendar-parts", () => ({
   SessionTime: ({ startsAt }: { startsAt: string }) =>
     createElement("time", { dateTime: startsAt }, "Fri, 1:00 PM"),
@@ -31,13 +32,24 @@ function data(
   };
 }
 
+const dailyFuel = {
+  day: "2026-11-18",
+  video: null,
+  videoError: false,
+  bookmarkError: false,
+  affirmed: false,
+  affirmationError: false,
+};
+
 function renderDashboard(dashboardData: MemberDashboardData) {
   return renderToStaticMarkup(
     createElement(MemberDashboard, {
       profile,
       data: dashboardData,
+      dailyFuel,
       progress: null,
       tasksCopy: en.tasks,
+      libraryCopy: en.library,
       locale: "en",
       copy: en.dashboard,
       roleLabel: "Member",
@@ -63,6 +75,8 @@ describe("member dashboard rendering", () => {
     }
     expect(html).toContain("Upcoming sessions");
     expect(html).toContain("Tasks");
+    expect(html).toContain("Daily Fuel");
+    expect(html).toContain("No video has been selected for today yet.");
     expect(html).not.toContain("Member activity");
     expect(html).not.toContain("Edit your profile");
   });
@@ -133,5 +147,42 @@ describe("member dashboard rendering", () => {
     expect(html).toContain("Coach Sage");
     expect(html).toContain("Mobility work");
     expect(html).not.toContain('href="/profile"');
+  });
+
+  it("renders real Daily Fuel metadata and the supplied short-lived player URL", () => {
+    const html = renderToStaticMarkup(
+      createElement(MemberDashboard, {
+        profile,
+        data: data({ coachSelection: "selected", armoryPurchase: "purchased" }),
+        dailyFuel: {
+          ...dailyFuel,
+          video: {
+            id: "video-1",
+            title: "Mobility before lifting",
+            coachName: "Coach Sage",
+            category: "Mobility",
+            durationSeconds: 420,
+            playerUrl: "https://customer.example/token/iframe",
+            thumbnailUrl: "https://customer.example/token/thumbnail.jpg",
+            saved: true,
+          },
+        },
+        progress: null,
+        tasksCopy: en.tasks,
+        libraryCopy: en.library,
+        locale: "en",
+        copy: en.dashboard,
+        roleLabel: "Member",
+        levels: en.options.levels,
+        weeklyCheckinDue: false,
+      }),
+    );
+
+    expect(html).toContain("Mobility before lifting");
+    expect(html).toContain("Coach Sage · Mobility");
+    expect(html).toContain('src="https://customer.example/token/iframe?controls=false');
+    expect(html).toContain('aria-label="Play video"');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('href="/library"');
   });
 });

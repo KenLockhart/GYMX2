@@ -1,5 +1,7 @@
 "use client";
 
+import "./member-dashboard-header.css";
+
 import {
   ChevronDown,
   LogOut,
@@ -31,6 +33,7 @@ type Props = {
   messagesLabel: string;
   unreadMessages: number;
   unreadNotifications: number;
+  memberDashboard?: boolean;
   // Badges on menu items, by href (open reports, for example).
   badges: Record<string, number>;
 };
@@ -110,9 +113,13 @@ export function AppHeader(props: Props) {
   }, []);
 
   const menuBadge = Object.values(props.badges).reduce((a, b) => a + b, 0);
+  const memberDashboard = props.memberDashboard && pathname === "/dashboard";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+    <header
+      className={`app-header sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85${memberDashboard ? " member-dashboard-header" : ""}`}
+      data-member-dashboard={memberDashboard ? "true" : undefined}
+    >
       <div className="mx-auto flex h-16 w-full max-w-[96rem] items-center gap-3 px-4 sm:px-6">
         <Link
           href="/dashboard"
@@ -124,6 +131,7 @@ export function AppHeader(props: Props) {
 
         <nav
           aria-label={t.nav.main}
+          data-member-nav={memberDashboard ? "true" : undefined}
           className="hidden min-w-0 flex-1 items-center gap-0.5 lg:flex xl:gap-1"
         >
           {props.primary.map((entry) => {
@@ -133,6 +141,7 @@ export function AppHeader(props: Props) {
                 key={entry.href}
                 href={entry.href}
                 aria-current={active ? "page" : undefined}
+                data-member-nav-item={memberDashboard ? "true" : undefined}
                 className={`relative flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-semibold transition-colors ${
                   active
                     ? "text-accent"
@@ -160,6 +169,7 @@ export function AppHeader(props: Props) {
             type="button"
             onClick={() => setSearchOpen(true)}
             aria-label={t.nav.searchPages}
+            data-member-header-control={memberDashboard ? "true" : undefined}
             className="grid size-10 place-items-center rounded-full text-foreground/85 hover:bg-surface-raised hover:text-foreground"
           >
             <Search aria-hidden className="size-5" strokeWidth={1.8} />
@@ -174,6 +184,7 @@ export function AppHeader(props: Props) {
                 ? "text-accent"
                 : "text-foreground/85 hover:text-foreground"
             }`}
+            data-member-header-control={memberDashboard ? "true" : undefined}
           >
             <MessageCircle aria-hidden className="size-5" strokeWidth={1.8} />
             <span className="sr-only">
@@ -189,9 +200,14 @@ export function AppHeader(props: Props) {
           <NotificationBell
             me={props.me}
             initialCount={props.unreadNotifications}
+            memberDashboard={Boolean(memberDashboard)}
           />
 
-          <div ref={menuRef} className="relative hidden lg:block">
+          <div
+            ref={menuRef}
+            className="relative hidden lg:block"
+            data-member-account-menu={memberDashboard ? "true" : undefined}
+          >
             <button
               type="button"
               aria-haspopup="menu"
@@ -266,6 +282,7 @@ export function AppHeader(props: Props) {
             aria-label={`${t.nav.openMenu}${menuBadge > 0 ? t.nav.openReports(menuBadge) : ""}`}
             aria-expanded={drawerOpen}
             className="relative grid size-10 place-items-center rounded-full hover:bg-surface-raised lg:hidden"
+              data-member-header-control={memberDashboard ? "true" : undefined}
           >
             <Menu aria-hidden className="size-6" strokeWidth={1.8} />
             {menuBadge > 0 && (

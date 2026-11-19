@@ -100,11 +100,18 @@ export default async function LibraryPage() {
                 : t.introMember}
           </p>
         </div>
-        {canUpload && (
-          <Link href="/library/upload" className="btn-primary">
-            {t.upload}
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {profile.role === "member" && (
+            <Link href="/library/saved" className="btn-secondary">
+              {t.savedVideos}
+            </Link>
+          )}
+          {canUpload && (
+            <Link href="/library/upload" className="btn-primary">
+              {t.upload}
+            </Link>
+          )}
+        </div>
       </div>
 
       {error ? (
