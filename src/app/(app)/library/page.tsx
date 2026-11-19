@@ -19,10 +19,13 @@ type LibraryVideo = Video & {
   coach: { display_name: string } | null;
 };
 
-// Cloudflare finishes processing in its own time, so unfinished videos are re-checked when a coach looks.
-async function refreshUnfinishedVideos(videos: Video[]) {
+// Cloudflare finishes processing in its own time, so unfinished uploads are re-checked when their owner looks.
+async function refreshUnfinishedVideos(videos: Video[], creatorId: string) {
   const unfinished = videos.filter(
-    (video) => video.status !== "ready" && video.status !== "failed",
+    (video) =>
+      video.coach_id === creatorId &&
+      video.status !== "ready" &&
+      video.status !== "failed",
   );
   if (unfinished.length === 0 || !isStreamConfigured()) return false;
 
@@ -64,10 +67,11 @@ async function loadVideos() {
 export default async function LibraryPage() {
   const { profile } = await requireAccount();
   const isCoach = profile.role === "coach";
+  const canUpload = isCoach || profile.role === "admin";
   const t = (await getT()).library;
 
   let { videos, error } = await loadVideos();
-  if (isCoach && (await refreshUnfinishedVideos(videos))) {
+  if (canUpload && (await refreshUnfinishedVideos(videos, profile.id))) {
     ({ videos, error } = await loadVideos());
   }
   const cards: LibraryCard[] = videos.map((video) => ({
@@ -96,7 +100,7 @@ export default async function LibraryPage() {
                 : t.introMember}
           </p>
         </div>
-        {isCoach && (
+        {canUpload && (
           <Link href="/library/upload" className="btn-primary">
             {t.upload}
           </Link>

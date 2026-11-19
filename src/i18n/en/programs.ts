@@ -3,13 +3,20 @@ export const programs = {
   program: "Program",
   introCoach:
     "Build multi-week programs as a series of days. Members who joined you start one, and a new day unlocks each day.",
-  introAdmin: "Every coach's programs.",
+  introAdmin: "Create GYMX2 programs and manage every coach's programs.",
   introMember:
-    "Step-by-step plans from your coaches. A new day unlocks each day; finishing one is +3 points.",
+    "Programs from coaches you joined and GYMX2. A new day unlocks each day; finishing one is +3 points.",
   new: "New program",
   programTitle: "Title",
   titlePlaceholder: "6-Week Strong Start",
   descriptionOptional: "Description (optional)",
+  introVideoOptional: "Program intro video (optional)",
+  noIntroVideo: "No intro video",
+  introVideoHint:
+    "Choose a ready video from your own library. Only this selected intro can be previewed by signed-in members who can view the program.",
+  programIntro: "Program introduction",
+  introVideoUnavailable: "The intro video isn't available to play right now.",
+  platform: "GYMX2",
   description: "Description",
   creating: "Creating...",
   create: "Create and add days",
@@ -30,12 +37,15 @@ export const programs = {
   dayOf: (day: number, total: number, done: number) =>
     `Day ${day} of ${total} · ${done} done`,
   fromCoaches: "From your coaches",
+  availablePrograms: "Available programs",
   noneNew: "No new programs right now.",
   findCoach: "Find a coach",
   starting: "Starting...",
   startToday: "Start today",
   back: "Back to programs",
   publishedHint: "Members who joined you can see and start it.",
+  publishedPlatformHint:
+    "Members can find and start this GYMX2 program in the signed-in Programs area.",
   saving: "Saving...",
   saveProgram: "Save program",
   days: (label: string) => `Days · ${label}`,

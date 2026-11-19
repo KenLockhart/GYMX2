@@ -23,6 +23,7 @@ type Program = {
   title: string;
   description: string;
   published: boolean;
+  platform_owned: boolean;
   coach: { display_name: string } | null;
   program_days: { count: number }[];
   program_enrollments?: { count: number }[];
@@ -38,13 +39,20 @@ export default async function ProgramsPage() {
     const query = supabase
       .from("programs")
       .select(
-        "id, coach_id, title, description, published, coach:profiles!coach_id(display_name), program_days(count), program_enrollments(count)",
+        "id, coach_id, title, description, published, platform_owned, coach:profiles!coach_id(display_name), program_days(count), program_enrollments(count)",
       )
       .order("created_at", { ascending: false });
-    const { data } = isCoach
-      ? await query.eq("coach_id", profile.id)
-      : await query;
+    const [{ data }, { data: videoData }] = await Promise.all([
+      isCoach ? query.eq("coach_id", profile.id) : query,
+      supabase
+        .from("videos")
+        .select("id, title")
+        .eq("coach_id", profile.id)
+        .eq("status", "ready")
+        .order("created_at", { ascending: false }),
+    ]);
     const programs = (data ?? []) as unknown as Program[];
+    const introVideos = (videoData ?? []) as { id: string; title: string }[];
     return (
       <div className="space-y-8">
         <div>
@@ -53,7 +61,7 @@ export default async function ProgramsPage() {
             {isCoach ? t.introCoach : t.introAdmin}
           </p>
         </div>
-        {isCoach && (
+        {(isCoach || profile.role === "admin") && (
           <ActionForm
             action={createProgram}
             className="max-w-xl space-y-3 rounded-lg border border-dashed border-border p-4"
@@ -76,6 +84,20 @@ export default async function ProgramsPage() {
                 maxLength={2000}
                 className="field-input"
               />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium">{t.introVideoOptional}</span>
+              <select name="intro_video_id" defaultValue="" className="field-input">
+                <option value="">{t.noIntroVideo}</option>
+                {introVideos.map((video) => (
+                  <option key={video.id} value={video.id}>
+                    {video.title}
+                  </option>
+                ))}
+              </select>
+              <span className="block text-xs text-muted">
+                {t.introVideoHint}
+              </span>
             </label>
             <FormStatus />
             <SubmitButton pendingText={t.creating} className="btn-primary">
@@ -102,8 +124,11 @@ export default async function ProgramsPage() {
                     {program.title}
                   </Link>
                   <p className="text-sm text-muted">
-                    {!isCoach &&
-                      `${program.coach?.display_name ?? t.aCoach} · `}
+                    {program.platform_owned
+                      ? `${t.platform} · `
+                      : !isCoach
+                        ? `${program.coach?.display_name ?? t.aCoach} · `
+                        : ""}
                     {t.weeks(program.program_days[0]?.count ?? 0)} ·{" "}
                     {t.started(program.program_enrollments?.[0]?.count ?? 0)} ·{" "}
                     {program.published ? t.published : t.draft}
@@ -130,7 +155,7 @@ export default async function ProgramsPage() {
     supabase
       .from("programs")
       .select(
-        "id, coach_id, title, description, published, coach:profiles!coach_id(display_name), program_days(count)",
+        "id, coach_id, title, description, published, platform_owned, coach:profiles!coach_id(display_name), program_days(count)",
       )
       .eq("published", true)
       .order("created_at", { ascending: false }),
@@ -203,7 +228,7 @@ export default async function ProgramsPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-2xl">{t.fromCoaches}</h2>
+        <h2 className="text-2xl">{t.availablePrograms}</h2>
         {open.length === 0 ? (
           <p className="rounded-lg border border-border bg-surface p-4 text-muted">
             {t.noneNew}{" "}
@@ -222,7 +247,9 @@ export default async function ProgramsPage() {
                 <div>
                   <p className="font-semibold">{program.title}</p>
                   <p className="text-sm text-muted">
-                    {program.coach?.display_name} ·{" "}
+                    {program.platform_owned
+                      ? t.platform
+                      : program.coach?.display_name ?? t.aCoach}{" "}·{" "}
                     {t.weeks(program.program_days[0]?.count ?? 0)}
                   </p>
                 </div>

@@ -13,8 +13,15 @@ import { LOCALE_TAG, type Locale } from "@/i18n/config";
 import type { Messages } from "@/i18n/messages";
 import { getLocale, getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
-import { nextDay, progressPercent, unlockedThrough } from "@/lib/programs";
+import {
+  canPreviewProgramIntro,
+  nextDay,
+  progressPercent,
+  unlockedThrough,
+} from "@/lib/programs";
 import { todayKey } from "@/lib/reminders";
+import { getPlayerUrl, isStreamConfigured } from "@/lib/stream";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
 import {
@@ -40,6 +47,89 @@ type Day = {
   video_id: string | null;
   video: { title: string } | null;
 };
+
+type ProgramIntro = {
+  title: string;
+  description: string;
+  playerUrl: string | null;
+};
+
+async function loadProgramIntro(input: {
+  videoId: string | null;
+  creatorId: string;
+  isOwner: boolean;
+  isPublished: boolean;
+}): Promise<ProgramIntro | null> {
+  if (!input.videoId) return null;
+
+  // The program row is already visible to this signed-in user through Programs RLS.
+  // Resolve only its exact, creator-owned intro reference; never widen Library access.
+  const { data } = await createAdminClient()
+    .from("videos")
+    .select("id, coach_id, title, description, cloudflare_uid, status")
+    .eq("id", input.videoId)
+    .eq("coach_id", input.creatorId)
+    .eq("status", "ready")
+    .maybeSingle();
+  const canPreview = canPreviewProgramIntro({
+    isOwner: input.isOwner,
+    isPublished: input.isPublished,
+    programIsVisible: true,
+    creatorId: input.creatorId,
+    video: data
+      ? { id: data.id, creatorId: data.coach_id, status: data.status }
+      : null,
+  });
+  if (!data || !canPreview) return null;
+
+  let playerUrl: string | null = null;
+  if (isStreamConfigured()) {
+    try {
+      playerUrl = await getPlayerUrl(data.cloudflare_uid);
+    } catch {
+      playerUrl = null;
+    }
+  }
+  return { title: data.title, description: data.description, playerUrl };
+}
+
+function ProgramIntroPreview({
+  intro,
+  t,
+}: {
+  intro: ProgramIntro;
+  t: Messages["programs"];
+}) {
+  return (
+    <section className="max-w-3xl space-y-3">
+      <h2 className="text-2xl">{t.programIntro}</h2>
+      {intro.playerUrl ? (
+        <div className="relative aspect-video overflow-hidden rounded-lg bg-surface">
+          <iframe
+            src={intro.playerUrl}
+            title={intro.title}
+            className="absolute inset-0 size-full border-0"
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      ) : (
+        <p
+          role="status"
+          className="rounded-lg border border-border bg-surface p-4 text-sm text-muted"
+        >
+          {t.introVideoUnavailable}
+        </p>
+      )}
+      <p className="font-medium">{intro.title}</p>
+      {intro.description && (
+        <p className="whitespace-pre-line text-sm text-muted">
+          {intro.description}
+        </p>
+      )}
+    </section>
+  );
+}
 
 function shiftDay(key: string, days: number, locale: Locale) {
   const date = new Date(`${key}T12:00:00Z`);
@@ -163,14 +253,16 @@ export default async function ProgramPage({
   const { data: program } = await supabase
     .from("programs")
     .select(
-      "id, coach_id, title, description, published, coach:profiles!coach_id(display_name)",
+      "id, coach_id, title, description, published, platform_owned, intro_video_id, coach:profiles!coach_id(display_name)",
     )
     .eq("id", id)
     .maybeSingle();
   if (!program) notFound();
-  const coachName =
-    (program.coach as unknown as { display_name: string } | null)
-      ?.display_name ?? t.yourCoach;
+  const isOwner = program.coach_id === profile.id;
+  const coachName = program.platform_owned
+    ? t.platform
+    : (program.coach as unknown as { display_name: string } | null)
+        ?.display_name ?? t.yourCoach;
 
   const { data: dayData } = await supabase
     .from("program_days")
@@ -180,7 +272,12 @@ export default async function ProgramPage({
     .eq("program_id", id)
     .order("day_number");
   const days = (dayData ?? []) as unknown as Day[];
-  const isOwner = program.coach_id === profile.id;
+  const intro = await loadProgramIntro({
+    videoId: program.intro_video_id,
+    creatorId: program.coach_id,
+    isOwner,
+    isPublished: program.published,
+  });
 
   if (isOwner) {
     const [{ data: videoData }, { data: enrollmentData }] = await Promise.all([
@@ -231,6 +328,24 @@ export default async function ProgramPage({
               className="field-input"
             />
           </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">{t.introVideoOptional}</span>
+            <select
+              name="intro_video_id"
+              defaultValue={program.intro_video_id ?? ""}
+              className="field-input"
+            >
+              <option value="">{t.noIntroVideo}</option>
+              {videos.map((video) => (
+                <option key={video.id} value={video.id}>
+                  {video.title}
+                </option>
+              ))}
+            </select>
+            <span className="block text-xs text-muted">
+              {t.introVideoHint}
+            </span>
+          </label>
           <label className="flex items-start gap-3 text-sm">
             <input
               type="checkbox"
@@ -240,7 +355,11 @@ export default async function ProgramPage({
             />
             <span>
               {t.published}
-              <span className="block text-muted">{t.publishedHint}</span>
+              <span className="block text-muted">
+                {program.platform_owned
+                  ? t.publishedPlatformHint
+                  : t.publishedHint}
+              </span>
             </span>
           </label>
           <div className="flex items-center gap-3">
@@ -250,6 +369,8 @@ export default async function ProgramPage({
             <FormStatus />
           </div>
         </ActionForm>
+
+        {intro && <ProgramIntroPreview intro={intro} t={t} />}
 
         <section className="space-y-4">
           <h2 className="text-2xl">{t.days(t.weeks(days.length))}</h2>
@@ -277,6 +398,14 @@ export default async function ProgramPage({
                   </SubmitButton>
                 </ActionForm>
               </div>
+              {day.video_id && (
+                <Link
+                  href={`/programs/${program.id}/days/${day.id}`}
+                  className="text-link text-sm"
+                >
+                  {t.watch(day.video?.title ?? t.theVideo)}
+                </Link>
+              )}
               <details>
                 <summary className="cursor-pointer text-sm text-muted">
                   {t.edit}
@@ -400,6 +529,8 @@ export default async function ProgramPage({
         )}
       </div>
 
+      {intro && <ProgramIntroPreview intro={intro} t={t} />}
+
       {enrollment ? (
         <div className="max-w-2xl space-y-2">
           <div className="flex justify-between text-sm">
@@ -429,7 +560,10 @@ export default async function ProgramPage({
 
       <ol className="space-y-3">
         {days.map((day) => {
-          const isOpen = !enrollment || day.day_number <= unlocked;
+          const isOpen =
+            profile.role === "admin" ||
+            !enrollment ||
+            day.day_number <= unlocked;
           const isDone = completed.has(day.id);
           return (
             <li
@@ -456,14 +590,16 @@ export default async function ProgramPage({
                           {day.instructions}
                         </p>
                       )}
-                      {day.video_id && (
-                        <Link
-                          href={`/library/${day.video_id}`}
-                          className="text-link mt-2 inline-block text-sm"
-                        >
-                          {t.watch(day.video?.title ?? t.theVideo)}
-                        </Link>
-                      )}
+                      {day.video_id &&
+                        (profile.role === "admin" ||
+                          (profile.role === "member" && enrollment)) && (
+                          <Link
+                            href={`/programs/${program.id}/days/${day.id}`}
+                            className="text-link mt-2 inline-block text-sm"
+                          >
+                            {t.watch(day.video?.title ?? t.theVideo)}
+                          </Link>
+                        )}
                     </>
                   ) : (
                     enrollment && (
