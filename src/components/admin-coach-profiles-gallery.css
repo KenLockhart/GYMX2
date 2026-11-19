@@ -220,9 +220,38 @@
 }
 
 .coach-profiles-gallery .featuredStatus {
-  margin: 0.75rem 0 1.2rem;
+  margin: 0.75rem 0 0.8rem;
   color: rgb(242 244 236 / 73%);
   font-size: 0.8rem;
+}
+
+.coach-profiles-gallery .featuredMetrics {
+  display: grid;
+  width: min(100%, 27rem);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.coach-profiles-gallery .featuredMetric {
+  display: grid;
+  min-height: 4rem;
+  align-content: center;
+  gap: 0.25rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 0.55rem;
+  background: rgb(13 15 12 / 62%);
+  color: rgb(242 244 236 / 70%);
+  font-size: 0.65rem;
+}
+
+.coach-profiles-gallery .featuredMetricValue {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .coach-profiles-gallery .featuredContent .completion {
@@ -252,6 +281,37 @@
 .coach-profiles-gallery .featuredAction span {
   font-size: 1.15rem;
   line-height: 1;
+}
+
+.coach-profiles-gallery .featuredEmpty {
+  display: grid;
+  min-height: 12rem;
+  align-content: center;
+  justify-items: start;
+  gap: 0.35rem;
+  padding: clamp(1.4rem, 4vw, 2.5rem);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 1.1rem;
+  background:
+    radial-gradient(55% 100% at 0% 0%, rgb(200 241 53 / 7%), transparent 85%),
+    var(--surface);
+}
+
+.coach-profiles-gallery .featuredEmpty .featuredEyebrow {
+  margin-bottom: 0.25rem;
+}
+
+.coach-profiles-gallery .featuredEmptyTitle {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.coach-profiles-gallery .featuredEmptyCopy {
+  max-width: 38rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
 .coach-profiles-gallery .featuredAction:hover {
@@ -617,6 +677,19 @@
 
   .coach-profiles-gallery .featuredContent h2 {
     font-size: clamp(2.7rem, 12vw, 4rem);
+  }
+
+  .coach-profiles-gallery .featuredMetrics {
+    gap: 0.35rem;
+  }
+
+  .coach-profiles-gallery .featuredMetric {
+    padding-inline: 0.5rem;
+    font-size: 0.59rem;
+  }
+
+  .coach-profiles-gallery .featuredMetricValue {
+    font-size: 0.9rem;
   }
 
   .coach-profiles-gallery .rails {
