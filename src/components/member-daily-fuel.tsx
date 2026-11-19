@@ -1,12 +1,11 @@
 "use client";
 
-import { Bookmark, Check, Heart, RefreshCw } from "lucide-react";
+import { Bookmark, Check, Heart } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { setMemberDailyAffirmation, setMemberDailyFuelBookmark } from "@/app/(app)/dashboard/fuel-actions";
 import type { Messages } from "@/i18n/messages";
 import type { MemberDailyFuelData } from "@/lib/member-daily-fuel-data";
-import { quoteIndexForDay } from "@/lib/daily-fuel";
 import { MemberDailyFuelPlayer } from "./member-daily-fuel-player";
 
 type Copy = Messages["dashboard"]["dailyFuel"];
@@ -22,27 +21,9 @@ export function MemberDailyFuel({
   categories: Record<string, string>;
   libraryHref: string;
 }) {
-  const quotes = copy.quotes;
-  const [quoteIndex, setQuoteIndex] = useState(() =>
-    quoteIndexForDay(data.day, quotes.length),
-  );
-  const [affirmed, setAffirmed] = useState(data.affirmed);
-  const [affirmationError, setAffirmationError] = useState(false);
   const [saved, setSaved] = useState(Boolean(data.video?.saved));
   const [bookmarkError, setBookmarkError] = useState(data.bookmarkError);
   const [pending, startTransition] = useTransition();
-  const quote = quotes[quoteIndex] ?? quotes[0];
-
-  function toggleAffirmation() {
-    if (pending) return;
-    const next = !affirmed;
-    setAffirmationError(false);
-    startTransition(async () => {
-      const result = await setMemberDailyAffirmation(data.day, next);
-      if (result.ok) setAffirmed(result.value);
-      else setAffirmationError(true);
-    });
-  }
 
   function toggleSaved() {
     if (!data.video || pending) return;
@@ -117,40 +98,91 @@ export function MemberDailyFuel({
           <section className="daily-fuel-quote-card" aria-labelledby="daily-fuel-quote-heading">
             <div className="daily-fuel-card-heading">
               <h3 id="daily-fuel-quote-heading">{copy.quoteTitle}</h3>
-              <button
-                type="button"
-                className="daily-fuel-icon-button"
-                onClick={() => setQuoteIndex((current) => (current + 1) % quotes.length)}
-                aria-label={copy.anotherQuote}
-              >
-                <RefreshCw size={18} strokeWidth={1.8} aria-hidden="true" />
-              </button>
             </div>
-            <span className="daily-fuel-quote-mark" aria-hidden="true">“</span>
-            <blockquote>{quote.text}</blockquote>
-            <p className="daily-fuel-attribution">— {quote.author}</p>
+            {data.quoteError ? (
+              <p className="daily-fuel-empty" role="alert">{copy.quoteLoadError}</p>
+            ) : data.quote ? (
+              <>
+                <span className="daily-fuel-quote-mark" aria-hidden="true">“</span>
+                <blockquote>{data.quote.text}</blockquote>
+                {data.quote.attribution && (
+                  <p className="daily-fuel-attribution">— {data.quote.attribution}</p>
+                )}
+              </>
+            ) : (
+              <p className="daily-fuel-empty">{copy.noQuote}</p>
+            )}
           </section>
 
-          <section className="daily-fuel-affirmation-card" aria-labelledby="daily-fuel-affirmation-heading">
-            <h3 id="daily-fuel-affirmation-heading">
-              <Heart size={19} strokeWidth={2} aria-hidden="true" />
-              {copy.affirmationTitle}
-            </h3>
-            <p>{copy.affirmationText}</p>
-            <button
-              type="button"
-              className={`daily-fuel-affirmation-toggle ${affirmed ? "is-affirmed" : ""}`}
-              onClick={toggleAffirmation}
-              disabled={pending}
-              aria-pressed={affirmed}
-            >
-              <Check size={17} strokeWidth={2} aria-hidden="true" />
-              {affirmed ? copy.affirmationOn : copy.affirmationOff}
-            </button>
-            {affirmationError && <p className="daily-fuel-affirmation-error" role="alert">{copy.affirmationFailed}</p>}
-          </section>
+          <DailyFuelAffirmation
+            key={`${data.day}:${data.affirmation?.revisionId ?? "no-authored-affirmation"}`}
+            day={data.day}
+            affirmation={data.affirmation}
+            initiallyAffirmed={data.affirmed}
+            loadError={data.affirmationError}
+            copy={copy}
+          />
         </div>
       </div>
+    </section>
+  );
+}
+
+function DailyFuelAffirmation({
+  day,
+  affirmation,
+  initiallyAffirmed,
+  loadError,
+  copy,
+}: {
+  day: string;
+  affirmation: MemberDailyFuelData["affirmation"];
+  initiallyAffirmed: boolean;
+  loadError: boolean;
+  copy: Copy;
+}) {
+  const [affirmed, setAffirmed] = useState(
+    initiallyAffirmed && Boolean(affirmation) && !loadError,
+  );
+  const [actionError, setActionError] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const canAcknowledge = Boolean(affirmation) && !loadError;
+
+  function toggleAffirmation() {
+    if (!affirmation || loadError || pending) return;
+    const next = !affirmed;
+    setActionError(false);
+    startTransition(async () => {
+      const result = await setMemberDailyAffirmation(day, affirmation.revisionId, next);
+      if (result.ok) setAffirmed(result.value);
+      else setActionError(true);
+    });
+  }
+
+  return (
+    <section className="daily-fuel-affirmation-card" aria-labelledby="daily-fuel-affirmation-heading">
+      <h3 id="daily-fuel-affirmation-heading">
+        <Heart size={19} strokeWidth={2} aria-hidden="true" />
+        {copy.affirmationTitle}
+      </h3>
+      {loadError ? (
+        <p className="daily-fuel-affirmation-error" role="alert">{copy.affirmationLoadError}</p>
+      ) : affirmation ? (
+        <p>{affirmation.text}</p>
+      ) : (
+        <p>{copy.noAffirmation}</p>
+      )}
+      <button
+        type="button"
+        className={`daily-fuel-affirmation-toggle ${affirmed ? "is-affirmed" : ""}`}
+        onClick={toggleAffirmation}
+        disabled={!canAcknowledge || pending}
+        aria-pressed={affirmed}
+      >
+        <Check size={17} strokeWidth={2} aria-hidden="true" />
+        {affirmed ? copy.affirmationOn : copy.affirmationOff}
+      </button>
+      {actionError && <p className="daily-fuel-affirmation-error" role="alert">{copy.affirmationFailed}</p>}
     </section>
   );
 }

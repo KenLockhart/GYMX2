@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { NavIcon } from "@/components/nav-icon";
+import { useT } from "@/i18n/client";
 import { ADMIN_NAV, isActive, type NavItem } from "@/lib/nav";
 
 function Item({
@@ -18,7 +19,9 @@ function Item({
   pathname: string;
   prominent?: boolean;
 }) {
+  const t = useT();
   const active = isActive(pathname, entry.href);
+  const label = t.nav.links[entry.href] ?? entry.label;
   return (
     <Link
       href={entry.href}
@@ -30,7 +33,7 @@ function Item({
       }`}
     >
       <NavIcon name={entry.icon} className="size-[18px] shrink-0" />
-      <span className="flex-1">{entry.label}</span>
+      <span className="flex-1">{label}</span>
       {!!badge && (
         <span
           className={`min-w-5 rounded-full px-1.5 text-center text-xs font-bold leading-5 ${

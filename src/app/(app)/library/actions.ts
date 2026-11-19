@@ -10,6 +10,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 import { videoInUseError } from "@/lib/format";
+import {
+  DAILY_CONTENT_VIDEO_DELETE_BLOCKED,
+  DAILY_FUEL_VIDEO_DELETE_BLOCKED,
+} from "@/lib/daily-content";
 import { idSchema, videoSchema } from "@/lib/validation";
 
 async function videoInUseMessage(videoId: string) {
@@ -27,6 +31,29 @@ export async function deleteVideo(
   await requireAccount();
   const videoId = idSchema.safeParse(formData.get("video_id"));
   if (!videoId.success) return { error: "Choose a video." };
+  if (!isStreamConfigured())
+    return { error: "We couldn't delete that video. Please try again." };
+
+  // Reserve under the same videos-row lock used by Daily Content publication and
+  // assignment/bookmark writes before making the provider request.
+  const supabase = await createClient();
+  const { data: reserved, error: reservationError } = await supabase.rpc(
+    "reserve_daily_content_video_delete",
+    { target_video_id: videoId.data },
+  );
+  if (reservationError) {
+    if (reservationError.code === "23503") {
+      if (/Daily Content|saved by a member/i.test(reservationError.message))
+        return { error: DAILY_CONTENT_VIDEO_DELETE_BLOCKED };
+      if (/Daily Fuel/i.test(reservationError.message))
+        return { error: DAILY_FUEL_VIDEO_DELETE_BLOCKED };
+      if (/Task/i.test(reservationError.message))
+        return { error: await videoInUseMessage(videoId.data) };
+    }
+    return { error: "We couldn't delete that video. Please try again." };
+  }
+  if (reserved !== true)
+    return { error: "We couldn't delete that video. Please try again." };
 
   const { data: stored, error: lookupError } = await createAdminClient()
     .from("videos")
@@ -34,33 +61,39 @@ export async function deleteVideo(
     .eq("id", videoId.data)
     .maybeSingle();
   // Without the Cloudflare id, deleting the row would leave the video in Cloudflare for good.
-  if (lookupError)
+  // Keep the reservation on failure so a later retry can finish safely.
+  if (lookupError || !stored?.cloudflare_uid)
     return { error: "We couldn't delete that video. Please try again." };
 
-  // The database decides who may delete, so nothing is removed from Cloudflare unless this succeeds.
-  const supabase = await createClient();
+  try {
+    // deleteVideo treats a provider 404 as success so DB deletion can be retried
+    // after a previous provider success and later database failure.
+    await deleteStreamVideo(stored.cloudflare_uid);
+  } catch {
+    return { error: "We couldn't delete that video. Please try again." };
+  }
+
   const { data: deleted, error } = await supabase
     .from("videos")
     .delete()
     .eq("id", videoId.data)
     .select("id");
-
-  // Tasks keep their video, so the database refuses to delete one that a Task still uses.
-  if (error?.code === "23503")
-    return { error: await videoInUseMessage(videoId.data) };
-  if (error)
-    return { error: "We couldn't delete that video. Please try again." };
+  if (error?.code === "23503") {
+    if (/Daily Content|saved by a member/i.test(error.message))
+      return { error: DAILY_CONTENT_VIDEO_DELETE_BLOCKED };
+    if (/Daily Fuel/i.test(error.message))
+      return { error: DAILY_FUEL_VIDEO_DELETE_BLOCKED };
+    if (/Task/i.test(error.message))
+      return { error: await videoInUseMessage(videoId.data) };
+  }
+  if (error) return { error: "We couldn't delete that video. Please try again." };
   if (!deleted?.length) return { error: "We couldn't find that video." };
 
-  if (stored && isStreamConfigured()) {
-    try {
-      await deleteStreamVideo(stored.cloudflare_uid);
-    } catch (cause) {
-      console.error(cause);
-    }
-  }
-
   revalidatePath("/library");
+  revalidatePath("/library/saved");
+  revalidatePath("/dashboard");
+  revalidatePath("/library/daily-content");
+  revalidatePath("/admin/daily-content");
   return {};
 }
 

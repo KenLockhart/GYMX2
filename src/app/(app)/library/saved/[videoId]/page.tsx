@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MemberDailyFuelPlayer } from "@/components/member-daily-fuel-player";
+import { SavedDailyFuelRemove } from "@/components/saved-daily-fuel-remove";
 import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { formatDuration } from "@/lib/format";
@@ -70,6 +71,17 @@ export default async function SavedDailyFuelVideoPage({
               {video.description}
             </p>
           )}
+          <SavedDailyFuelRemove
+            videoId={video.id}
+            redirectAfterRemove
+            copy={{
+              remove: t.savedRemove,
+              removing: t.savedRemoving,
+              confirm: t.savedRemoveConfirm(video.title),
+              removed: t.savedRemoved,
+              error: t.savedRemoveError,
+            }}
+          />
         </>
       ) : null}
     </main>

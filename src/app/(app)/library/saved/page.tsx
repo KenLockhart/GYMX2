@@ -5,6 +5,7 @@ import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { loadSavedMemberDailyFuelVideos } from "@/lib/member-saved-daily-fuel";
 import { formatDuration } from "@/lib/format";
+import { SavedDailyFuelRemove } from "@/components/saved-daily-fuel-remove";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT()).library.savedTitle };
@@ -56,6 +57,16 @@ export default async function SavedDailyFuelPage() {
               >
                 {t.savedWatch(video.title)}
               </Link>
+              <SavedDailyFuelRemove
+                videoId={video.id}
+                copy={{
+                  remove: t.savedRemove,
+                  removing: t.savedRemoving,
+                  confirm: t.savedRemoveConfirm(video.title),
+                  removed: t.savedRemoved,
+                  error: t.savedRemoveError,
+                }}
+              />
             </li>
           ))}
         </ul>

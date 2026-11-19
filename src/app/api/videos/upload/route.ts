@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
   );
   if (!parsed.success) return failure(parsed.error.issues[0].message, 400);
 
+  const requestedReturnTo = request.nextUrl.searchParams.get("returnTo");
+  const dailyContentUpload =
+    (account.profile.role === "coach" && requestedReturnTo === "/library/daily-content") ||
+    (account.profile.role === "admin" && requestedReturnTo === "/admin/daily-content");
+  const visibility = dailyContentUpload ? "private" : parsed.data.visibility;
+
   try {
     const { location, uid } = await createUpload({
       length,
@@ -47,7 +53,7 @@ export async function POST(request: NextRequest) {
       title: parsed.data.title,
       description: parsed.data.description,
       category: parsed.data.category,
-      visibility: parsed.data.visibility,
+      visibility,
     });
     if (error) {
       // Nothing points at this upload now, so don't leave it behind in Cloudflare.
