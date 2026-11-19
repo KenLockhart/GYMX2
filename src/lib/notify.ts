@@ -4,6 +4,7 @@ import { formatEmailSessionTime } from "@/lib/calendar";
 import type { Locale } from "@/i18n/config";
 import { translate } from "@/i18n/phrases";
 import { loadRecipient, sendEmail } from "@/lib/email";
+import { gatedSessionJoinUrl } from "@/lib/session-join";
 import { describeFlags, detectFlags } from "@/lib/message-flags";
 import {
   flaggedMessageEmail,
@@ -316,7 +317,11 @@ export function notifySession(
           locale,
         ),
         location: session.location,
-        meetingUrl: session.meeting_url,
+        meetingUrl: gatedSessionJoinUrl(
+          getSiteUrl(),
+          session.id,
+          session.meeting_url,
+        ),
         sessionId: session.id,
       });
 
@@ -471,7 +476,11 @@ export function notifyIntro(bookingId: string, change: "booked" | "cancelled") {
         locale,
       ),
       location: booking.slot!.location,
-      meetingUrl: booking.slot!.meeting_url,
+      meetingUrl: gatedSessionJoinUrl(
+        getSiteUrl(),
+        booking.session_id,
+        booking.slot!.meeting_url,
+      ),
       message: booking.message,
       sessionId: booking.session_id,
     });

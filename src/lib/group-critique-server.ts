@@ -3,6 +3,7 @@ import "server-only";
 import type { UserRole } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { memberCoachIntakeFailure } from "@/lib/member-intake-server";
 import {
   groupCritiqueConsentInputSchema,
   groupCritiqueGenerationInputSchema,
@@ -247,6 +248,10 @@ export async function readGroupCritiqueSnapshot(
   }
   const access = await authorizedForSession(user, admin, actor, parsed.data.sessionId);
   if (!access.ok) return fail(access.error);
+  if (actor.role === "member") {
+    const intakeFailure = await memberCoachIntakeFailure(user, access.session.coach_id);
+    if (intakeFailure) return fail(intakeFailure);
+  }
   const coachId = zUuid(access.session.coach_id);
   if (!coachId) return fail("temporarily_unavailable");
   const runtime = await providerRuntime();
@@ -435,6 +440,8 @@ export async function acceptGroupCritiqueOffer(
   try { accessAdmin = createAdminClient(); } catch { return fail("temporarily_unavailable"); }
   const access = await authorizedForSession(user, accessAdmin, actor, parsed.data.sessionId);
   if (!access.ok) return fail(access.error);
+  const intakeFailure = await memberCoachIntakeFailure(user, access.session.coach_id);
+  if (intakeFailure) return fail(intakeFailure);
   const runtime = await providerRuntime();
   if (!runtime || !(await providerReadyForMedia(runtime))) return fail("not_ready");
   const { data, error } = await user.rpc("accept_group_critique_offer", {
@@ -548,6 +555,10 @@ export async function joinGroupCritique(
   const access = await authorizedForSession(user, accessAdmin, actor, parsed.data.sessionId);
   if (!access.ok) return fail(access.error);
   if (access.session.live_mode !== "broadcast") return fail("not_ready");
+  if (actor.role === "member") {
+    const intakeFailure = await memberCoachIntakeFailure(user, access.session.coach_id);
+    if (intakeFailure) return fail(intakeFailure);
+  }
   const runtime = await providerRuntime();
   if (!runtime || !(await providerReadyForMedia(runtime))) return fail("not_ready");
 

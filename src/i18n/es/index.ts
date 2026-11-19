@@ -13,6 +13,7 @@ import { programs } from "./programs";
 import { tasks } from "./tasks";
 import { track } from "./track";
 import { welcome } from "./welcome";
+import { intake } from "./intake";
 
 export const es: Messages = {
   auth,
@@ -32,4 +33,5 @@ export const es: Messages = {
   tasks,
   track,
   welcome,
+  intake,
 };

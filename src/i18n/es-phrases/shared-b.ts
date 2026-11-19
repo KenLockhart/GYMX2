@@ -140,6 +140,7 @@ export const sharedB: Record<string, string> = {
   How: "Cómo",
   Where: "Dónde",
   "Video link": "Enlace de video",
+  "Join video call": "Unirse a la videollamada",
   "Your message": "Tu mensaje",
   "Open in your calendar": "Abrir en tu calendario",
   "the coaches page": "la página de coaches",

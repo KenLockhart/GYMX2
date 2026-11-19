@@ -49,9 +49,24 @@ export function forgetEmailCopy() {
 // Sends one email through Resend. Never throws: a failed email must not undo the order,
 // message or session that triggered it. Admins' wording is applied here, and optional
 // emails they turned off are skipped.
-export async function sendEmail(to: string, original: Email) {
+export type SendEmailOptions = {
+  idempotencyKey?: string;
+};
+
+export async function sendEmail(
+  to: string,
+  original: Email,
+  options: SendEmailOptions = {},
+) {
   const key = process.env.RESEND_API_KEY;
   if (!key) return false;
+  const idempotencyKey = options.idempotencyKey;
+  if (
+    idempotencyKey !== undefined &&
+    (idempotencyKey.length < 1 ||
+      idempotencyKey.length > 256 ||
+      /[\r\n]/.test(idempotencyKey))
+  ) return false;
   let email = original;
   if (original.key) {
     const copy = (await loadEmailCopy().catch(() => null))?.get(original.key);
@@ -66,6 +81,7 @@ export async function sendEmail(to: string, original: Email) {
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from: FROM,

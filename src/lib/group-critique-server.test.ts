@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   createRealtimeKitApi: vi.fn(),
   readRealtimeKitConfiguration: vi.fn(),
+  memberCoachIntakeFailure: vi.fn(),
   api: {
     verifyPresetDefinitions: vi.fn(),
     listMeetingsByTitle: vi.fn(),
@@ -23,6 +24,9 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdminCli
 vi.mock("@/lib/realtimekit-server", () => ({
   createRealtimeKitApi: mocks.createRealtimeKitApi,
   readRealtimeKitConfiguration: mocks.readRealtimeKitConfiguration,
+}));
+vi.mock("@/lib/member-intake-server", () => ({
+  memberCoachIntakeFailure: mocks.memberCoachIntakeFailure,
 }));
 
 import {
@@ -129,6 +133,7 @@ describe("group critique snapshot capacity", () => {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.readRealtimeKitConfiguration.mockReturnValue(providerConfig);
+  mocks.memberCoachIntakeFailure.mockResolvedValue(null);
   mocks.createRealtimeKitApi.mockReturnValue(mocks.api);
   Object.values(mocks.api).forEach((method) => method.mockReset());
   mocks.api.verifyPresetDefinitions.mockResolvedValue(true);
@@ -297,6 +302,35 @@ describe("group critique server authorization and races", () => {
 
     expect(result).toEqual({ ok: false, error: "not_allowed" });
     expect(admin.rpc).not.toHaveBeenCalled();
+    expect(mocks.api.addParticipant).not.toHaveBeenCalled();
+  });
+
+  it("blocks a member without explicit intake clearance before joining or accepting a group offer", async () => {
+    const admin = makeAdmin();
+    mocks.createAdminClient.mockReturnValue(admin);
+    mocks.memberCoachIntakeFailure.mockResolvedValue("not_allowed");
+    const user = makeUser({
+      data: [{ camera_allowed: true, microphone_allowed: true, participant_epoch: 4 }],
+      error: null,
+    });
+
+    const join = await joinGroupCritique(
+      user as never,
+      { id: memberId, role: "member" },
+      sessionId,
+      4,
+    );
+    const accept = await acceptGroupCritiqueOffer(
+      user as never,
+      { id: memberId, role: "member" },
+      sessionId,
+      4,
+    );
+
+    expect(join).toEqual({ ok: false, error: "not_allowed" });
+    expect(accept).toEqual({ ok: false, error: "not_allowed" });
+    expect(admin.rpc).not.toHaveBeenCalled();
+    expect(user.rpc).not.toHaveBeenCalled();
     expect(mocks.api.addParticipant).not.toHaveBeenCalled();
   });
 

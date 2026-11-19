@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { SessionTime } from "@/components/calendar-parts";
 import { LiveRoom } from "@/components/live-room";
 import {
@@ -14,6 +14,7 @@ import { canGoLive } from "@/lib/live";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
+import { getMemberCoachIntakeClearance } from "@/lib/member-intake-server";
 import { readPrivateLiveSession } from "./private-actions";
 import { readGroupCritiqueSnapshot } from "./group-actions";
 import type { LiveChatMessage } from "./actions";
@@ -47,6 +48,18 @@ export default async function LivePage({
   const inviteeIds = invites.map((row) => row.member_id as string);
   const isCoach = session.coach_id === profile.id;
   const invited = inviteeIds.includes(profile.id);
+  if (profile.role === "member" && invited) {
+    const clearance = await getMemberCoachIntakeClearance(
+      supabase,
+      session.coach_id as string,
+    );
+    if (clearance === "needs_intake") {
+      const returnTo = `/calendar/${id}/live`;
+      redirect(`/intake?coach=${encodeURIComponent(session.coach_id as string)}&returnTo=${encodeURIComponent(returnTo)}`);
+    }
+    if (clearance === "needs_booking") redirect(`/calendar/${id}`);
+    if (clearance !== "cleared") notFound();
+  }
   const privateMemberId = inviteeIds.length === 1 ? inviteeIds[0] : null;
 
   const { data: people } = await createAdminClient()

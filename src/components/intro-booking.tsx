@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { isSafeExternalMeetingUrl, sessionJoinPath } from "@/lib/session-join";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { bookIntro, cancelIntro } from "@/app/(app)/calendar/intro-actions";
@@ -69,20 +70,15 @@ export function IntroBooking({
               <dd>{existing.location}</dd>
             </div>
           )}
-          {existing.meetingUrl && (
+          {isSafeExternalMeetingUrl(existing.meetingUrl) && existing.sessionId && sessionJoinPath(existing.sessionId) && (
             <div className="sm:col-span-2">
               <dt className="text-muted">
                 <T>Video link</T>
               </dt>
               <dd>
-                <a
-                  href={existing.meetingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-link break-all"
-                >
-                  {existing.meetingUrl}
-                </a>
+                <Link href={sessionJoinPath(existing.sessionId)!} className="text-link break-all">
+                  <T>Join video call</T>
+                </Link>
               </dd>
             </div>
           )}
@@ -173,6 +169,8 @@ export function IntroBooking({
             setError(result.error);
             setSlotId(null);
             router.refresh();
+          } else if (result.intakeCoachId) {
+            router.push(`/intake?coach=${encodeURIComponent(result.intakeCoachId)}`);
           } else router.refresh();
         });
       }}

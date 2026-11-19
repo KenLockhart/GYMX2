@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getLiveStreamCustomerCode: vi.fn(),
   hasDedicatedLiveStreamConfig: vi.fn(),
   isLiveStreamConfigured: vi.fn(),
+  memberCoachIntakeFailure: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -32,9 +33,13 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
+vi.mock("@/lib/member-intake-server", () => ({
+  memberCoachIntakeFailure: mocks.memberCoachIntakeFailure,
+}));
 
 import {
   cleanupPrivateLiveInputsAndRecordHeartbeat,
+  acceptPrivateSession,
   mintPrivateStreamJwt,
   offerPrivateSession,
   preparePrivateBroadcast,
@@ -136,6 +141,7 @@ beforeEach(() => {
   );
   mocks.hasDedicatedLiveStreamConfig.mockReturnValue(true);
   mocks.isLiveStreamConfigured.mockReturnValue(true);
+  mocks.memberCoachIntakeFailure.mockResolvedValue(null);
   mocks.getLiveStreamAccountId.mockReturnValue(accountA);
   mocks.getLiveStreamCustomerCode.mockReturnValue("synthetic-customer");
   mocks.createLiveInput.mockReset();
@@ -254,6 +260,41 @@ describe("private live server boundaries", () => {
     expect(mocks.getLiveIngestUrl).not.toHaveBeenCalled();
     expect(member.rpc).not.toHaveBeenCalled();
     expect(admin.rpc).not.toHaveBeenCalled();
+  });
+
+  it("blocks direct private offer acceptance, publisher prep and playback without the coach's intake grant", async () => {
+    mocks.memberCoachIntakeFailure.mockResolvedValue("not_allowed");
+    const session = privateSession();
+    const user = fakeUser({ session, grant: validGrant(session) });
+
+    const accepted = await acceptPrivateSession(
+      user as never,
+      { id: memberId, role: "member" },
+      sessionId,
+      grantId,
+      true,
+    );
+    const prepared = await preparePrivateBroadcast(
+      user as never,
+      { id: memberId, role: "member" },
+      sessionId,
+      grantId,
+    );
+    const playback = await privatePlayback(
+      user as never,
+      { id: memberId, role: "member" },
+      sessionId,
+      grantId,
+      2,
+    );
+
+    expect(accepted).toEqual({ ok: false, error: "not_allowed" });
+    expect(prepared).toEqual({ ok: false, error: "not_allowed" });
+    expect(playback).toEqual({ ok: false, error: "not_allowed" });
+    expect(user.rpc).not.toHaveBeenCalled();
+    expect(mocks.createAdminClient).not.toHaveBeenCalled();
+    expect(mocks.createLiveInput).not.toHaveBeenCalled();
+    expect(mocks.getLiveIngestUrl).not.toHaveBeenCalled();
   });
 
   it("rejects a coach that does not own the session before provider access", async () => {

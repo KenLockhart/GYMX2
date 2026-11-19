@@ -12,7 +12,7 @@ import { notifyIntro } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
 
-type Result = { error?: string };
+type Result = { error?: string; intakeCoachId?: string | null };
 
 // Coaches publish intro times. Row security checks the times are theirs and in the future.
 export async function addIntroSlots(input: {
@@ -100,11 +100,25 @@ export async function bookIntro(
 
   const { data: booking } = await supabase
     .from("coach_intro_bookings")
-    .select("session_id")
+    .select("session_id, coach_id")
     .eq("id", bookingId as string)
     .maybeSingle();
+  const coachId = (booking?.coach_id as string | null) ?? null;
+  let intakeCoachId: string | null = null;
+  if (coachId) {
+    const { data: pending } = await supabase.rpc("my_pending_intake_bookings");
+    if (
+      (pending ?? []).some(
+        (row: { coach_id?: string }) => row.coach_id === coachId,
+      )
+    ) intakeCoachId = coachId;
+  }
+  revalidatePath("/dashboard");
   revalidatePath("/calendar");
-  return { sessionId: (booking?.session_id as string | null) ?? null };
+  return {
+    sessionId: (booking?.session_id as string | null) ?? null,
+    intakeCoachId,
+  };
 }
 
 // Either person cancels. The time opens up again for someone else.

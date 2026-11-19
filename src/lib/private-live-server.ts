@@ -21,6 +21,7 @@ import {
 } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { memberCoachIntakeFailure } from "@/lib/member-intake-server";
 import {
   privateLiveAcceptInputSchema,
   privateLiveCleanupLeaseSchema,
@@ -130,6 +131,15 @@ function sessionWindowOpen(session: Session, nowMs = Date.now()) {
     session.endsAt,
     new Date(nowMs),
   );
+}
+
+async function memberIntakeAccessError(
+  user: UserClient,
+  actor: PrivateLiveActor,
+  coachId: string,
+): Promise<PrivateLiveErrorCode | null> {
+  if (actor.role !== "member") return null;
+  return memberCoachIntakeFailure(user, coachId);
 }
 
 async function readSession(
@@ -596,6 +606,11 @@ export async function acceptPrivateSession(
   sessionId = parsed.data.sessionId;
   grantId = parsed.data.grantId;
   if (actor.role !== "member") return failure("not_allowed");
+  const { session, error: sessionError } = await readSession(user, sessionId);
+  if (sessionError || !session) return failure(sessionError ?? "not_found");
+  if (session.mode !== "one_on_one") return failure("wrong_mode");
+  const intakeError = await memberIntakeAccessError(user, actor, session.coachId);
+  if (intakeError) return failure(intakeError);
   const { grant, error: grantError } = await readGrant(user, sessionId, grantId);
   if (grantError) return failure(grantError);
   if (!grant) return failure("not_allowed");
@@ -649,6 +664,8 @@ export async function preparePrivateBroadcast(
   if (session.mode !== "one_on_one") return failure("wrong_mode");
   if (direction === "coach" && session.coachId !== actor.id.toLowerCase())
     return failure("not_allowed");
+  const intakeError = await memberIntakeAccessError(user, actor, session.coachId);
+  if (intakeError) return failure(intakeError);
   const { grant, error: grantError } = await readGrant(user, sessionId, grantId);
   if (grantError) return failure(grantError);
   if (!grant) return failure("not_allowed");
@@ -789,6 +806,8 @@ export async function preparePrivateBroadcast(
     await bestEffortDelete(uid);
     return failure("not_ready");
   }
+  const finalIntakeError = await memberIntakeAccessError(user, actor, session.coachId);
+  if (finalIntakeError) return failure(finalIntakeError);
   return {
     ok: true,
     direction,
@@ -823,6 +842,8 @@ export async function markPrivateBroadcastLive(
   if (session.mode !== "one_on_one") return failure("wrong_mode");
   if (direction === "coach" && session.coachId !== actor.id.toLowerCase())
     return failure("not_allowed");
+  const intakeError = await memberIntakeAccessError(user, actor, session.coachId);
+  if (intakeError) return failure(intakeError);
   const { grant, error: grantError } = await readGrant(user, sessionId, grantId);
   if (grantError) return failure(grantError);
   if (!grant) return failure("not_allowed");
@@ -887,6 +908,8 @@ export async function privatePlayback(
   if (session.mode !== "one_on_one") return failure("wrong_mode");
   if (viewerDirection === "coach" && session.coachId !== actor.id.toLowerCase())
     return failure("not_allowed");
+  const intakeError = await memberIntakeAccessError(user, actor, session.coachId);
+  if (intakeError) return failure(intakeError);
   const { grant, error: grantError } = await readGrant(user, sessionId, grantId);
   if (grantError) return failure(grantError);
   if (!grant) return failure("not_allowed");
@@ -964,6 +987,9 @@ export async function privatePlayback(
   ) {
     return failure("not_ready");
   }
+
+  const finalIntakeError = await memberIntakeAccessError(user, actor, session.coachId);
+  if (finalIntakeError) return failure(finalIntakeError);
 
   return {
     ok: true,

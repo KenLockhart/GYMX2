@@ -5,6 +5,11 @@ import { ResponseButtons, SessionTime } from "@/components/calendar-parts";
 import { ActionForm, FormStatus, SubmitButton } from "@/components/form-parts";
 import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
+import {
+  getMemberCoachIntakeClearance,
+  loadCoachSessionIntakes,
+} from "@/lib/member-intake-server";
+import { sessionJoinPath, isSafeExternalMeetingUrl } from "@/lib/session-join";
 import type { SessionResponse } from "@/lib/calendar";
 import { liveState } from "@/lib/live";
 import { createClient } from "@/lib/supabase/server";
@@ -35,6 +40,7 @@ export default async function SessionPage({
   const { id } = await params;
   const all = (await getT()).calendar;
   const t = all.session;
+  const intakeCopy = (await getT()).intake;
   const { formerMember } = (await getT()).tasks;
 
   // Row security decides who can open a session: its coach, its invited members and admins.
@@ -53,6 +59,10 @@ export default async function SessionPage({
   const myInvite = session.session_invites.find(
     (invite) => invite.member_id === profile.id,
   );
+  const intakeClearance = profile.role === "member" && myInvite
+    ? await getMemberCoachIntakeClearance(supabase, session.coach_id)
+    : null;
+  const memberHasIntakeAccess = profile.role !== "member" || intakeClearance === "cleared";
   const isPast = new Date(session.ends_at) < new Date();
   const guests = [...session.session_invites].sort(
     (a, b) =>
@@ -80,7 +90,23 @@ export default async function SessionPage({
   );
   const showLive =
     (isOwner || myInvite || profile.role === "admin") &&
+    memberHasIntakeAccess &&
     (live === "open" || live === "live" || (isOwner && live === "not_yet"));
+
+  const coachIntake = profile.role === "coach" && isOwner
+    ? await loadCoachSessionIntakes(session.id)
+    : null;
+  const coachIntakeStatus = new Map(
+    (coachIntake?.rows ?? []).map((row) => [row.memberId, row.status]),
+  );
+  let memberIntakeStatus: "pending" | "complete" | "unavailable" | null = null;
+  if (profile.role === "member" && myInvite?.response === "going") {
+    memberIntakeStatus = intakeClearance === "cleared"
+      ? "complete"
+      : intakeClearance === "needs_intake"
+        ? "pending"
+        : "unavailable";
+  }
 
   return (
     <div className="space-y-6">
@@ -130,6 +156,13 @@ export default async function SessionPage({
         )}
       </div>
 
+      {profile.role === "coach" && isOwner && (
+        <nav aria-label="Session tabs" className="flex gap-2 border-b border-border">
+          <Link href={`/calendar/${session.id}`} aria-current="page" className="border-b-2 border-accent px-3 py-2 text-sm font-semibold">{t.title}</Link>
+          <Link href={`/calendar/${session.id}/intake`} className="border-b-2 border-transparent px-3 py-2 text-sm text-muted">{intakeCopy.title}</Link>
+        </nav>
+      )}
+
       {showLive && (
         <div
           className={`flex max-w-2xl flex-wrap items-center justify-between gap-3 rounded-lg border p-4 ${
@@ -164,18 +197,15 @@ export default async function SessionPage({
               <dd>{session.location}</dd>
             </div>
           )}
-          {session.meeting_url && (
+          {isSafeExternalMeetingUrl(session.meeting_url) &&
+            sessionJoinPath(session.id) &&
+            (isOwner || profile.role === "admin" || (myInvite && intakeClearance === "cleared")) && (
             <div>
               <dt className="text-sm text-muted">{t.videoCall}</dt>
               <dd>
-                <a
-                  href={session.meeting_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-link break-all"
-                >
+                <Link href={sessionJoinPath(session.id)!} className="text-link break-all">
                   {t.joinCall}
-                </a>
+                </Link>
               </dd>
             </div>
           )}
@@ -191,6 +221,14 @@ export default async function SessionPage({
       {myInvite && !isPast && (
         <section className="space-y-3">
           <h2 className="text-2xl">{t.coming}</h2>
+          {memberIntakeStatus && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3">
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${memberIntakeStatus === "complete" ? "bg-success/10 text-success" : memberIntakeStatus === "pending" ? "bg-accent/10 text-accent" : "bg-surface-raised text-muted"}`}>
+                {memberIntakeStatus === "complete" ? intakeCopy.statusComplete : memberIntakeStatus === "pending" ? intakeCopy.statusPending : intakeCopy.statusUnavailable}
+              </span>
+              {memberIntakeStatus === "pending" && <Link href={`/intake?coach=${session.coach_id}&returnTo=${encodeURIComponent(`/calendar/${session.id}/join`)}`} className="text-link text-sm">{intakeCopy.buttons.openIntake}</Link>}
+            </div>
+          )}
           <ResponseButtons
             sessionId={session.id}
             response={myInvite.response}
@@ -210,11 +248,16 @@ export default async function SessionPage({
                 key={invite.member_id}
                 className="flex justify-between gap-4 p-3"
               >
-                <span>
-                  {invite.member?.display_name ?? formerMember}
+                <span className="space-y-1">
+                  <span className="block">{invite.member?.display_name ?? formerMember}</span>
                   {attended.has(invite.member_id) && (
                     <span className="ml-2 text-xs text-success">
                       {t.watchedLive}
+                    </span>
+                  )}
+                  {invite.response === "going" && coachIntake && !coachIntake.error && coachIntakeStatus.has(invite.member_id) && (
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${coachIntakeStatus.get(invite.member_id) === "complete" ? "bg-success/10 text-success" : "bg-accent/10 text-accent"}`}>
+                      {coachIntakeStatus.get(invite.member_id) === "complete" ? intakeCopy.statusComplete : intakeCopy.statusPending}
                     </span>
                   )}
                 </span>

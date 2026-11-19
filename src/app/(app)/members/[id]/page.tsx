@@ -19,7 +19,7 @@ import {
 import { loadProgressPhotos } from "@/lib/photos";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { T } from "@/i18n/t";
-import { getLocale, getTr } from "@/i18n/server";
+import { getLocale, getT, getTr } from "@/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTr())("Member") };
@@ -39,6 +39,7 @@ export default async function MemberPage({
 }) {
   const tr = await getTr();
   const locale = await getLocale();
+  const intakeCopy = (await getT()).intake;
   const { profile } = await requireCoach();
   const { id } = await params;
 
@@ -177,6 +178,11 @@ export default async function MemberPage({
           <T>Message</T>
         </Link>
       </div>
+
+      <nav aria-label="Member profile tabs" className="flex gap-2 border-b border-border">
+        <Link href={`/members/${id}`} aria-current="page" className="border-b-2 border-accent px-3 py-2 text-sm font-semibold">Overview</Link>
+        <Link href={`/members/${id}/intake`} className="border-b-2 border-transparent px-3 py-2 text-sm text-muted">{intakeCopy.title}</Link>
+      </nav>
 
       <section className="space-y-3">
         <h2 className="text-2xl">

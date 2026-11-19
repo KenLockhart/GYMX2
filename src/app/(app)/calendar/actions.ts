@@ -169,6 +169,24 @@ export async function respondToSession(
   after(() => syncProgressQuietly(profile));
   revalidatePath("/calendar");
   revalidatePath(`/calendar/${parsed.data.session_id}`);
+  if (profile.role === "member" && parsed.data.response === "going") {
+    const { data: session } = await supabase
+      .from("calendar_sessions")
+      .select("coach_id")
+      .eq("id", parsed.data.session_id)
+      .maybeSingle();
+    const coachId = (session?.coach_id as string | null) ?? null;
+    if (coachId) {
+      const { data: pending } = await supabase.rpc("my_pending_intake_bookings");
+      if (
+        (pending ?? []).some(
+          (row: { coach_id?: string }) => row.coach_id === coachId,
+        )
+      ) {
+        redirect(`/intake?coach=${encodeURIComponent(coachId)}`);
+      }
+    }
+  }
   return {
     message:
       parsed.data.response === "going"
