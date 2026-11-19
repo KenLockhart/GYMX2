@@ -16,6 +16,7 @@ import { setMemberDailyAffirmation, setMemberDailyFuelBookmark } from "./fuel-ac
 const memberId = "11111111-1111-4111-8111-111111111111";
 const videoId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const replacementVideoId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const affirmationRevisionId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
 describe("Daily Fuel member actions", () => {
   beforeEach(() => {
@@ -27,19 +28,20 @@ describe("Daily Fuel member actions", () => {
     const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
     mockCreateClient.mockResolvedValue({ rpc });
 
-    await expect(setMemberDailyAffirmation("2026-11-18", true)).resolves.toEqual({
+    await expect(setMemberDailyAffirmation("2026-11-18", affirmationRevisionId, true)).resolves.toEqual({
       ok: true,
       value: true,
     });
-    expect(rpc).toHaveBeenCalledWith("set_member_daily_affirmation", {
+    expect(rpc).toHaveBeenCalledWith("set_member_daily_content_acknowledgment", {
       target_expected_day: "2026-11-18",
-      target_affirmed: true,
+      target_revision_id: affirmationRevisionId,
+      target_acknowledged: true,
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("refuses a stale date before touching Supabase", async () => {
-    await expect(setMemberDailyAffirmation("2026-11-17", true)).resolves.toEqual({
+    await expect(setMemberDailyAffirmation("2026-11-17", affirmationRevisionId, true)).resolves.toEqual({
       ok: false,
       error: "day_changed",
     });

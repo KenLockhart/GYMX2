@@ -9,18 +9,34 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT()).library.upload };
 }
 
-export default async function UploadPage() {
-  await requireCoachOrAdmin();
+function uploadReturnTo(value: string | string[] | undefined, role: string) {
+  const requested = Array.isArray(value) ? value[0] : value;
+  if (role === "coach" && requested === "/library/daily-content")
+    return "/library/daily-content";
+  if (role === "admin" && requested === "/admin/daily-content")
+    return "/admin/daily-content";
+  return "/library";
+}
+
+export default async function UploadPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string | string[] }>;
+}) {
+  const { profile } = await requireCoachOrAdmin();
+  const returnTo = uploadReturnTo((await searchParams).returnTo, profile.role);
+  const isDailyContentUpload = returnTo !== "/library";
   const t = (await getT()).library;
 
   return (
     <div className="space-y-6">
-      <Link href="/library" className="text-link text-sm">
-        {t.back}
+      <Link href={returnTo} className="text-link text-sm">
+        {isDailyContentUpload ? t.dailyContent.open : t.back}
       </Link>
       <h1 className="text-5xl">{t.upload}</h1>
+      {isDailyContentUpload && <p className="max-w-xl text-sm text-muted">{t.dailyContentUploadPrivacy}</p>}
       {isStreamConfigured() ? (
-        <UploadForm />
+        <UploadForm returnTo={returnTo} dailyContentUpload={isDailyContentUpload} />
       ) : (
         <p
           role="status"

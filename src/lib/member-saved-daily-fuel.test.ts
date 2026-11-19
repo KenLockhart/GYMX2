@@ -35,13 +35,19 @@ const futureVideoId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 type Result = { data: unknown; error?: unknown };
 
-function resultClient(results: Record<string, Result>) {
+function resultClient(results: Record<string, Result | Result[]>) {
   const operations: Record<string, unknown[][]> = {};
+  const reads: Record<string, number> = {};
   return {
     operations,
     from(table: string) {
       operations[table] ??= [];
-      const result = results[table] ?? { data: [] };
+      const configured = results[table] ?? { data: [] };
+      const readIndex = reads[table] ?? 0;
+      reads[table] = readIndex + 1;
+      const result = Array.isArray(configured)
+        ? (configured[Math.min(readIndex, configured.length - 1)] ?? { data: [] })
+        : configured;
       const builder: Record<string, unknown> = {};
       for (const method of ["select", "eq", "in", "lte", "order", "limit"]) {
         builder[method] = (...args: unknown[]) => {
@@ -49,7 +55,10 @@ function resultClient(results: Record<string, Result>) {
           return builder;
         };
       }
-      builder.maybeSingle = () => Promise.resolve(result);
+      builder.maybeSingle = () => {
+        operations[table]!.push(["maybeSingle"]);
+        return Promise.resolve(result);
+      };
       builder.then = (
         resolve: (value: Result) => unknown,
         reject?: (reason: unknown) => unknown,
@@ -190,6 +199,96 @@ describe("saved Daily Fuel access", () => {
       id: videoId,
       playerUrl: "short-lived-player-token-url",
       coachName: "Coach Sage",
+    });
+    expect(
+      user.operations.member_daily_fuel_bookmarks.filter(([method]) => method === "maybeSingle"),
+    ).toHaveLength(2);
+    expect(user.operations.member_daily_fuel_assignments.filter(([method]) => method === "lte"))
+      .toHaveLength(2);
+  });
+
+  it("withholds a signed URL when the saved Daily Content grant is revoked during signing", async () => {
+    const user = resultClient({
+      member_daily_fuel_bookmarks: [
+        { data: { video_id: videoId, created_at: "2026-11-10T10:00:00Z" } },
+        { data: { video_id: videoId, created_at: "2026-11-10T10:00:00Z" } },
+      ],
+      member_daily_fuel_assignments: [{ data: null }, { data: null }],
+      member_daily_content_video_grants: [
+        { data: { video_id: videoId, day: "2026-11-18" } },
+        { data: null },
+      ],
+    });
+    const admin = resultClient({ videos: { data: video() } });
+    mockCreateClient.mockResolvedValue(user);
+    mockCreateAdminClient.mockReturnValue(admin);
+
+    await expect(loadSavedMemberDailyFuelPlayback(videoId)).resolves.toEqual({
+      video: null,
+      error: false,
+    });
+    expect(mockGetPlayerUrl).toHaveBeenCalledOnce();
+  });
+
+  it("withholds a signed URL when the own bookmark is removed during signing", async () => {
+    const user = resultClient({
+      member_daily_fuel_bookmarks: [
+        { data: { video_id: videoId, created_at: "2026-11-10T10:00:00Z" } },
+        { data: null },
+      ],
+      member_daily_fuel_assignments: [
+        { data: { video_id: videoId, day: "2026-11-12" } },
+        { data: { video_id: videoId, day: "2026-11-12" } },
+      ],
+    });
+    const admin = resultClient({ videos: { data: video() } });
+    mockCreateClient.mockResolvedValue(user);
+    mockCreateAdminClient.mockReturnValue(admin);
+
+    await expect(loadSavedMemberDailyFuelPlayback(videoId)).resolves.toEqual({
+      video: null,
+      error: false,
+    });
+    expect(mockGetPlayerUrl).toHaveBeenCalledOnce();
+  });
+
+  it("rechecks video readiness and visibility after signing", async () => {
+    const user = resultClient({
+      member_daily_fuel_bookmarks: {
+        data: { video_id: videoId, created_at: "2026-11-10T10:00:00Z" },
+      },
+      member_daily_fuel_assignments: {
+        data: { video_id: videoId, day: "2026-11-12" },
+      },
+    });
+    const admin = resultClient({
+      videos: [{ data: video() }, { data: video({ status: "processing" }) }],
+    });
+    mockCreateClient.mockResolvedValue(user);
+    mockCreateAdminClient.mockReturnValue(admin);
+
+    await expect(loadSavedMemberDailyFuelPlayback(videoId)).resolves.toEqual({
+      video: null,
+      error: false,
+    });
+    expect(mockGetPlayerUrl).toHaveBeenCalledOnce();
+  });
+
+  it("keeps legacy nonfuture assignments sufficient through post-sign revalidation", async () => {
+    const user = resultClient({
+      member_daily_fuel_bookmarks: {
+        data: { video_id: videoId, created_at: "2026-11-10T10:00:00Z" },
+      },
+      member_daily_fuel_assignments: {
+        data: { video_id: videoId, day: "2026-11-12" },
+      },
+    });
+    mockCreateClient.mockResolvedValue(user);
+    mockCreateAdminClient.mockReturnValue(resultClient({ videos: { data: video() } }));
+
+    await expect(loadSavedMemberDailyFuelPlayback(videoId)).resolves.toMatchObject({
+      video: { id: videoId, playerUrl: "short-lived-player-token-url" },
+      error: false,
     });
   });
 

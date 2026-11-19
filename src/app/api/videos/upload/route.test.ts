@@ -30,8 +30,10 @@ function encoded(value: string) {
   return Buffer.from(value).toString("base64");
 }
 
-function uploadRequest() {
-  return new NextRequest("http://localhost/api/videos/upload", {
+function uploadRequest(returnTo?: string, visibility = "private") {
+  const url = new URL("http://localhost/api/videos/upload");
+  if (returnTo !== undefined) url.searchParams.set("returnTo", returnTo);
+  return new NextRequest(url, {
     method: "POST",
     headers: {
       "Upload-Length": "1024",
@@ -39,7 +41,7 @@ function uploadRequest() {
         `title ${encoded("Intro")}`,
         `description ${encoded("Program introduction")}`,
         `category ${encoded("Technique")}`,
-        `visibility ${encoded("private")}`,
+        `visibility ${encoded(visibility)}`,
       ].join(","),
     },
   });
@@ -83,5 +85,45 @@ describe("video upload authorization", () => {
     expect(response.status).toBe(403);
     expect(mocks.createUpload).not.toHaveBeenCalled();
     expect(mocks.insertVideo).not.toHaveBeenCalled();
+  });
+
+  it("forces Daily Content uploads from a coach to stay private", async () => {
+    mocks.getCurrentAccount.mockResolvedValue({
+      profile: { id: "coach-id", role: "coach" },
+    });
+
+    const response = await POST(uploadRequest("/library/daily-content"));
+
+    expect(response.status).toBe(201);
+    expect(mocks.insertVideo).toHaveBeenCalledWith(
+      expect.objectContaining({ coach_id: "coach-id", visibility: "private" }),
+    );
+  });
+
+  it("forces the admin Daily Content fallback upload to stay private", async () => {
+    mocks.getCurrentAccount.mockResolvedValue({
+      profile: { id: "admin-id", role: "admin" },
+    });
+
+    const response = await POST(uploadRequest("/admin/daily-content"));
+
+    expect(response.status).toBe(201);
+    expect(mocks.insertVideo).toHaveBeenCalledWith(
+      expect.objectContaining({ coach_id: "admin-id", visibility: "private" }),
+    );
+  });
+
+  it("ignores a tampered or role-mismatched return target", async () => {
+    mocks.getCurrentAccount.mockResolvedValue({
+      profile: { id: "coach-id", role: "coach" },
+    });
+
+    const response = await POST(uploadRequest("https://attacker.example/", "members"));
+
+    expect(response.status).toBe(201);
+    expect(response.headers.get("Location")).toBe("https://upload.example.test/tus/one-time");
+    expect(mocks.insertVideo).toHaveBeenCalledWith(
+      expect.objectContaining({ coach_id: "coach-id", visibility: "members" }),
+    );
   });
 });

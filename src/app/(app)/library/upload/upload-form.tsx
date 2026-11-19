@@ -11,7 +11,13 @@ import { videoSchema } from "@/lib/validation";
 // Cloudflare needs chunks in multiples of 256 KiB, and recommends about 50 MB.
 const CHUNK_BYTES = 50 * 1024 * 1024;
 
-export function UploadForm() {
+export function UploadForm({
+  returnTo = "/library",
+  dailyContentUpload = false,
+}: {
+  returnTo?: string;
+  dailyContentUpload?: boolean;
+}) {
   const t = useT().library;
   const locale = useLocale();
   const router = useRouter();
@@ -39,7 +45,9 @@ export function UploadForm() {
 
     const { Upload } = await import("tus-js-client");
     new Upload(file, {
-      endpoint: "/api/videos/upload",
+      endpoint: dailyContentUpload
+        ? `/api/videos/upload?returnTo=${encodeURIComponent(returnTo)}`
+        : "/api/videos/upload",
       chunkSize: CHUNK_BYTES,
       retryDelays: [0, 3000, 5000, 10000, 20000],
       metadata: {
@@ -55,7 +63,7 @@ export function UploadForm() {
         setError(t.uploadStopped);
       },
       onSuccess: () => {
-        router.push("/library");
+        router.push(returnTo);
         router.refresh();
       },
     }).start();
@@ -96,18 +104,22 @@ export function UploadForm() {
             ))}
           </select>
         </label>
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">{t.whoCanWatch}</span>
-          <select
-            name="visibility"
-            defaultValue="members"
-            disabled={uploading}
-            className="field-input"
-          >
-            <option value="members">{t.membersWhoJoinMe}</option>
-            <option value="private">{t.onlyMe}</option>
-          </select>
-        </label>
+        {dailyContentUpload ? (
+          <input type="hidden" name="visibility" value="private" />
+        ) : (
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">{t.whoCanWatch}</span>
+            <select
+              name="visibility"
+              defaultValue="members"
+              disabled={uploading}
+              className="field-input"
+            >
+              <option value="members">{t.membersWhoJoinMe}</option>
+              <option value="private">{t.onlyMe}</option>
+            </select>
+          </label>
+        )}
       </div>
       <Field
         label={t.file}

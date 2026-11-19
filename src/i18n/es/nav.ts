@@ -6,6 +6,8 @@ export const nav: Messages["nav"] = {
     "/tasks": "Tareas",
     "/calendar": "Calendario",
     "/library": "Biblioteca",
+    "/library/daily-content": "Contenido diario",
+    "/admin/daily-content": "Contenido diario",
     "/community": "Comunidad",
     "/programs": "Programas",
     "/members": "Miembros",
