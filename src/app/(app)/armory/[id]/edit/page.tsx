@@ -72,6 +72,12 @@ export default async function EditArmoryItemPage({
           made_to_order: data.made_to_order,
           delivery_min_weeks: data.delivery_min_weeks,
           delivery_max_weeks: data.delivery_max_weeks,
+          printful_sku: data.printful_sku,
+          printful_sync_variant_id:
+            data.printful_sync_variant_id === null
+              ? null
+              : String(data.printful_sync_variant_id),
+          printful_variant_mappings: data.printful_variant_mappings ?? [],
         }}
       />
     </div>

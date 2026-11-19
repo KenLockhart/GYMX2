@@ -8,6 +8,7 @@ import {
   releasePlatformCheckout,
   syncPlatformSubscriptionById,
 } from "@/lib/platform-membership-server";
+import { updateArmoryCheckoutStatus } from "@/lib/armory-purchases";
 
 // Stripe calls this after a payment. The signature check proves the message really came from Stripe.
 export async function POST(request: NextRequest) {
@@ -30,7 +31,9 @@ export async function POST(request: NextRequest) {
       event.type === "customer.subscription.deleted"
     ) {
       const subscription = event.data.object;
-      if (subscription.metadata?.kind === "platform_membership") {
+      if (subscription.metadata?.kind === "armory_purchase") {
+        return NextResponse.json({ received: true });
+      } else if (subscription.metadata?.kind === "platform_membership") {
         // Retrieve Stripe's current subscription state instead of trusting a delayed snapshot.
         // The database revision CAS prevents an earlier in-flight read from overwriting it;
         // event.created is retained only as audit data because delivery order is not guaranteed.
@@ -46,7 +49,10 @@ export async function POST(request: NextRequest) {
     if (event.type === "invoice.paid") {
       const subscriptionMetadata =
         event.data.object.parent?.subscription_details?.metadata;
-      if (subscriptionMetadata?.kind === "platform_membership") {
+      if (
+        subscriptionMetadata?.kind === "platform_membership" ||
+        subscriptionMetadata?.kind === "armory_purchase"
+      ) {
         // Platform invoices are not coach purchases and never include Connect commissions.
         return NextResponse.json({ received: true });
       }
@@ -56,7 +62,13 @@ export async function POST(request: NextRequest) {
     if (event.type === "checkout.session.completed" && event.data.object.mode === "subscription") {
       const session = event.data.object;
       const subscription = session.subscription;
-      if (session.metadata?.kind === "platform_membership") {
+      if (
+        session.metadata?.kind === "platform_membership" ||
+        session.metadata?.kind === "armory_purchase"
+      ) {
+        if (session.metadata?.kind === "armory_purchase") {
+          return NextResponse.json({ received: true });
+        }
         if (
           session.metadata.member_id &&
           session.metadata.checkout_request_id &&
@@ -82,6 +94,18 @@ export async function POST(request: NextRequest) {
       event.data.object.metadata?.kind === "platform_membership"
     ) {
       await releasePlatformCheckout(event.data.object.id);
+      return NextResponse.json({ received: true });
+    }
+    if (
+      (event.type === "checkout.session.expired" ||
+        event.type === "checkout.session.async_payment_failed") &&
+      event.data.object.metadata?.kind === "armory_purchase"
+    ) {
+      const updated = await updateArmoryCheckoutStatus(
+        event.data.object.id,
+        event.type === "checkout.session.expired" ? "expired" : "failed",
+      );
+      if (!updated) return new NextResponse("Could not update checkout intent", { status: 500 });
       return NextResponse.json({ received: true });
     }
   } catch (error) {

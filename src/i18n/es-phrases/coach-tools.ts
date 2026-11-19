@@ -198,6 +198,18 @@ export const coachTools: Record<string, string> = {
   "Before members can buy this, connect where your money goes.":
     "Antes de que los miembros puedan comprarlo, conecta a dónde va tu dinero.",
   "Show to everyone on GYMX2": "Mostrar a todos en GYMX2",
+  "Printful reference": "Referencia de Printful",
+  "Printful SKU (optional)": "SKU de Printful (opcional)",
+  "Printful Sync Variant ID (optional)": "ID de variante sincronizada de Printful (opcional)",
+  "Map each listed size to its exact Printful variant. Leave every field blank for manual fulfillment.":
+    "Asigna cada talla a su variante exacta de Printful. Deja todos los campos en blanco para el envío manual.",
+  "SKU for {option}": "SKU para {option}",
+  "Sync Variant ID for {option} (optional)": "ID de variante sincronizada para {option} (opcional)",
+  "Manual reference only. GYMX2 does not sync products or automatically fulfill orders.":
+    "Solo como referencia manual. GYMX2 no sincroniza productos ni prepara pedidos automáticamente.",
+  "Email for your receipt and download link": "Correo para tu recibo y enlace de descarga",
+  "Secure card checkout by Stripe. You can check out without creating an account.":
+    "Pago seguro con tarjeta mediante Stripe. Puedes comprar sin crear una cuenta.",
   "Off: only members who joined you see it. On: anyone signed in can find it in the Armory.":
     "Apagado: solo lo ven los miembros que se unieron a ti. Encendido: cualquier persona con sesión iniciada puede encontrarlo en la Armory.",
   "An ebook or program members pay for and download. Sales go to GYMX2.":
@@ -429,4 +441,47 @@ export const coachTools: Record<string, string> = {
     "p. ej. Le pedí al coach quitar la afirmación; revisé sus credenciales.",
   time: "horario",
   times: "horarios",
+  "Armory download": "Descarga de la Armería",
+  "Checking your order securely…": "Verificando tu pedido de forma segura…",
+  "This download link is invalid, expired, or the order was refunded.":
+    "Este enlace de descarga no es válido, venció o se reembolsó el pedido.",
+  "Browse the Armory": "Explorar la Armería",
+  "Back to the Armory": "Volver a la Armería",
+  "Your order for {item} (size {size}) is confirmed.":
+    "Tu pedido de {item} (talla {size}) está confirmado.",
+  "Your order for {item} is confirmed.": "Tu pedido de {item} está confirmado.",
+  "Total charged: {amount}.": "Total cobrado: {amount}.",
+  "This secure download link expires in 7 days.":
+    "Este enlace seguro de descarga vence en 7 días.",
+  "We’ll email you when your order ships.":
+    "Te enviaremos un correo cuando se envíe tu pedido.",
+  "Armory order confirmed: {p0}": "Pedido de la Armería confirmado: {p0}",
+  "Your Armory order is confirmed": "Tu pedido de la Armería está confirmado",
+  "Download your file": "Descargar tu archivo",
+  "Thanks for your order": "Gracias por tu pedido",
+  "Your payment is being confirmed. Your completed order will appear in My purchases.":
+    "Estamos confirmando tu pago. Tu pedido completado aparecerá en Mis compras.",
+  "If your payment completed, we'll email your receipt and any download link to the address used at checkout.":
+    "Si se completó el pago, enviaremos por correo tu recibo y cualquier enlace de descarga a la dirección usada al pagar.",
+  "Shop ebooks, gear, accessories and programs. Regular items are available without a paid membership.":
+    "Compra libros electrónicos, equipo, accesorios y programas. Los artículos regulares están disponibles sin una membresía paga.",
+  "Nothing here yet. Check back soon.": "Aún no hay artículos. Vuelve pronto.",
+  "{p0} shipping": "{p0} de envío",
+  "Premium membership is required to buy this item.":
+    "Se requiere una membresía Premium para comprar este artículo.",
+  "You'll enter your US shipping address at checkout.":
+    "Ingresarás tu dirección de envío en EE. UU. al pagar.",
+  order: "pedido",
+  orders: "pedidos",
+  sale: "venta",
+  sales: "ventas",
+  "Remove {title} from the Armory?": "¿Quitar {title} de la Armería?",
+  "Color options need separate listings.":
+    "Las opciones de color deben publicarse en anuncios separados.",
+  "Printful references are available for Gear and Accessories listings.":
+    "Las referencias de Printful están disponibles para artículos de Equipo y Accesorios.",
+  Dashboard: "Panel",
+  "Log in": "Iniciar sesión",
+  "Create account": "Crear cuenta",
+  "A guest buyer": "Una persona invitada",
 };

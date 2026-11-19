@@ -23,6 +23,8 @@ type Sale = {
   created_at: string;
   seller_id: string | null;
   size: string | null;
+  printful_sku: string | null;
+  printful_sync_variant_id: string | null;
   shipping_name: string | null;
   shipping_address: ShippingAddress | null;
   fulfillment_status: string;
@@ -52,7 +54,7 @@ export default async function SalesPage() {
   const { data, error } = await supabase
     .from("purchases")
     .select(
-      "id, item_id, item_title, amount_cents, fee_cents, created_at, seller_id, size, shipping_name, shipping_address, fulfillment_status, tracking_number, refunded_at, kind, buyer:profiles!member_id(display_name), seller:profiles!seller_id(display_name)",
+      "id, item_id, item_title, amount_cents, fee_cents, created_at, seller_id, size, printful_sku, printful_sync_variant_id, shipping_name, shipping_address, fulfillment_status, tracking_number, refunded_at, kind, buyer:profiles!member_id(display_name), seller:profiles!seller_id(display_name)",
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -135,6 +137,15 @@ export default async function SalesPage() {
                       </span>
                     )}
                   </p>
+                  {(order.printful_sku || order.printful_sync_variant_id) && (
+                    <p className="mt-2 text-xs text-muted">
+                      Manual Printful reference
+                      {order.printful_sku && <> · SKU: {order.printful_sku}</>}
+                      {order.printful_sync_variant_id && (
+                        <> · Sync Variant ID: {order.printful_sync_variant_id}</>
+                      )}
+                    </p>
+                  )}
                   <p className="text-xs text-muted">
                     Ordered {formatDay(order.created_at)} by{" "}
                     {order.buyer?.display_name ?? "a member"}

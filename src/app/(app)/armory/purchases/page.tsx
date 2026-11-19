@@ -9,6 +9,7 @@ import {
   openBillingPortal,
   resumeMembership,
 } from "../../plans/actions";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { T } from "@/i18n/t";
 import { getTr } from "@/i18n/server";
@@ -30,6 +31,7 @@ type Purchase = {
   tracking_number: string | null;
   refunded_at: string | null;
   kind: string;
+  checkout_intent_id: string | null;
   item: { kind: string } | null;
 };
 
@@ -51,12 +53,40 @@ export default async function MyPurchasesPage() {
   const { data, error } = await supabase
     .from("purchases")
     .select(
-      "id, item_id, item_title, amount_cents, created_at, size, fulfillment_status, tracking_number, refunded_at, kind, item:armory_items(kind)",
+      "id, item_id, checkout_intent_id, item_title, amount_cents, created_at, size, fulfillment_status, tracking_number, refunded_at, kind, item:armory_items(kind)",
     )
     .eq("member_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(500);
   const purchases = (data ?? []) as unknown as Purchase[];
+  const intentIds = purchases
+    .map((purchase) => purchase.checkout_intent_id)
+    .filter((id): id is string => Boolean(id));
+  const downloadableIntentItemIds = new Map<string, string>();
+  if (intentIds.length > 0) {
+    const { data: intentRows } = await createAdminClient()
+      .from("armory_checkout_intents")
+      .select("id, item_id, member_id, buyer_was_guest, status, item_kind")
+      .in("id", intentIds);
+    const purchaseByIntent = new Map(
+      purchases
+        .filter((purchase) => purchase.checkout_intent_id)
+        .map((purchase) => [purchase.checkout_intent_id!, purchase]),
+    );
+    for (const intent of intentRows ?? []) {
+      const purchase = purchaseByIntent.get(intent.id as string);
+      if (
+        purchase &&
+        (purchase.item_id === null || purchase.item_id === intent.item_id) &&
+        intent.member_id === profile.id &&
+        !intent.buyer_was_guest &&
+        intent.status === "paid" &&
+        intent.item_kind === "paid"
+      ) {
+        downloadableIntentItemIds.set(intent.id as string, intent.item_id as string);
+      }
+    }
+  }
   const { data: membershipData } = await supabase
     .from("subscriptions")
     .select(
@@ -200,11 +230,17 @@ export default async function MyPurchasesPage() {
         <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
           {purchases.map((purchase) => {
             const digital = purchase.fulfillment_status === "not_needed";
+            const downloadItemId = purchase.checkout_intent_id
+              ? downloadableIntentItemIds.get(purchase.checkout_intent_id) ?? null
+              : purchase.item_id;
+            const isPaidDownload = purchase.checkout_intent_id
+              ? downloadItemId !== null
+              : purchase.item?.kind === "paid";
             const canDownload =
               digital &&
               !purchase.refunded_at &&
-              purchase.item?.kind === "paid" &&
-              purchase.item_id;
+              isPaidDownload &&
+              downloadItemId;
             return (
               <li
                 key={purchase.id}
@@ -235,7 +271,7 @@ export default async function MyPurchasesPage() {
                 </div>
                 {canDownload && (
                   <a
-                    href={`/armory/${purchase.item_id}/download`}
+                    href={`/armory/${downloadItemId}/download`}
                     className="btn-secondary px-3 py-2 text-sm"
                   >
                     <T>Download</T>

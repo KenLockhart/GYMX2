@@ -6,6 +6,7 @@ import {
   affiliatePayoutEmail,
   checkinReminderEmail,
   communityEmail,
+  guestArmoryOrderEmail,
   flaggedMessageEmail,
   introEmail,
   liveNowEmail,
@@ -115,6 +116,22 @@ export const EMAIL_CATALOG: CatalogEntry[] = [
         sellerName: "Coach Ken",
         size: "L",
         tracking: "1Z999AA10123456784",
+      }),
+  },
+  {
+    key: "armory.guest.receipt",
+    name: "Guest Armory order confirmation",
+    group: "Orders",
+    to: "Guest buyer",
+    when: "A guest buys an Armory item",
+    optional: false,
+    sample: (siteUrl) =>
+      guestArmoryOrderEmail({
+        siteUrl,
+        itemTitle: "GYMX2 Training Guide",
+        amountCents: 1299,
+        size: null,
+        downloadUrl: `${siteUrl}/armory/claim#token=sample`,
       }),
   },
   {
