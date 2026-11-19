@@ -8,6 +8,7 @@ export const nav: Messages["nav"] = {
     "/library": "Biblioteca",
     "/library/daily-content": "Contenido diario",
     "/admin/daily-content": "Contenido diario",
+    "/admin/monetization/feature-pricing": "Precios de Form Coach",
     "/community": "Comunidad",
     "/programs": "Programas",
     "/members": "Miembros",
