@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { FeaturedCoachMetrics } from "@/lib/featured-coach";
 
 const styles = {
   backLink: "backLink",
@@ -27,6 +28,12 @@ const styles = {
   featuredContent: "featuredContent",
   featuredEyebrow: "featuredEyebrow",
   featuredHeadline: "featuredHeadline",
+  featuredEmpty: "featuredEmpty",
+  featuredEmptyCopy: "featuredEmptyCopy",
+  featuredEmptyTitle: "featuredEmptyTitle",
+  featuredMetric: "featuredMetric",
+  featuredMetricValue: "featuredMetricValue",
+  featuredMetrics: "featuredMetrics",
   featuredScrim: "featuredScrim",
   featuredStatus: "featuredStatus",
   intro: "intro",
@@ -65,6 +72,10 @@ export type CoachGalleryItem = {
   location: string;
   formats: ("online" | "in_person")[];
   completion: number;
+};
+
+export type FeaturedCoachGalleryItem = CoachGalleryItem & {
+  metrics: FeaturedCoachMetrics;
 };
 
 const profileUrl = (id: string) => `/admin/coach-profiles/${id}`;
@@ -258,11 +269,44 @@ function Rail({
   );
 }
 
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 2,
+});
+
+function FeaturedMetrics({ metrics }: { metrics: FeaturedCoachMetrics }) {
+  return (
+    <dl className={styles.featuredMetrics} aria-label="Last 30 days performance">
+      <div className={styles.featuredMetric}>
+        <dt>Sales</dt>
+        <dd className={styles.featuredMetricValue}>
+          {currency.format(metrics.salesCents / 100)}
+        </dd>
+      </div>
+      <div className={styles.featuredMetric}>
+        <dt>New members</dt>
+        <dd className={styles.featuredMetricValue}>{metrics.newMembers}</dd>
+      </div>
+      <div className={styles.featuredMetric}>
+        <dt>Active days</dt>
+        <dd className={styles.featuredMetricValue}>{metrics.activeDays}</dd>
+      </div>
+    </dl>
+  );
+}
+
 export function CoachProfilesGallery({
   coaches = [],
+  featuredCoach = null,
+  eligibleLiveCount = 0,
+  featuredMetricsError = false,
   loadError = false,
 }: {
   coaches?: CoachGalleryItem[];
+  featuredCoach?: FeaturedCoachGalleryItem | null;
+  eligibleLiveCount?: number;
+  featuredMetricsError?: boolean;
   loadError?: boolean;
 }) {
   const review = coaches.filter((coach) => coach.status === "submitted");
@@ -272,7 +316,6 @@ export function CoachProfilesGallery({
   const inProgress = coaches.filter(
     (coach) => coach.status !== "submitted" && !coach.publishedAt,
   );
-  const featured = review[0] ?? live[0] ?? inProgress[0];
   const publishedCount = coaches.filter((coach) => coach.publishedAt).length;
 
   return (
@@ -315,7 +358,7 @@ export function CoachProfilesGallery({
           <h2>Coach profiles are unavailable</h2>
           <p>We couldn’t load the current roster. Refresh the page to try again.</p>
         </div>
-      ) : coaches.length === 0 ? (
+      ) : coaches.length === 0 && eligibleLiveCount === 0 ? (
         <div className={styles.emptyState}>
           <span className={styles.emptyMark} aria-hidden="true">
             G
@@ -325,29 +368,47 @@ export function CoachProfilesGallery({
         </div>
       ) : (
         <>
-          {featured && (
+          {featuredCoach ? (
             <section className={styles.featured} aria-label="Featured coach profile">
-              <CoachPhoto coach={featured} featured />
+              <CoachPhoto coach={featuredCoach} featured />
               <div className={styles.featuredScrim} />
               <div className={styles.featuredContent}>
-                <span
-                  className={`${styles.badge} ${featured.status === "submitted" ? styles.reviewBadge : featured.publishedAt ? styles.liveBadge : ""}`}
-                >
+                <span className={`${styles.badge} ${styles.liveBadge}`}>
                   <span className={styles.badgeDot} />
-                  {badgeText(featured)}
+                  Featured coach
                 </span>
-                <p className={styles.featuredEyebrow}>COACH PROFILE</p>
-                <h2>{featured.name}</h2>
-                {featured.headline && (
-                  <p className={styles.featuredHeadline}>{featured.headline}</p>
+                <p className={styles.featuredEyebrow}>LAST 30 DAYS</p>
+                <h2>{featuredCoach.name}</h2>
+                {featuredCoach.headline && (
+                  <p className={styles.featuredHeadline}>{featuredCoach.headline}</p>
                 )}
-                <p className={styles.featuredStatus}>{statusText(featured)}</p>
-                <Completion percent={featured.completion} />
-                <Link href={profileUrl(featured.id)} className={styles.featuredAction}>
-                  {featured.status === "submitted" ? "Review profile" : "View profile"}
+                <p className={styles.featuredStatus}>
+                  Balanced across sales, new members, and coaching activity.
+                </p>
+                <FeaturedMetrics metrics={featuredCoach.metrics} />
+                <Link href={profileUrl(featuredCoach.id)} className={styles.featuredAction}>
+                  View published profile
                   <span aria-hidden="true">→</span>
                 </Link>
               </div>
+            </section>
+          ) : (
+            <section
+              className={styles.featuredEmpty}
+              aria-label="Featured coach"
+              role={featuredMetricsError ? "status" : undefined}
+            >
+              <p className={styles.featuredEyebrow}>LAST 30 DAYS</p>
+              <h2 className={styles.featuredEmptyTitle}>
+                {featuredMetricsError ? "Performance data unavailable" : "No featured coach yet"}
+              </h2>
+              <p className={styles.featuredEmptyCopy}>
+                {featuredMetricsError
+                  ? "Recent performance could not be loaded. The coach roster and review queue are still available below."
+                  : eligibleLiveCount > 0
+                  ? "No live coach has recorded sales, new member links, or coaching activity in the last 30 days."
+                  : "A coach will appear here after a profile is published and records recent performance."}
+              </p>
             </section>
           )}
 
