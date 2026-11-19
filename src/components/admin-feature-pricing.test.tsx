@@ -9,6 +9,7 @@ vi.mock("@/app/(app)/admin/monetization/feature-pricing/actions", () => ({
   revokeFeatureComp: vi.fn(),
   searchFeatureCompRecipients: vi.fn(),
   saveFeaturePricingRevision: vi.fn(),
+  syncFeaturePricingRequest: vi.fn(),
 }));
 
 import { AdminFeaturePricing, centsToUsdInput, discardAdminPricingRetry, generatedPriceKey, isoToUtcLocalInput, pricingOperationStorageKey, readAdminPendingOperations, usdInputToCents, utcLocalInputToIso } from "./admin-feature-pricing";
@@ -77,6 +78,31 @@ describe("admin Form Coach pricing form", () => {
     expect(markup).toContain("Amount (USD)");
     expect(markup).toContain('value="12.00"');
     expect(markup).toContain("Credits per pack");
+  });
+
+  it("offers resume only for an unpublished saved sync request without exposing provider IDs", () => {
+    const liveDashboard: PricingAdminDashboard = {
+      ...dashboard,
+      syncRequests: [{
+        requestId: "2e03ea57-5212-4f2e-8a48-e421d2c959c3",
+        expectedRevision: 3,
+        publishedRevision: null,
+        state: "unknown",
+        updatedAt: "2026-11-19T12:00:00Z",
+        objects: [{ kind: "product", priceKey: null, state: "unknown" }],
+      }],
+    };
+    const markup = renderToStaticMarkup(createElement(AdminFeaturePricing, {
+      dashboard: liveDashboard,
+      adminId: "admin-1",
+      initialRequestId: "2e03ea57-5212-4f2e-8a48-e421d2c959c3",
+      initialCompRequestId: "3e03ea57-5212-4f2e-8a48-e421d2c959c3",
+    }));
+    expect(markup).toContain("Resume sync and publish");
+    expect(markup).toContain('name="request_id" value="2e03ea57-5212-4f2e-8a48-e421d2c959c3"');
+    expect(markup).toContain('name="expected_revision" value="3"');
+    expect(markup).not.toContain("stripe_price_id");
+    expect(markup).not.toContain("prod_");
   });
 
   it("shows unsupported existing currency as read only without treating its minor units as USD", () => {

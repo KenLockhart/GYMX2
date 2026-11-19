@@ -7,6 +7,7 @@ import {
   revokeFeatureComp,
   searchFeatureCompRecipients,
   saveFeaturePricingRevision,
+  syncFeaturePricingRequest,
   type FeaturePricingActionState,
   type FeaturePricingRecipient,
 } from "@/app/(app)/admin/monetization/feature-pricing/actions";
@@ -210,6 +211,26 @@ function ActionFeedback({ state, copy }: { state: FeaturePricingActionState; cop
     <p role={failed ? "alert" : "status"} className={`text-sm ${failed ? "text-danger" : "text-success"}`}>
       {text}
     </p>
+  );
+}
+
+function SyncPricingRequestForm({
+  request,
+  copy,
+}: {
+  request: PricingAdminDashboard["syncRequests"][number];
+  copy: Copy;
+}) {
+  const [state, formAction, pending] = useActionState(syncFeaturePricingRequest, {});
+  return (
+    <form action={formAction} className="mt-3 flex flex-wrap items-center gap-3">
+      <input type="hidden" name="request_id" value={request.requestId} />
+      <input type="hidden" name="expected_revision" value={request.expectedRevision} />
+      <button className="btn-secondary min-h-10" type="submit" disabled={pending}>
+        {pending ? copy.syncRunning : copy.syncResume}
+      </button>
+      <ActionFeedback state={state} copy={copy} />
+    </form>
   );
 }
 
@@ -612,7 +633,10 @@ export function AdminFeaturePricing({
         <p className="mt-1 text-sm text-muted">{copy.syncStepNote}</p>
         {dashboard.syncRequests.length === 0 ? <p className="mt-3 text-sm text-muted">{copy.syncEmpty}</p> : (
           <ul className="mt-3 space-y-2 text-sm">
-            {dashboard.syncRequests.map((request, index) => <li key={`${request.expectedRevision}-${request.updatedAt}-${index}`} className="rounded-lg bg-surface-raised p-3">{copy.currentRevision(request.expectedRevision)} · {copy.workflowStates[request.state as keyof typeof copy.workflowStates] ?? request.state} · {request.publishedRevision ? copy.currentRevision(request.publishedRevision) : "—"} · {request.objects.map((object) => `${object.kind === "product" ? copy.syncProduct : copy.syncPrice}: ${copy.workflowStates[object.state as keyof typeof copy.workflowStates] ?? object.state}`).join("; ") || "—"}</li>)}
+          {dashboard.syncRequests.map((request, index) => <li key={request.requestId || `${request.expectedRevision}-${request.updatedAt}-${index}`} className="rounded-lg bg-surface-raised p-3">
+            {copy.currentRevision(request.expectedRevision)} · {copy.workflowStates[request.state as keyof typeof copy.workflowStates] ?? request.state} · {request.publishedRevision ? copy.currentRevision(request.publishedRevision) : "—"} · {request.objects.map((object) => `${object.kind === "product" ? copy.syncProduct : copy.syncPrice}: ${copy.workflowStates[object.state as keyof typeof copy.workflowStates] ?? object.state}`).join("; ") || "—"}
+            {request.requestId && ["reserved", "unknown", "verified"].includes(request.state) && <SyncPricingRequestForm request={request} copy={copy} />}
+          </li>)}
           </ul>
         )}
       </section>

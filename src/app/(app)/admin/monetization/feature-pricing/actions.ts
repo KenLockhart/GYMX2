@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { syncCurrentAdminPricingRequest } from "@/lib/form-coach/pricing-sync-server";
 import {
   matchesPricingRequest,
   loadAllAdminUsers,
@@ -20,7 +21,7 @@ const UuidSchema = z.string().uuid();
 const RevisionSchema = z.number().int().positive().safe();
 
 export type FeaturePricingActionState = {
-  status?: "saved" | "reserved" | "already_applied" | "granted" | "revoked" | "searched" | "error";
+  status?: "saved" | "reserved" | "already_applied" | "granted" | "revoked" | "searched" | "sync_pending" | "error";
   errorCode?: string;
   recipients?: FeaturePricingRecipient[];
 };
@@ -209,6 +210,57 @@ export async function saveFeaturePricingRevision(
   }
   const result = await publishExistingRequest(requestId.data, expectedRevision.data, candidate);
   return result;
+}
+
+/** Resume only the caller's persisted live pricing request, then publish through the authenticated admin CAS. */
+export async function syncFeaturePricingRequest(
+  _previous: FeaturePricingActionState,
+  formData: FormData,
+): Promise<FeaturePricingActionState> {
+  await requireAdmin();
+  const requestId = UuidSchema.safeParse(formString(formData, "request_id"));
+  const expectedRevision = RevisionSchema.safeParse(Number(formString(formData, "expected_revision")));
+  if (!requestId.success || !expectedRevision.success) return error("invalid_input");
+
+  let result: Awaited<ReturnType<typeof syncCurrentAdminPricingRequest>>;
+  try {
+    result = await syncCurrentAdminPricingRequest({
+      requestId: requestId.data,
+      expectedRevision: expectedRevision.data,
+    });
+  } catch {
+    return error("sync_pending");
+  }
+
+  if (result.status === "already_applied") return { status: "already_applied" };
+  if (result.status === "fenced_failed" || result.status === "failed") return error("sync_failed_fenced");
+  if (result.status === "published_mismatch") return error("sync_published_mismatch");
+  if (result.status === "fence_pending") return error("sync_fence_pending");
+  if (result.status === "stale") return error("stale");
+  if (result.status === "missing" || result.status === "identity_mismatch") return error("sync_request_unavailable");
+  if (result.status !== "ready_to_publish") return { status: "sync_pending" };
+
+  const session = await createClient();
+  const { data, error: publishError } = await session.rpc("admin_publish_feature_pricing_sync", {
+    p_request_id: requestId.data,
+    p_expected_revision: expectedRevision.data,
+  });
+  if (publishError) return error(pricingAdminErrorCode(publishError) === "23505" ? "stale" : "sync_publish_failed");
+  const publish = firstRpcRow(data);
+  if (publish?.outcome === "applied") {
+    revalidatePath(PAGE_PATH);
+    return { status: "saved" };
+  }
+  if (publish?.outcome === "already_applied") {
+    revalidatePath(PAGE_PATH);
+    return { status: "already_applied" };
+  }
+  if (publish?.outcome === "cas_stale") return error("stale");
+  if (publish?.outcome === "failed") return error("sync_failed_fenced");
+  if (publish?.outcome === "objects_unverified" || publish?.outcome === "verified" || publish?.outcome === "reserved" || publish?.outcome === "unknown") {
+    return { status: "sync_pending" };
+  }
+  return error("sync_publish_failed");
 }
 
 const CompGrantFormSchema = z.object({

@@ -169,6 +169,7 @@ export type PricingAdminDashboard = {
   revisions: PricingRevisionSummary[];
   changes: Array<{ revision: number; previousRevision: number | null; changedAt: string }>;
   syncRequests: Array<{
+    requestId: string;
     expectedRevision: number;
     publishedRevision: number | null;
     state: string;
@@ -331,6 +332,7 @@ export function toPricingAdminDashboard(input: {
     objectsByRequest.set(requestId, list);
   }
   const syncRequests = rows(input.syncRequests).map((row) => ({
+    requestId: text(row.request_id),
     expectedRevision: numberOrNull(row.expected_revision) ?? 0,
     publishedRevision: numberOrNull(row.published_revision),
     state: text(row.state),

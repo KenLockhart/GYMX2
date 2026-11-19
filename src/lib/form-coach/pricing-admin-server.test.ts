@@ -89,11 +89,12 @@ describe("admin pricing DTO projection", () => {
     });
 
     expect(dashboard.current?.priceOptions[0]).toEqual({ priceKey: "pack_3", amountCents: 1500, currency: "USD", interval: null, creditsPerPack: 3 });
+    expect(dashboard.syncRequests[0]).toMatchObject({ requestId: "sync-private-id", expectedRevision: 1, state: "cas_applied" });
     expect(dashboard.comps).toHaveLength(1);
     expect(dashboard.comps[0]).toMatchObject({ id: "grant-form", recipientName: "Rae Coach", recipientEmail: "rae@example.test", grantedByName: "Site Admin", revoked: true, revokedAt: "2026-11-20T00:00:00Z", revokedByName: "Site Admin" });
     expect(dashboard.moveStateCounts).toEqual({ reserved: 1 });
     const serialized = JSON.stringify(dashboard);
-    for (const forbidden of ["prod_secret", "price_secret", "digest_secret", "payload_secret", "price_private", "not-allowed", "sync-private-id", "move-private-id", "sub_private", "user-1", "admin-1"]) {
+    for (const forbidden of ["prod_secret", "price_secret", "digest_secret", "payload_secret", "price_private", "not-allowed", "move-private-id", "sub_private", "user-1", "admin-1"]) {
       expect(serialized).not.toContain(forbidden);
     }
   });

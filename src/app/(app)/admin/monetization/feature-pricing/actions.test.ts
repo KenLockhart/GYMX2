@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   adminDb: { from: vi.fn() },
   rpc: vi.fn(),
+  syncPricing: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -14,8 +15,9 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ requireAdmin: mocks.requireAdmin }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
+vi.mock("@/lib/form-coach/pricing-sync-server", () => ({ syncCurrentAdminPricingRequest: mocks.syncPricing }));
 
-import { grantFeatureComp, revokeFeatureComp, saveFeaturePricingRevision, searchFeatureCompRecipients } from "./actions";
+import { grantFeatureComp, revokeFeatureComp, saveFeaturePricingRevision, searchFeatureCompRecipients, syncFeaturePricingRequest } from "./actions";
 
 const uuid = "2e03ea57-5212-4f2e-8a48-e421d2c959c3";
 const adminId = "1f03ea57-5212-4f2e-8a48-e421d2c959c3";
@@ -38,6 +40,13 @@ function pricingForm(overrides: { requestId?: string; expectedRevision?: number;
   form.set("request_id", overrides.requestId ?? uuid);
   form.set("expected_revision", String(overrides.expectedRevision ?? 1));
   form.set("candidate_json", JSON.stringify(overrides.candidate ?? candidate));
+  return form;
+}
+
+function syncForm(requestId = uuid, expectedRevision = 1) {
+  const form = new FormData();
+  form.set("request_id", requestId);
+  form.set("expected_revision", String(expectedRevision));
   return form;
 }
 
@@ -96,6 +105,35 @@ beforeEach(() => {
 });
 
 describe("Form Coach pricing actions", () => {
+  it("publishes only after the persisted Stripe sync reports every object verified", async () => {
+    mocks.syncPricing.mockResolvedValue({ status: "ready_to_publish" });
+    mocks.rpc.mockResolvedValue({ data: [{ outcome: "applied", published_revision: 2 }], error: null });
+
+    await expect(syncFeaturePricingRequest({}, syncForm())).resolves.toEqual({ status: "saved" });
+    expect(mocks.syncPricing).toHaveBeenCalledWith({ requestId: uuid, expectedRevision: 1 });
+    expect(mocks.rpc).toHaveBeenCalledOnce();
+    expect(mocks.rpc).toHaveBeenCalledWith("admin_publish_feature_pricing_sync", {
+      p_request_id: uuid,
+      p_expected_revision: 1,
+    });
+  });
+
+  it("keeps an unresolved or fenced sync away from the authenticated publish RPC", async () => {
+    mocks.syncPricing.mockResolvedValueOnce({ status: "unresolved" });
+    await expect(syncFeaturePricingRequest({}, syncForm())).resolves.toEqual({ status: "sync_pending" });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+
+    mocks.syncPricing.mockResolvedValueOnce({ status: "fenced_failed" });
+    await expect(syncFeaturePricingRequest({}, syncForm())).resolves.toEqual({ status: "error", errorCode: "sync_failed_fenced" });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid sync references before invoking the server sync adapter", async () => {
+    await expect(syncFeaturePricingRequest({}, syncForm("not-a-uuid"))).resolves.toEqual({ status: "error", errorCode: "invalid_input" });
+    expect(mocks.syncPricing).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
   it("reconciles a lost publish response through the exact existing request", async () => {
     setLookupQueue([savedRequest({ state: "cas_applied", published_revision: 2 })]);
     mocks.rpc.mockResolvedValue({ data: [{ outcome: "already_applied", published_revision: 2 }], error: null });
