@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-19",
+  "sdk": {
+    "package": "@mediapipe/tasks-vision",
+    "version": "1.2.3",
+    "license": "Apache-2.0",
+    "registryTarball": "https://registry.npmjs.org/@mediapipe/tasks-vision/-/tasks-vision-1.2.3.tgz",
+    "integrity": "sha512-sxJyfhbN+EamexhaaCmUlw7v8vWWMum7VDsORe6d4c8Dk/xlI4qiIgoSw9cE9hpvYhVRRVLIA8y605FbqWkNeQ==",
+    "packageFileCount": 12,
+    "packageTotalBytes": 31398574,
+    "dependencies": [],
+    "installScripts": [],
+    "moduleEntry": {
+      "sourcePath": "node_modules/@mediapipe/tasks-vision/vision_bundle.mjs",
+      "sizeBytes": 155990,
+      "sha256": "FB0C02C296F44CE0CC324BA16BD646D8773EB4A7847DB4019CC4D0430DB7A9B5"
+    },
+    "wasmFiles": [
+      {
+        "sourcePath": "node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.js",
+        "filesetMode": "useModule=false (default/classic)",
+        "sizeBytes": 336624,
+        "sha256": "2AA5FD3FDD3D8208CD7587DF0BB19FB6925C4EA16A76DD025AEDC1F64D6A6309"
+      },
+      {
+        "sourcePath": "node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm",
+        "filesetMode": "useModule=false (default/classic)",
+        "sizeBytes": 14665716,
+        "sha256": "225BC06C0F51A9CF31FEA0E9E0B0243E9E01FB5EF332CC1A7FA6656DBDFDAABF"
+      },
+      {
+        "sourcePath": "node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_module_internal.js",
+        "filesetMode": "useModule=true (ES module)",
+        "sizeBytes": 336662,
+        "sha256": "D29996249490361715C769C6A49B43AD47E6AC9A28A8E8BCE8D02B238E897851"
+      },
+      {
+        "sourcePath": "node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_module_internal.wasm",
+        "filesetMode": "useModule=true (ES module)",
+        "sizeBytes": 14665738,
+        "sha256": "A269E84B12AEFC93C9D6A4D62B01F41E5434A9FA941533BB8E75B1E3D1669E46"
+      }
+    ],
+    "staticNetworkAudit": {
+      "endpoint": "https://odml.pa.googleapis.com/v1/log",
+      "method": "POST",
+      "contentType": "application/x-protobuf",
+      "periodicFlushMilliseconds": 60000,
+      "flushOnClose": true,
+      "requestTimeoutMilliseconds": 10000,
+      "credentialsIncluded": false,
+      "apiKeyHeaderName": "x-goog-api-key",
+      "publicOptOutFound": false,
+      "runtimeNetworkTested": false,
+      "wasmBinaryStringScan": {
+        "telemetryLiteralFound": false,
+        "documentationUrlStrings": ["https://www.tensorflow.org/lite/guide/ops_select", "https://github.com/opencv/opencv/issues/16739", "https://www.tensorflow.org/lite/guide/ops_custom"],
+        "scope": "Static byte-string scan only; binaries were not loaded, compiled, or executed."
+      }
+    }
+  },
+  "models": [
+    {
+      "name": "Pose Landmarker Lite",
+      "file": "assets/form-coach/models/pose_landmarker_lite.task",
+      "sourceUrl": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task",
+      "sourceAlias": "latest (official documentation link; no numeric release version exposed)",
+      "sourceObjectGeneration": "1682624738331272",
+      "sourceLastModified": "Thu, 27 Apr 2023 19:45:38 GMT",
+      "sourceETagMd5": "04a75ddf7c811ac7a1a4523266dd7d88",
+      "downloadedAt": "2026-11-19",
+      "sizeBytes": 5777746,
+      "sha256": "59929E1D1EE95287735DDD833B19CF4AC46D29BC7AFDDBBF6753C459690D574A",
+      "license": "Apache-2.0",
+      "licenseSource": "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20BlazePose%20GHUM%203D.pdf"
+    },
+    {
+      "name": "Pose Landmarker Full",
+      "file": "assets/form-coach/models/pose_landmarker_full.task",
+      "sourceUrl": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task",
+      "sourceAlias": "latest (official documentation link; no numeric release version exposed)",
+      "sourceObjectGeneration": "1682642787774579",
+      "sourceLastModified": "Fri, 28 Apr 2023 00:46:27 GMT",
+      "sourceETagMd5": "5a9ad88919b2231d02b1fdf4a54090ec",
+      "downloadedAt": "2026-11-19",
+      "sizeBytes": 9398198,
+      "sha256": "4EAA5EB7A98365221087693FCC286334CF0858E2EB6E15B506AA4A7ECDCEC4AD",
+      "license": "Apache-2.0",
+      "licenseSource": "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20BlazePose%20GHUM%203D.pdf"
+    }
+  ]
+}
