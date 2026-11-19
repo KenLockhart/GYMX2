@@ -21,4 +21,12 @@ export const common = {
     label: "Language",
     switchTo: "Language",
   },
+  fullscreen: {
+    expand: "Expand",
+    exit: "Exit",
+    escapeHint: "Press Esc to exit",
+    liveRoom: "Live session",
+    yourVideo: "Your video",
+    coachVideo: "Coach video",
+  },
 };

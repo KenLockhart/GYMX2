@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   getT: vi.fn(),
   readPrivateLiveSession: vi.fn(),
+  readGroupCritiqueSnapshot: vi.fn(),
   tables: [] as string[],
 }));
 
@@ -37,8 +38,21 @@ vi.mock("@/components/private-live-room", () => ({
     return null;
   },
 }));
+vi.mock("@/components/group-critique-room", () => ({
+  GroupCritiqueGate: function GroupCritiqueGateStub({
+    children,
+  }: {
+    children?: ReactNode;
+  }) {
+    return children ?? null;
+  },
+}));
+vi.mock("./group-actions", () => ({
+  readGroupCritiqueSnapshot: mocks.readGroupCritiqueSnapshot,
+}));
 
 import { LiveRoom } from "@/components/live-room";
+import { GroupCritiqueGate } from "@/components/group-critique-room";
 import {
   PrivateLiveRoom,
   PrivateOneOnOneOffer,
@@ -154,6 +168,11 @@ beforeEach(() => {
       memberLive: false,
     },
   });
+  mocks.readGroupCritiqueSnapshot.mockResolvedValue({
+    ok: true,
+    featureEnabled: true,
+    snapshot: null,
+  });
 });
 
 describe("live page mode selection", () => {
@@ -165,6 +184,35 @@ describe("live page mode selection", () => {
     expect(offers).toHaveLength(1);
     expect(offers[0].props).toMatchObject({ sessionId, memberId });
     expect(findElements(element, LiveRoom)).toHaveLength(1);
+  });
+
+  it("passes a pending sole invite to group controls without requiring a Going RSVP", async () => {
+    const snapshot = {
+      sessionId,
+      generation: 1,
+      state: "open",
+      joinExpiresAt: "2026-11-15T14:00:00.000Z",
+      role: "coach",
+      allMembersMuted: false,
+      members: [],
+    };
+    mocks.readGroupCritiqueSnapshot.mockResolvedValue({
+      ok: true,
+      featureEnabled: true,
+      snapshot,
+    });
+
+    const element = await LivePage({ params: Promise.resolve({ id: sessionId }) });
+    const gates = findElements(element, GroupCritiqueGate);
+
+    expect(gates).toHaveLength(1);
+    expect(gates[0].props).toMatchObject({
+      sessionId,
+      invitees: [{ id: memberId, name: "Invited member" }],
+      initialSnapshot: snapshot,
+      legacyRoomExists: false,
+    });
+    expect(findElements(element, PrivateOneOnOneOffer)).toHaveLength(1);
   });
 
   it("does not read a group room or pass its playback URL for a private session", async () => {

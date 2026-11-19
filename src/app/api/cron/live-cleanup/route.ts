@@ -2,6 +2,7 @@ import {
   cleanupPrivateLiveInputsAndRecordHeartbeat,
   verifyLiveCleanupHmac,
 } from "@/lib/private-live-server";
+import { cleanupGroupCritiqueAndRecordHeartbeat } from "@/lib/group-critique-server";
 
 export const runtime = "nodejs";
 
@@ -33,8 +34,19 @@ export async function GET(request: Request) {
     );
   }
 
-  const result = await cleanupPrivateLiveInputsAndRecordHeartbeat();
-  if (!result.ok || !result.heartbeatRecorded) {
+  // Keep both durable queues independent: one family's provider outage must not starve the other.
+  const [privateResult, groupResult] = await Promise.allSettled([
+    cleanupPrivateLiveInputsAndRecordHeartbeat(),
+    cleanupGroupCritiqueAndRecordHeartbeat(),
+  ]);
+  const privateBatch = privateResult.status === "fulfilled" ? privateResult.value : null;
+  const groupBatch = groupResult.status === "fulfilled" ? groupResult.value : null;
+  if (
+    !privateBatch?.ok ||
+    !privateBatch.heartbeatRecorded ||
+    !groupBatch?.ok ||
+    (groupBatch.enabled && !groupBatch.heartbeatRecorded)
+  ) {
     return Response.json(
       { ok: false, error: "cleanup_failed" },
       { status: 503, headers: NO_STORE },
@@ -44,8 +56,13 @@ export async function GET(request: Request) {
   return Response.json(
     {
       ok: true,
-      claimed: result.claimed,
-      completed: result.completed,
+      claimed: privateBatch.claimed,
+      completed: privateBatch.completed,
+      groupCleanup: {
+        enabled: groupBatch.enabled,
+        claimed: groupBatch.claimed,
+        completed: groupBatch.completed,
+      },
     },
     { status: 200, headers: NO_STORE },
   );

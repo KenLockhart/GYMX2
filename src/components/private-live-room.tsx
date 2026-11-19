@@ -28,6 +28,7 @@ import type {
 import { canGoLive, isLiveSnapshotCurrent } from "@/lib/live";
 import { NotLiveYet, play, publish, type Connection } from "@/lib/webrtc";
 import { useRouter } from "next/navigation";
+import { LiveFullscreenRegion } from "@/components/live-fullscreen";
 
 type OfferProps = {
   sessionId: string;
@@ -117,6 +118,7 @@ function activeGrant(grant: PrivateLiveGrantSnapshot | null, now: number) {
 export function PrivateLiveRoom(props: PrivateRoomProps) {
   const t = useT().calendar.live.private;
   const liveT = useT().calendar.live;
+  const fullscreenT = useT().common.fullscreen;
   const isCoach = props.me === props.coachId;
   const [snapshot, setSnapshot] = useState(props.initialSnapshot);
   const [now, setNow] = useState(0);
@@ -798,11 +800,19 @@ export function PrivateLiveRoom(props: PrivateRoomProps) {
         </p>
       )}
       {accepted && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black">
+        <LiveFullscreenRegion
+          label={fullscreenT.liveRoom}
+          className="relative"
+          controlPlacement="inline"
+        >
+          <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <LiveFullscreenRegion
+                    label={fullscreenT.yourVideo}
+                    className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black"
+                  >
                   <video
                     ref={videoLocal}
                     autoPlay
@@ -815,63 +825,66 @@ export function PrivateLiveRoom(props: PrivateRoomProps) {
                       {t.cameraDisabled}
                     </p>
                   )}
-                </div>
-                <p className="text-sm text-muted">{liveT.you}</p>
-                <div className="flex flex-wrap gap-2">
-                  {!camera ? (
-                    <button
-                      type="button"
-                      onClick={turnCameraOn}
-                      disabled={!cameraAllowed || cameraBusy || working}
-                      className="btn-secondary"
-                    >
-                      {cameraBusy ? t.cameraStarting : t.enableCamera}
-                    </button>
-                  ) : publishing ? (
-                    <span role="status" className="text-sm text-muted">
-                      {t.broadcasting}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={goLive}
-                      disabled={
-                        !canGo ||
-                        working ||
-                        !privateLive ||
-                        (!isCoach && !grant?.coachLive)
-                      }
-                      className="btn-primary"
-                    >
-                      {ownLive ? t.reconnect : t.goLive}
-                    </button>
+                  </LiveFullscreenRegion>
+                  <p className="text-sm text-muted">{liveT.you}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {!camera ? (
+                      <button
+                        type="button"
+                        onClick={turnCameraOn}
+                        disabled={!cameraAllowed || cameraBusy || working}
+                        className="btn-secondary"
+                      >
+                        {cameraBusy ? t.cameraStarting : t.enableCamera}
+                      </button>
+                    ) : publishing ? (
+                      <span role="status" className="text-sm text-muted">
+                        {t.broadcasting}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={goLive}
+                        disabled={
+                          !canGo ||
+                          working ||
+                          !privateLive ||
+                          (!isCoach && !grant?.coachLive)
+                        }
+                        className="btn-primary"
+                      >
+                        {ownLive ? t.reconnect : t.goLive}
+                      </button>
+                    )}
+                    {camera && (
+                      <button
+                        type="button"
+                        onClick={turnCameraOff}
+                        className="btn-secondary"
+                      >
+                        {t.turnCameraOff}
+                      </button>
+                    )}
+                  </div>
+                  {!isCoach && (
+                    <p className="text-xs text-muted">
+                      {cameraAllowed ? t.cameraPermission : t.cameraNotAllowed}
+                    </p>
                   )}
-                  {camera && (
-                    <button
-                      type="button"
-                      onClick={turnCameraOff}
-                      className="btn-secondary"
-                    >
-                      {t.turnCameraOff}
-                    </button>
+                  {!isCoach && cameraAllowed && !grant?.coachLive && (
+                    <p className="text-xs text-muted">{t.waitForCoachVideo}</p>
+                  )}
+                  {cameraError && (
+                    <p role="alert" className="text-sm text-danger">
+                      {t.cameraError}
+                    </p>
                   )}
                 </div>
-                {!isCoach && (
-                  <p className="text-xs text-muted">
-                    {cameraAllowed ? t.cameraPermission : t.cameraNotAllowed}
-                  </p>
-                )}
-                {!isCoach && cameraAllowed && !grant?.coachLive && (
-                  <p className="text-xs text-muted">{t.waitForCoachVideo}</p>
-                )}
-                {cameraError && (
-                  <p role="alert" className="text-sm text-danger">
-                    {t.cameraError}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black">
+                <div className="space-y-2">
+                  <LiveFullscreenRegion
+                    label={props.otherName}
+                    className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black"
+                  >
                   <video
                     ref={videoRemote}
                     autoPlay
@@ -900,46 +913,47 @@ export function PrivateLiveRoom(props: PrivateRoomProps) {
                           : t.waitingForCoach}
                     </p>
                   )}
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm text-muted">{props.otherName}</p>
-                  {remoteStream && (
-                    <button
-                      type="button"
-                      onClick={() => setMuted((value) => !value)}
-                      className="btn-secondary px-3 py-2 text-sm"
-                    >
-                      {muted ? liveT.soundOn : liveT.mute}
-                    </button>
-                  )}
+                  </LiveFullscreenRegion>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-muted">{props.otherName}</p>
+                    {remoteStream && (
+                      <button
+                        type="button"
+                        onClick={() => setMuted((value) => !value)}
+                        className="btn-secondary px-3 py-2 text-sm"
+                      >
+                        {muted ? liveT.soundOn : liveT.mute}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={endSession}
+                  disabled={working || !grant}
+                  className="btn-secondary"
+                >
+                  {working ? t.ending : t.end}
+                </button>
+                {error && (
+                  <p role="alert" className="text-sm text-danger">
+                    {t.errors[error]}
+                  </p>
+                )}
+                {!isCoach && !grant?.memberCameraAllowed && (
+                  <span className="text-xs text-muted">{t.cameraNotAllowed}</span>
+                )}
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={endSession}
-                disabled={working || !grant}
-                className="btn-secondary"
-              >
-                {working ? t.ending : t.end}
-              </button>
-              {error && (
-                <p role="alert" className="text-sm text-danger">
-                  {t.errors[error]}
-                </p>
-              )}
-              {!isCoach && !grant?.memberCameraAllowed && (
-                <span className="text-xs text-muted">{t.cameraNotAllowed}</span>
-              )}
-            </div>
+            <LiveChat
+              {...liveChatProps}
+              live={Boolean(grant?.coachLive)}
+              privateSession
+            />
           </div>
-          <LiveChat
-            {...liveChatProps}
-            live={Boolean(grant?.coachLive)}
-            privateSession
-          />
-        </div>
+        </LiveFullscreenRegion>
       )}
       {!accepted && error && (
         <p role="alert" className="text-sm text-danger">

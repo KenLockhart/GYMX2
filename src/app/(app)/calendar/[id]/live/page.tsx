@@ -7,6 +7,7 @@ import {
   PrivateLiveRoom,
   PrivateOneOnOneOffer,
 } from "@/components/private-live-room";
+import { GroupCritiqueGate } from "@/components/group-critique-room";
 import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { canGoLive } from "@/lib/live";
@@ -14,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { idSchema } from "@/lib/validation";
 import { readPrivateLiveSession } from "./private-actions";
+import { readGroupCritiqueSnapshot } from "./group-actions";
 import type { LiveChatMessage } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -121,7 +123,7 @@ export default async function LivePage({
     );
   }
 
-  const [{ data: room }, { data: chat }] = await Promise.all([
+  const [{ data: room }, { data: chat }, groupResult] = await Promise.all([
     supabase
       .from("session_live")
       .select("playback_url, live_started_at, live_ended_at")
@@ -133,7 +135,13 @@ export default async function LivePage({
       .eq("session_id", id)
       .order("created_at", { ascending: false })
       .limit(200),
+    readGroupCritiqueSnapshot(id),
   ]);
+
+  const invitees = inviteeIds.slice(0, 25).map((inviteeId) => ({
+    id: inviteeId,
+    name: names[inviteeId] ?? t.private.otherParticipant,
+  }));
 
   return (
     <div className="space-y-6">
@@ -152,47 +160,61 @@ export default async function LivePage({
           />
         </p>
       </div>
-      <LiveRoom
-        key={session.id as string}
+      <GroupCritiqueGate
         sessionId={session.id as string}
-        startsAt={session.starts_at as string}
-        endsAt={session.ends_at as string}
         me={profile.id}
         coachId={session.coach_id as string}
-        mode={isCoach ? "coach" : "viewer"}
+        coachName={coachName ?? t.groupCritique.coach}
+        canOpen={isCoach}
         canChat={isCoach || invited}
-        canStart={
-          isCoach &&
-          canGoLive({
-            starts_at: session.starts_at as string,
-            ends_at: session.ends_at as string,
-          })
-        }
-        playbackUrl={(room?.playback_url as string | undefined) ?? null}
-        initialRoom={
-          room
-            ? {
-                live_started_at: room.live_started_at as string | null,
-                live_ended_at: room.live_ended_at as string | null,
-              }
-            : null
-        }
-        names={names}
+        invitees={invitees}
         initialChat={((chat ?? []) as LiveChatMessage[]).reverse()}
-      />
-      {isCoach && privateMemberId && !room && (
-        <PrivateOneOnOneOffer
+        initialSnapshot={groupResult.ok ? groupResult.snapshot : null}
+        featureEnabled={groupResult.ok && groupResult.featureEnabled}
+        legacyRoomExists={Boolean(room)}
+      >
+        <LiveRoom
+          key={session.id as string}
           sessionId={session.id as string}
-          memberId={privateMemberId}
-          memberName={names[privateMemberId] ?? t.private.otherParticipant}
+          startsAt={session.starts_at as string}
+          endsAt={session.ends_at as string}
+          me={profile.id}
+          coachId={session.coach_id as string}
+          mode={isCoach ? "coach" : "viewer"}
+          canChat={isCoach || invited}
+          canStart={
+            isCoach &&
+            canGoLive({
+              starts_at: session.starts_at as string,
+              ends_at: session.ends_at as string,
+            })
+          }
+          playbackUrl={(room?.playback_url as string | undefined) ?? null}
+          initialRoom={
+            room
+              ? {
+                  live_started_at: room.live_started_at as string | null,
+                  live_ended_at: room.live_ended_at as string | null,
+                }
+              : null
+          }
+          names={names}
+          initialChat={((chat ?? []) as LiveChatMessage[]).reverse()}
         />
-      )}
-      {isCoach && privateMemberId && room && (
-        <p className="rounded-lg border border-border p-4 text-sm text-muted">
-          {t.private.previousGroupRoom}
-        </p>
-      )}
-      <p className="text-xs text-muted">{t.notRecorded}</p>
+        {isCoach && privateMemberId && !room && (
+          <PrivateOneOnOneOffer
+            sessionId={session.id as string}
+            memberId={privateMemberId}
+            memberName={names[privateMemberId] ?? t.private.otherParticipant}
+          />
+        )}
+        {isCoach && privateMemberId && room && (
+          <p className="rounded-lg border border-border p-4 text-sm text-muted">
+            {t.private.previousGroupRoom}
+          </p>
+        )}
+        <p className="text-xs text-muted">{t.notRecorded}</p>
+      </GroupCritiqueGate>
     </div>
   );
 }

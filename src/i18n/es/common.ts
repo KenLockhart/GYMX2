@@ -23,4 +23,12 @@ export const common: Messages["common"] = {
     label: "Idioma",
     switchTo: "Idioma",
   },
+  fullscreen: {
+    expand: "Expandir",
+    exit: "Salir",
+    escapeHint: "Presiona Esc para salir",
+    liveRoom: "Sesión en vivo",
+    yourVideo: "Tu video",
+    coachVideo: "Video del coach",
+  },
 };

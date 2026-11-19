@@ -60,6 +60,8 @@ function liveRoomAdmin(options: {
   startedAt?: string | null;
   endedAt?: string | null;
   updateError?: { code?: string; message?: string } | null;
+  activeGroupRoom?: boolean;
+  groupRoomReadError?: { code?: string; message?: string } | null;
 } = {}) {
   const state = {
     startedAt: options.startedAt ?? null,
@@ -67,7 +69,19 @@ function liveRoomAdmin(options: {
   };
 
   const client = {
-    from: () => {
+    from: (table: string) => {
+      if (table === "group_critique_rooms") {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          in: () => query,
+          maybeSingle: async () => ({
+            data: options.activeGroupRoom ? { generation: 1 } : null,
+            error: options.groupRoomReadError ?? null,
+          }),
+        };
+        return query;
+      }
       let operation: "select" | "update" = "select";
       let values: Record<string, unknown> = {};
       const filters: Record<string, string> = {};
@@ -127,6 +141,24 @@ function liveRoomAdmin(options: {
   return { client, state };
 }
 
+function withEmptyGroupRoom(
+  base: { from: (table?: string) => unknown },
+  groupRoom: { generation: number } | null = null,
+) {
+  return {
+    from(table: string) {
+      if (table !== "group_critique_rooms") return base.from(table);
+      const query = {
+        select: () => query,
+        eq: () => query,
+        in: () => query,
+        maybeSingle: async () => ({ data: groupRoom, error: null }),
+      };
+      return query;
+    },
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
@@ -167,8 +199,46 @@ describe("live session server actions", () => {
         sessionClient({ ...openSession, live_mode: "one_on_one" }),
       );
     mocks.getLiveIngestUrl.mockResolvedValue("https://stream.test/secret-ingest");
-    mocks.createAdminClient.mockReturnValue({
+    mocks.createAdminClient.mockReturnValue(withEmptyGroupRoom({
       from: () => {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          maybeSingle: async () => ({
+            data: { input_uid: "existing-group-input" },
+            error: null,
+          }),
+        };
+        return query;
+      },
+    }));
+
+    await expect(prepareBroadcast(sessionId)).resolves.toEqual({
+      error: "We couldn't open the live room. Please try again.",
+    });
+    expect(mocks.getLiveIngestUrl).toHaveBeenCalledOnce();
+  });
+
+  it("does not return a legacy ingest address if a coaching circle opens during provider setup", async () => {
+    let groupRoomActive = false;
+    mocks.getLiveIngestUrl.mockImplementation(async () => {
+      groupRoomActive = true;
+      return "https://stream.test/secret-ingest";
+    });
+    mocks.createAdminClient.mockReturnValue({
+      from: (table: string) => {
+        if (table === "group_critique_rooms") {
+          const query = {
+            select: () => query,
+            eq: () => query,
+            in: () => query,
+            maybeSingle: async () => ({
+              data: groupRoomActive ? { generation: 1 } : null,
+              error: null,
+            }),
+          };
+          return query;
+        }
         const query = {
           select: () => query,
           eq: () => query,
@@ -182,7 +252,8 @@ describe("live session server actions", () => {
     });
 
     await expect(prepareBroadcast(sessionId)).resolves.toEqual({
-      error: "We couldn't open the live room. Please try again.",
+      error:
+        "A coaching circle is open or closing. End it before using the broadcast controls.",
     });
     expect(mocks.getLiveIngestUrl).toHaveBeenCalledOnce();
   });
@@ -210,6 +281,38 @@ describe("live session server actions", () => {
       error: "We couldn't mark the session as live. Please try again.",
     });
     expect(mocks.after).not.toHaveBeenCalled();
+  });
+
+  it("keeps legacy broadcast actions out of an active or unreadable group room", async () => {
+    const active = liveRoomAdmin({
+      startedAt: "2026-11-15T12:00:00.000Z",
+      activeGroupRoom: true,
+    });
+    mocks.createAdminClient.mockReturnValue(active.client);
+
+    await expect(prepareBroadcast(sessionId)).resolves.toEqual({
+      error:
+        "A coaching circle is open or closing. End it before using the broadcast controls.",
+    });
+    await expect(markLive(sessionId)).resolves.toEqual({
+      error:
+        "A coaching circle is open or closing. End it before using the broadcast controls.",
+    });
+    await expect(endLive(sessionId)).resolves.toEqual({
+      error:
+        "A coaching circle is open or closing. End it before using the broadcast controls.",
+    });
+    expect(mocks.createLiveInput).not.toHaveBeenCalled();
+    expect(active.state.startedAt).toBe("2026-11-15T12:00:00.000Z");
+    expect(active.state.endedAt).toBeNull();
+
+    const unreadable = liveRoomAdmin({
+      groupRoomReadError: { code: "42501", message: "unavailable" },
+    });
+    mocks.createAdminClient.mockReturnValue(unreadable.client);
+    await expect(markLive(sessionId)).resolves.toEqual({
+      error: "We couldn't mark the session as live. Please try again.",
+    });
   });
 
   it("sends the start notification only to the atomic first-start winner", async () => {
@@ -246,7 +349,7 @@ describe("live session server actions", () => {
   });
 
   it("does not report success if a live row remains active after a zero-row update", async () => {
-    mocks.createAdminClient.mockReturnValue({
+    mocks.createAdminClient.mockReturnValue(withEmptyGroupRoom({
       from: () => {
         let operation: "select" | "update" = "select";
         const query = {
@@ -271,7 +374,7 @@ describe("live session server actions", () => {
         };
         return query;
       },
-    });
+    }));
 
     await expect(endLive(sessionId)).resolves.toEqual({
       error: "We couldn't end the live session. Please try again.",
@@ -286,7 +389,7 @@ describe("live session server actions", () => {
       return { uid: `input-${next}`, playbackUrl: `https://stream.test/play-${next}` };
     });
     mocks.getLiveIngestUrl.mockImplementation(async (uid: string) => `https://stream.test/ingest/${uid}`);
-    mocks.createAdminClient.mockReturnValue({
+    mocks.createAdminClient.mockReturnValue(withEmptyGroupRoom({
       from: () => {
         let insert: typeof stored = null;
         const query = {
@@ -311,7 +414,7 @@ describe("live session server actions", () => {
         };
         return query;
       },
-    });
+    }));
 
     const results = await Promise.all([
       prepareBroadcast(sessionId),
@@ -334,7 +437,7 @@ describe("live session server actions", () => {
       uid: "unused-after-mode-change",
       playbackUrl: "https://stream.test/playback",
     });
-    mocks.createAdminClient.mockReturnValue({
+    mocks.createAdminClient.mockReturnValue(withEmptyGroupRoom({
       from: () => {
         const query = {
           select: () => query,
@@ -346,7 +449,7 @@ describe("live session server actions", () => {
         };
         return query;
       },
-    });
+    }));
 
     await expect(prepareBroadcast(sessionId)).resolves.toEqual({
       error: "We couldn't open the live room. Please try again.",
