@@ -55,6 +55,7 @@ describe("video upload authorization", () => {
       location: "https://upload.example.test/tus/one-time",
       uid: "stream-video-1",
     });
+    mocks.deleteVideo.mockResolvedValue(undefined);
     mocks.insertVideo.mockResolvedValue({ error: null });
     mocks.from.mockReturnValue({ insert: mocks.insertVideo });
   });
@@ -125,5 +126,17 @@ describe("video upload authorization", () => {
     expect(mocks.insertVideo).toHaveBeenCalledWith(
       expect.objectContaining({ coach_id: "coach-id", visibility: "members" }),
     );
+  });
+
+  it("uses the signed-in uploader as owner when cleaning up a failed row insert", async () => {
+    mocks.getCurrentAccount.mockResolvedValue({
+      profile: { id: "coach-id", role: "coach" },
+    });
+    mocks.insertVideo.mockResolvedValueOnce({ error: { code: "23505" } });
+
+    const response = await POST(uploadRequest());
+
+    expect(response.status).toBe(502);
+    expect(mocks.deleteVideo).toHaveBeenCalledWith("stream-video-1", "coach-id");
   });
 });

@@ -72,6 +72,106 @@ describe("createLiveInput playback privacy", () => {
   });
 });
 
+describe("VOD deletion ownership guard", () => {
+  const uid = "synthetic-video-1";
+  const owner = "11111111-1111-4111-8111-111111111111";
+
+  it("checks the provider creator before deleting and uses a safe UID path", async () => {
+    const { deleteVideo } = await import("./stream");
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ result: { creator: owner } })),
+      )
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+
+    await expect(deleteVideo(uid, owner)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `https://api.cloudflare.com/client/v4/accounts/test-account/stream/${uid}`,
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      `https://api.cloudflare.com/client/v4/accounts/test-account/stream/${uid}`,
+    );
+    expect(fetchMock.mock.calls[1][1]?.method).toBe("DELETE");
+  });
+
+  it.each([
+    ["a different creator", { creator: "22222222-2222-4222-8222-222222222222" }],
+    ["a missing creator", {}],
+    ["a non-string creator", { creator: 42 }],
+  ])("does not delete when provider details contain %s", async (_case, result) => {
+    const { deleteVideo } = await import("./stream");
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ result })));
+
+    await expect(deleteVideo(uid, owner)).rejects.toThrow(
+      "Cloudflare video ownership could not be confirmed.",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.method).not.toBe("DELETE");
+  });
+
+  it("treats only provider 404 as already absent and never sends DELETE", async () => {
+    const { deleteVideo } = await import("./stream");
+    fetchMock.mockResolvedValueOnce(new Response("{}", { status: 404 }));
+
+    await expect(deleteVideo(uid, owner)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.method).not.toBe("DELETE");
+  });
+
+  it("fails closed on provider lookup errors", async () => {
+    const { deleteVideo } = await import("./stream");
+    fetchMock.mockResolvedValueOnce(new Response("{}", { status: 503 }));
+
+    await expect(deleteVideo(uid, owner)).rejects.toThrow(
+      "Cloudflare couldn't verify the video owner (503).",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed when the provider ownership lookup has a network failure", async () => {
+    const { deleteVideo } = await import("./stream");
+    fetchMock.mockRejectedValueOnce(new Error("synthetic network failure"));
+
+    await expect(deleteVideo(uid, owner)).rejects.toThrow(
+      "synthetic network failure",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects invalid UID or expected creator before making a request", async () => {
+    const { deleteVideo } = await import("./stream");
+
+    await expect(deleteVideo("../foreign-video", owner)).rejects.toThrow(
+      "Invalid Cloudflare video identifier.",
+    );
+    await expect(deleteVideo(undefined as unknown as string, owner)).rejects.toThrow(
+      "Invalid Cloudflare video identifier.",
+    );
+    await expect(deleteVideo(uid, "../foreign-creator")).rejects.toThrow(
+      "The expected video owner is invalid.",
+    );
+    await expect(
+      deleteVideo(uid, null as unknown as string),
+    ).rejects.toThrow("The expected video owner is invalid.");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the delete retry idempotent when the DELETE itself returns 404", async () => {
+    const { deleteVideo } = await import("./stream");
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ result: { creator: owner } })),
+      )
+      .mockResolvedValueOnce(new Response("{}", { status: 404 }));
+
+    await expect(deleteVideo(uid, owner)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1]?.method).toBe("DELETE");
+  });
+});
+
 describe("live stream configuration", () => {
   it("falls back to the existing video config only when no live override is set", async () => {
     delete process.env.CLOUDFLARE_LIVE_ACCOUNT_ID;

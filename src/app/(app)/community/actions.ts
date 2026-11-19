@@ -154,8 +154,14 @@ export async function createPost(
     if (post.photos.some((photo) => !present.has(photo.path)))
       return { error: "A photo didn't finish uploading. Please try again." };
   }
-  if (post.videoUid && (await getVideoCreator(post.videoUid)) !== profile.id) {
-    return { error: "That video upload didn't work. Please try again." };
+  if (post.videoUid) {
+    try {
+      if ((await getVideoCreator(post.videoUid)) !== profile.id) {
+        return { error: "That video upload didn't work. Please try again." };
+      }
+    } catch {
+      return { error: "That video upload didn't work. Please try again." };
+    }
   }
   const photos = [...post.photos];
   if (post.progressPhotoId) {
@@ -334,7 +340,9 @@ export async function deletePost(postId: string): Promise<{ error?: string }> {
     await createAdminClient().storage.from(BUCKET).remove(paths);
   await Promise.all(
     rows.flatMap((row) =>
-      row.video_uid ? [deleteVideo(row.video_uid).catch(console.error)] : [],
+      row.video_uid
+        ? [deleteVideo(row.video_uid, profile.id).catch(console.error)]
+        : [],
     ),
   );
   revalidatePath("/community");

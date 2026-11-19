@@ -57,18 +57,18 @@ export async function deleteVideo(
 
   const { data: stored, error: lookupError } = await createAdminClient()
     .from("videos")
-    .select("cloudflare_uid")
+    .select("cloudflare_uid, coach_id")
     .eq("id", videoId.data)
     .maybeSingle();
   // Without the Cloudflare id, deleting the row would leave the video in Cloudflare for good.
   // Keep the reservation on failure so a later retry can finish safely.
-  if (lookupError || !stored?.cloudflare_uid)
+  if (lookupError || !stored?.cloudflare_uid || !stored.coach_id)
     return { error: "We couldn't delete that video. Please try again." };
 
   try {
     // deleteVideo treats a provider 404 as success so DB deletion can be retried
     // after a previous provider success and later database failure.
-    await deleteStreamVideo(stored.cloudflare_uid);
+    await deleteStreamVideo(stored.cloudflare_uid, stored.coach_id);
   } catch {
     return { error: "We couldn't delete that video. Please try again." };
   }
