@@ -88,26 +88,13 @@ export const dashboard: Messages["dashboard"] = {
     savedForLater: "Guardado para después",
     saveFailed: "No pudimos actualizar tus videos guardados. Inténtalo de nuevo.",
     quoteTitle: "Frase del día",
-    anotherQuote: "Mostrar otra frase",
+    quoteLoadError: "No pudimos cargar la frase de hoy. Actualiza para intentarlo de nuevo.",
+    noQuote: "Todavía no se ha elegido una frase para hoy.",
     affirmationTitle: "Afirmación de hoy",
-    affirmationText:
-      "Soy más fuerte que ayer. Cada repetición, cada comida y cada decisión que tomo hoy me impulsa hacia adelante.",
+    affirmationLoadError: "No pudimos cargar la afirmación de hoy. Actualiza para intentarlo de nuevo.",
+    noAffirmation: "Todavía no se ha elegido una afirmación para hoy.",
     affirmationOff: "Hoy me comprometo",
     affirmationOn: "Afirmado hoy",
     affirmationFailed: "No pudimos guardar esto ahora. Inténtalo de nuevo.",
-    quotes: [
-      {
-        text: "Somos lo que hacemos repetidamente. La excelencia, entonces, no es un acto, sino un hábito.",
-        author: "Will Durant",
-      },
-      {
-        text: "No importa lo lento que avances mientras no te detengas.",
-        author: "Atribuida a Confucio",
-      },
-      {
-        text: "El secreto para avanzar es comenzar.",
-        author: "Atribuida a Mark Twain",
-      },
-    ],
   },
 };

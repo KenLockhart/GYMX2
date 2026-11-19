@@ -13,33 +13,36 @@ export type DailyFuelActionResult =
 
 export async function setMemberDailyAffirmation(
   day: string,
+  revisionId: string,
   affirmed: boolean,
 ): Promise<DailyFuelActionResult> {
   const { profile } = await requireAccount();
   if (profile.role !== "member") return { ok: false, error: "not_allowed" };
-  if (typeof affirmed !== "boolean") return { ok: false, error: "failed" };
+  const parsedRevisionId = idSchema.safeParse(revisionId);
+  if (!parsedRevisionId.success || typeof affirmed !== "boolean")
+    return { ok: false, error: "failed" };
   const parsedDay = z.iso.date().safeParse(day);
   if (!parsedDay.success || day !== todayKey())
     return { ok: false, error: "day_changed" };
 
-  let data: unknown;
   try {
     const supabase = await createClient();
-    const result = await supabase.rpc("set_member_daily_affirmation", {
+    const result = await supabase.rpc("set_member_daily_content_acknowledgment", {
       target_expected_day: day,
-      target_affirmed: affirmed,
+      target_revision_id: parsedRevisionId.data,
+      target_acknowledged: affirmed,
     });
     if (result.error)
       return {
         ok: false,
         error: result.error.code === "P0001" ? "day_changed" : "failed",
       };
-    data = result.data;
+    if (result.data !== affirmed) return { ok: false, error: "failed" };
   } catch {
     return { ok: false, error: "failed" };
   }
   revalidatePath("/dashboard");
-  return { ok: true, value: data === true };
+  return { ok: true, value: affirmed };
 }
 
 export async function setMemberDailyFuelBookmark(
