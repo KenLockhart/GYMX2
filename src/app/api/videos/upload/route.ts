@@ -15,8 +15,8 @@ function failure(message: string, status: number) {
 export async function POST(request: NextRequest) {
   const account = await getCurrentAccount();
   if (!account) return failure("Log in to upload a video.", 401);
-  if (account.profile.role !== "coach")
-    return failure("Only coaches can upload videos.", 403);
+  if (account.profile.role !== "coach" && account.profile.role !== "admin")
+    return failure("Only coaches and admins can upload videos.", 403);
   if (!isStreamConfigured())
     return failure("Video uploads aren't connected yet.", 503);
 

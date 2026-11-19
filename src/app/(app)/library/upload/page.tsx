@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getT } from "@/i18n/server";
-import { requireCoach } from "@/lib/auth";
+import { requireCoachOrAdmin } from "@/lib/auth";
 import { isStreamConfigured } from "@/lib/stream";
 import { UploadForm } from "./upload-form";
 
@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function UploadPage() {
-  await requireCoach();
+  await requireCoachOrAdmin();
   const t = (await getT()).library;
 
   return (
