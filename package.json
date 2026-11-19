@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-form-coach-assets.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-form-coach-assets.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -12,6 +14,7 @@
   },
   "dependencies": {
     "@cloudflare/realtimekit": "2.0.4",
+    "@mediapipe/tasks-vision": "1.2.3",
     "@stripe/react-stripe-js": "7.0.1",
     "@stripe/stripe-js": "10.2.1",
     "@supabase/ssr": "^0.12.7",
