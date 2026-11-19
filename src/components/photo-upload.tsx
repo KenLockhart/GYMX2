@@ -26,6 +26,7 @@ export function PhotoUpload({ today }: { today: string }) {
     const prepared = await prepareProgressPhoto({
       fileName: file.name,
       size: file.size,
+      day: today,
     });
     if (prepared.error || !prepared.path || !prepared.token) {
       setStatus({ kind: "error", text: prepared.error ?? t.couldntStart });

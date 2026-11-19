@@ -11,13 +11,19 @@ import { MAX_PHOTO_BYTES, PHOTO_POSES, PHOTO_TYPES } from "@/lib/photos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_HABITS, isEditableDay, parseMeasure } from "@/lib/tracking";
-import type { ActionState } from "@/lib/types";
+import type { ActionState, UserRole } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
 
 async function trackingAccount() {
   const account = await requireAccount();
   if (account.profile.role === "admin") throw new Error("Admins don't track.");
   return account;
+}
+
+function trackingDayError(role: UserRole) {
+  return role === "member"
+    ? "Only today's tracking can be changed."
+    : "You can only update the last 7 days.";
 }
 
 function done(message?: string): ActionState {
@@ -73,15 +79,18 @@ export async function removeHabit(
   return done();
 }
 
-// Checks a habit off (or un-checks it) for one of the last seven days.
+// Members can change today; coaches retain the existing seven-day window.
 export async function setHabitDone(
   habitId: string,
   day: string,
   isDone: boolean,
 ): Promise<{ error?: string }> {
   const { profile } = await trackingAccount();
-  if (!idSchema.safeParse(habitId).success || !isEditableDay(day))
-    return { error: "You can only update the last 7 days." };
+  if (
+    !idSchema.safeParse(habitId).success ||
+    !isEditableDay(day, new Date(), profile.role)
+  )
+    return { error: trackingDayError(profile.role) };
 
   const supabase = await createClient();
   const { error } = isDone
@@ -108,7 +117,8 @@ export async function saveBodyLog(
 ): Promise<ActionState> {
   const { profile } = await trackingAccount();
   const day = String(formData.get("day") ?? "");
-  if (!isEditableDay(day)) return { error: "You can log the last 7 days." };
+  if (!isEditableDay(day, new Date(), profile.role))
+    return { error: trackingDayError(profile.role) };
   const weight = parseMeasure(formData.get("weight_lb"));
   const bodyFat = parseMeasure(formData.get("body_fat_pct"));
   const waist = parseMeasure(formData.get("waist_in"));
@@ -161,7 +171,8 @@ export async function saveNutritionLog(
 ): Promise<ActionState> {
   const { profile } = await trackingAccount();
   const day = String(formData.get("day") ?? "");
-  if (!isEditableDay(day)) return { error: "You can log the last 7 days." };
+  if (!isEditableDay(day, new Date(), profile.role))
+    return { error: trackingDayError(profile.role) };
   const protein = wholeNumber(formData.get("protein_g"), 1000);
   const calories = wholeNumber(formData.get("calories"), 20000);
   const water = wholeNumber(formData.get("water_glasses"), 50);
@@ -220,8 +231,11 @@ export async function saveTrackingSettings(
 export async function prepareProgressPhoto(input: {
   fileName: string;
   size: number;
+  day: string;
 }): Promise<{ error?: string; path?: string; token?: string }> {
   const { profile } = await trackingAccount();
+  if (!isEditableDay(input.day, new Date(), profile.role))
+    return { error: trackingDayError(profile.role) };
   const extension = fileExtension(input.fileName);
   if (!(extension in PHOTO_TYPES)) return { error: "Use a JPG, PNG or WebP photo." };
   if (input.size > MAX_PHOTO_BYTES) return { error: "Photos can be up to 10 MB." };
@@ -234,7 +248,8 @@ export async function prepareProgressPhoto(input: {
 export async function saveProgressPhoto(input: { path: string; pose: string; day: string }): Promise<{ error?: string }> {
   const { profile } = await trackingAccount();
   if (!PHOTO_POSES.some((pose) => pose.value === input.pose)) return { error: "Choose front, side, back or other." };
-  if (!isEditableDay(input.day)) return { error: "You can add photos for the last 7 days." };
+  if (!isEditableDay(input.day, new Date(), profile.role))
+    return { error: trackingDayError(profile.role) };
   if (!input.path.startsWith(`${profile.id}/`)) return { error: "That upload didn't work. Please try again." };
   const supabase = await createClient();
   const { error } = await supabase
@@ -250,6 +265,16 @@ export async function deleteProgressPhoto(_: ActionState, formData: FormData): P
   const id = idSchema.safeParse(formData.get("photo_id"));
   if (!id.success) return { error: "Choose a photo." };
   const supabase = await createClient();
+  const { data: photo } = await supabase
+    .from("progress_photos")
+    .select("day")
+    .eq("id", id.data)
+    .eq("user_id", profile.id)
+    .maybeSingle();
+  if (!photo) return { error: "We couldn't delete that photo." };
+  if (!isEditableDay(photo.day as string, new Date(), profile.role))
+    return { error: trackingDayError(profile.role) };
+
   const { data } = await supabase
     .from("progress_photos")
     .delete()

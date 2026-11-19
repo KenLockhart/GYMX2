@@ -13,12 +13,14 @@ export function HabitGrid({
   days,
   dayLabels,
   today,
+  editableDays,
   done,
 }: {
   habits: Habit[];
   days: string[];
   dayLabels: string[];
   today: string;
+  editableDays: string[];
   done: string[]; // "habitId:day" for every check-in shown
 }) {
   const t = useT().track.grid;
@@ -73,18 +75,20 @@ export function HabitGrid({
                 </th>
                 {days.map((day, index) => {
                   const isChecked = checked.has(`${habit.id}:${day}`);
+                  const readOnly = !editableDays.includes(day);
                   return (
                     <td key={day} className="p-1 text-center">
                       <button
                         type="button"
                         onClick={() => toggle(habit.id, day)}
+                        disabled={readOnly}
                         aria-pressed={isChecked}
-                        aria-label={`${habit.name}, ${day === today ? t.todayLower : dayLabels[index]}: ${isChecked ? t.done : t.notDone}`}
+                        aria-label={`${habit.name}, ${day === today ? t.todayLower : dayLabels[index]}: ${isChecked ? t.done : t.notDone}${readOnly ? `, ${t.readOnly}` : ""}`}
                         className={`inline-flex size-9 items-center justify-center rounded-md border text-base font-bold transition ${
                           isChecked
                             ? "border-accent bg-accent text-accent-foreground"
                             : "border-border hover:border-accent"
-                        } ${day === today ? "ring-1 ring-accent/40" : ""}`}
+                        } ${day === today ? "ring-1 ring-accent/40" : "cursor-not-allowed opacity-70"}`}
                       >
                         {isChecked ? "✓" : ""}
                       </button>
