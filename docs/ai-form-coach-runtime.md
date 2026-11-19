@@ -1,6 +1,6 @@
 # AI Form Coach runtime plan (Phase 2B)
 
-**Status:** implementation plan plus local synthetic Worker URL/response-CSP evidence; production-server browser proof remains unverified.
+**Status:** implementation plan, local synthetic Worker URL/response-CSP evidence, and pure request-policy/FPS helpers. The helpers are not wired into a MediaPipe runtime. Production-server browser proof and actual SDK network/device audits remain unverified and were not run.
 
 
 ## First-gate prototype evidence (2026-11-19)
@@ -47,6 +47,8 @@ Installed guidance read: `node_modules/next/dist/docs/01-app/02-guides/content-s
 - Static audit of the pinned 1.2.3 package README, declarations, module bundle, and Emscripten glue found model/graph/WASM fetch paths plus an SDK metrics logger. The bundle schedules metric flushes every 60 seconds and on task close; it posts protobuf data to `https://odml.pa.googleapis.com/v1/log`, with a 10-second timeout, `withCredentials: false`, and an internal `x-goog-api-key` header. The public README says input processing stays on-device and metrics are sent. Current [MediaPipe API Terms](https://developers.google.com/edge/mediapipe/legal/tos) says input itself is not sent, but metrics may include SDK/session use, inference and hardware performance, app/input characteristics, and system-environment metadata; the SDK may also contact Google for updates and hardware compatibility. No public telemetry opt-out was found in the README or type declarations. Both bundled WASM binaries were byte-scanned; URL-like strings found were TensorFlow Lite/OpenCV documentation references, and no telemetry URL string was found there. This is not a runtime network proof. No runtime request was executed. Resolve consent/privacy separately and do not claim all-local.
 
 ## Verification and release gates
+
+The pure FPS helper counts processed-frame completion events in `(max(sessionStart, now - windowMs), now]` with the left boundary excluded; the observation duration includes time since the latest frame, so a stalled stream decays before the window empties. Slow dwell is updated by accepted frame events and snapshots. `maxSamples` is bounded and validated to hold the configured target rate across the window; counts/rates may be lower bounds if a faster stream saturates that cap. This helper is not connected to a camera or MediaPipe runtime.
 
 1. The dev Worker URL prototype and narrowly matched response CSP are verified. Still test the emitted URL and response CSP against a production server, plus versioned asset Content-Type/cache behavior and reproducible generated assets from tracked models plus the locked npm package.
 2. Vitest tests (synthetic inputs only) cover lazy package/model loading; exact same-origin asset paths and checksums; `VIDEO`/monotonic timestamps; Lite/Full selection; GPU-to-CPU cleanup; unsupported Worker/OffscreenCanvas behavior; FPS/drop accounting; camera/Worker teardown; and set-limit messaging. Mock `fetch`, XHR, `sendBeacon`, and WebSocket to assert allowed destinations and reject request bodies containing image/frame/landmark data.
