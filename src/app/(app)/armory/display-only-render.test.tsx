@@ -5,31 +5,35 @@ const mocks = vi.hoisted(() => ({ item: {} as Record<string, unknown>, role: "me
 vi.mock("server-only", () => ({}));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("not found"); } }));
-vi.mock("@/lib/auth", () => ({ requireAccount: async () => ({ profile: { id: "00000000-0000-4000-8000-000000000002", role: mocks.role } }) }));
+vi.mock("@/lib/auth", () => ({ getCurrentAccount: async () => ({ profile: { id: "00000000-0000-4000-8000-000000000002", role: mocks.role } }) }));
+vi.mock("@/lib/platform-membership-server", () => ({ getPlatformEntitlement: async () => ({ ok: true, entitlement: null }) }));
 vi.mock("@/lib/purchases", () => ({ confirmCheckoutSession: vi.fn() }));
 vi.mock("@/lib/stripe", () => ({ isStripeTestMode: () => false, stripePublishableKey: () => "pk_test_fixture" }));
 vi.mock("@/lib/supabase/env", () => ({ getSupabaseEnv: () => ({ url: "https://example.test" }) }));
 vi.mock("@/lib/supabase/client", () => ({ createBrowserSupabase: vi.fn() }));
 vi.mock("@/components/buy-panel", () => ({ BuyPanel: () => <button data-checkout="true">Buy now</button> }));
-vi.mock("./actions", () => ({ removeArmoryItem: vi.fn(), saveArmoryItem: vi.fn(), prepareArmoryUpload: vi.fn() }));
+vi.mock("@/app/(app)/armory/actions", () => ({ removeArmoryItem: vi.fn(), saveArmoryItem: vi.fn(), prepareArmoryUpload: vi.fn() }));
 vi.mock("@/i18n/t", () => ({ T: ({ children }: { children: ReactNode }) => <>{children}</>, useTr: () => (text: string) => text }));
 vi.mock("@/i18n/server", () => ({ getLocale: async () => "en", getTr: async () => (text: string) => text }));
 vi.mock("@/components/form-parts", () => ({
   ActionForm: ({ children }: { children: ReactNode }) => <form>{children}</form>,
   FormStatus: () => null,
   SubmitButton: ({ children }: { children: ReactNode }) => <button>{children}</button>,
-  Field: ({ label, name, defaultValue }: { label: string; name: string; defaultValue: string }) => <label>{label}<input name={name} defaultValue={defaultValue} /></label>,
+  Field: ({ label, name, defaultValue, value }: { label: string; name?: string; defaultValue?: string; value?: string }) => <label>{label}<input name={name} defaultValue={defaultValue} value={value} /></label>,
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: (table: string) => {
+  const data = table === "public_armory_catalog"
+    ? { ...mocks.item, seller_label: "Coach" }
+    : mocks.item;
   const query = {
     select: () => query, eq: () => query, order: () => query, limit: () => query,
-    maybeSingle: async () => ({ data: mocks.item }),
-    then: (resolve: (value: unknown) => void) => Promise.resolve({ data: table === "armory_items" ? [mocks.item] : [], count: 0 }).then(resolve),
+    maybeSingle: async () => ({ data }),
+    then: (resolve: (value: unknown) => void) => Promise.resolve({ data: table === "armory_items" || table === "public_armory_catalog" ? [data] : [], count: 0 }).then(resolve),
   };
   return query;
 } }) }));
-import ArmoryItemPage from "./[id]/page";
-import ArmoryPage from "./page";
+import ArmoryItemPage from "../../armory/[id]/page";
+import ArmoryPage from "../../armory/page";
 import { ArmoryForm } from "@/components/armory-form";
 
 beforeEach(() => {
@@ -66,9 +70,76 @@ describe("display-only rendering", () => {
     expect(html).toContain("$38.44");
   });
   it("keeps preview selected when editing rather than switching to sell gear", () => {
-    const html = renderToStaticMarkup(<ArmoryForm payouts="platform" submitLabel="Save changes" initial={{ id: String(mocks.item.id), kind: "preview", category: "gear", title: "GYMX2 Cap", description: "", price: "38.44", shipping: "0", sizes: "S, M", buy_url: "", file_path: "", file_name: "", image_path: "", image_url: null, visible_to_all: true, made_to_order: false, delivery_min_weeks: null, delivery_max_weeks: null }} />);
+    const html = renderToStaticMarkup(<ArmoryForm payouts="platform" submitLabel="Save changes" initial={{ id: String(mocks.item.id), kind: "preview", category: "gear", title: "GYMX2 Cap", description: "", price: "38.44", shipping: "0", sizes: "S, M", buy_url: "", file_path: "", file_name: "", image_path: "", image_url: null, visible_to_all: true, made_to_order: false, delivery_min_weeks: null, delivery_max_weeks: null, printful_sku: null, printful_sync_variant_id: null, printful_variant_mappings: [] }} />);
     expect(html).toContain('name="kind" value="preview"');
     expect(html).toContain("Display only: members can view this product, but cannot purchase it.");
     expect(html).toContain('name="sizes" value="S, M"');
+  });
+
+  it("submits Printful references only for supported physical categories", () => {
+    const physical = renderToStaticMarkup(
+      <ArmoryForm
+        payouts="platform"
+        submitLabel="Save changes"
+        initial={{
+          id: String(mocks.item.id),
+          kind: "product",
+          category: "gear",
+          title: "GYMX2 Cap",
+          description: "",
+          price: "38.44",
+          shipping: "0",
+          sizes: "",
+          buy_url: "",
+          file_path: "",
+          file_name: "",
+          image_path: "",
+          image_url: null,
+          visible_to_all: true,
+          made_to_order: false,
+          delivery_min_weeks: null,
+          delivery_max_weeks: null,
+          printful_sku: "GYM-CAP-01",
+          printful_sync_variant_id: "0009007199254740993",
+          printful_variant_mappings: [],
+        }}
+      />,
+    );
+    expect(physical).toContain('name="printful_sku" value="GYM-CAP-01"');
+    expect(physical).toContain('name="printful_sync_variant_id" value="0009007199254740993"');
+    expect(physical).toContain('name="printful_variant_mappings" value=""');
+
+    const unsupportedCategory = renderToStaticMarkup(
+      <ArmoryForm
+        payouts="platform"
+        submitLabel="Save changes"
+        initial={{
+          id: String(mocks.item.id),
+          kind: "product",
+          category: "supplements",
+          title: "GYMX2 Supplements",
+          description: "",
+          price: "38.44",
+          shipping: "0",
+          sizes: "",
+          buy_url: "",
+          file_path: "",
+          file_name: "",
+          image_path: "",
+          image_url: null,
+          visible_to_all: true,
+          made_to_order: false,
+          delivery_min_weeks: null,
+          delivery_max_weeks: null,
+          printful_sku: "LEGACY-SKU",
+          printful_sync_variant_id: "42",
+          printful_variant_mappings: [],
+        }}
+      />,
+    );
+    expect(unsupportedCategory).toContain('name="printful_sku" value=""');
+    expect(unsupportedCategory).toContain('name="printful_sync_variant_id" value=""');
+    expect(unsupportedCategory).toContain('name="printful_variant_mappings" value=""');
+    expect(unsupportedCategory).not.toContain("LEGACY-SKU");
   });
 });

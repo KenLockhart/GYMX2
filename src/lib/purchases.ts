@@ -5,10 +5,20 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordAffiliateCommissions } from "@/lib/affiliate-server";
 import { notifyNewSale } from "@/lib/notify";
 import { getStripe } from "@/lib/stripe";
+import {
+  confirmArmoryCheckoutSession,
+  recordArmoryCheckoutPurchase,
+} from "@/lib/armory-purchases";
 
 // Saves a completed Checkout payment. Safe to call more than once for the same session:
 // the webhook and the buyer's return to the site may both report it.
 export async function recordPurchase(session: Stripe.Checkout.Session) {
+  if (
+    session.metadata?.kind === "armory_purchase" ||
+    session.metadata?.armory_checkout_intent_id
+  ) {
+    return recordArmoryCheckoutPurchase(session);
+  }
   if (session.payment_status !== "paid") return false;
   const { item_id, member_id, seller_id, item_title, fee_cents, kind, size } = session.metadata ?? {};
   if (!item_id || !member_id || !item_title) return false;
@@ -57,6 +67,12 @@ export async function recordPurchase(session: Stripe.Checkout.Session) {
 export async function confirmCheckoutSession(sessionId: string, memberId: string) {
   try {
     const session = await getStripe().checkout.sessions.retrieve(sessionId);
+    if (
+      session.metadata?.kind === "armory_purchase" ||
+      session.metadata?.armory_checkout_intent_id
+    ) {
+      return await confirmArmoryCheckoutSession(sessionId, memberId);
+    }
     if (session.metadata?.member_id !== memberId) return false;
     return await recordPurchase(session);
   } catch (error) {

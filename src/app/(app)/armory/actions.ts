@@ -14,6 +14,8 @@ import {
   safeFileName,
 } from "@/lib/armory";
 import { requireCoachOrAdmin } from "@/lib/auth";
+import { hasRetainedArmoryFileReference } from "@/lib/armory-file-retention";
+import { validatePrintfulMappingInput } from "@/lib/printful-mapping";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState, ArmoryItem } from "@/lib/types";
@@ -56,6 +58,9 @@ async function removeFiles(paths: { bucket: string; path: string | null }[]) {
   const admin = createAdminClient();
   for (const { bucket, path } of paths) {
     if (!path) continue;
+    if (bucket === "armory-files" && await hasRetainedArmoryFileReference(path)) {
+      continue;
+    }
     const { error } = await admin.storage.from(bucket).remove([path]);
     if (error) console.error(error);
   }
@@ -74,6 +79,17 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
   const shipping_cents = (kind === "product" || kind === "preview") ? (parsePrice(String(formData.get("shipping") ?? "")) ?? 0) : 0;
   if (Number.isNaN(shipping_cents)) return { error: "Enter the shipping fee like 5.99, or 0 for free shipping." };
   const sizes = (kind === "product" || kind === "preview") ? parseSizes(String(formData.get("sizes") ?? "")) : [];
+  const printful = validatePrintfulMappingInput({
+    kind: typeof kind === "string" ? kind : "",
+    category: String(formData.get("category") ?? ""),
+    sizes: String(formData.get("sizes") ?? ""),
+    printful_sku: formData.get("printful_sku") ?? "",
+    printful_sync_variant_id: formData.get("printful_sync_variant_id") ?? "",
+    printful_variant_mappings: formData.get("printful_variant_mappings") ?? "",
+  });
+  if (!printful.success) {
+    return { error: "Check the Printful SKU and make sure every listed size has one complete mapping." };
+  }
 
   const parsed = armoryItemSchema.safeParse({
     kind,
@@ -135,6 +151,7 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
       item.kind === "product" || item.kind === "preview"
         ? item.delivery_max_weeks
         : null,
+    ...printful.value,
   };
 
   const supabase = await createClient();

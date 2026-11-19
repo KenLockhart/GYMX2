@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   syncPlatformSubscriptionById: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/armory-purchases", () => ({ updateArmoryCheckoutStatus: vi.fn() }));
 vi.mock("@/lib/stripe", () => ({
   getStripe: () => ({ webhooks: { constructEvent: mocks.constructEvent } }),
 }));

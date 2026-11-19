@@ -3,18 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { isPremiumCategory, MIN_PAID_PRICE_CENTS, platformFeeCents } from "@/lib/armory";
-import { requireAccount, requireCoach } from "@/lib/auth";
+import { getCurrentAccount, requireAccount, requireAuthenticatedAccount, requireCoach } from "@/lib/auth";
+import { createArmoryCheckout, guestLivePreviewCheckoutBlocked } from "@/lib/armory-checkout";
 import { notifyOrderShipped } from "@/lib/notify";
-import { refreshPayoutAccount } from "@/lib/purchases";
 import { refundPurchase } from "@/lib/refunds";
-import { getStripe, isStripeConfigured, stripePublishableKey } from "@/lib/stripe";
+import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
-import { platformHasTier } from "@/lib/platform-membership-server";
 import { createClient } from "@/lib/supabase/server";
-import type { ActionState, ArmoryItem, CheckoutState } from "@/lib/types";
-import { idSchema, purchaseRequestSchema, shipOrderSchema } from "@/lib/validation";
+import type { ActionState, CheckoutState } from "@/lib/types";
+import { guestPurchaseRequestSchema, idSchema, purchaseRequestSchema, shipOrderSchema } from "@/lib/validation";
+import { getLocale } from "@/i18n/server";
 
 // Sends a coach to Stripe to set up (or finish setting up) the account their sales are paid into.
 export async function startPayoutSetup(): Promise<ActionState> {
@@ -85,149 +84,49 @@ export async function openPayoutDashboard(): Promise<ActionState> {
 // Opens checkout for an item. With a publishable key set, the payment form is shown inside the item
 // page (the buyer never leaves gymx2.com); otherwise the buyer is sent to Stripe's checkout page.
 export async function buyArmoryItem(_: CheckoutState, formData: FormData): Promise<CheckoutState> {
-  const { profile, email } = await requireAccount();
+  const { profile, email } = await requireAuthenticatedAccount();
   const request = purchaseRequestSchema.safeParse({
     item_id: formData.get("item_id"),
     size: formData.get("size") ?? "",
   });
   if (!request.success) return { error: "Choose an item." };
-  if (!isStripeConfigured()) return { error: "Payments aren't switched on yet. Please check back soon." };
+  const result = await createArmoryCheckout({
+    itemId: request.data.item_id,
+    size: request.data.size,
+    email,
+    profile,
+    embedded: true,
+    locale: profile.locale,
+  });
+  if ("error" in result) return { error: result.error };
+  if ("clientSecret" in result) return { clientSecret: result.clientSecret };
+  redirect(result.url);
+}
 
-  // Row security decides whether this person may see, and so buy, the item.
-  const supabase = await createClient();
-  const { data: item } = await supabase
-    .from("armory_items")
-    .select("id, coach_id, kind, category, title, price_cents, sizes, shipping_cents")
-    .eq("id", request.data.item_id)
-    .maybeSingle();
-  const sellable = item as (Pick<
-    ArmoryItem,
-    "id" | "coach_id" | "kind" | "title" | "price_cents" | "sizes" | "shipping_cents"
-    | "category"
-  >) | null;
-  // Preview gear is deliberately not in this allowlist. Never create a Stripe
-  // session for it, even if a caller submits the server action directly.
-  if (
-    !sellable ||
-    (sellable.kind !== "paid" && sellable.kind !== "product") ||
-    !sellable.price_cents ||
-    sellable.price_cents < MIN_PAID_PRICE_CENTS
-  ) {
-    return { error: "This item can't be bought right now." };
+export async function startGuestArmoryCheckout(_: CheckoutState, formData: FormData): Promise<CheckoutState> {
+  if (await getCurrentAccount()) {
+    return { error: "Use the signed-in checkout button to keep this order in your purchase history." };
   }
-  if (sellable.coach_id === profile.id) return { error: "This is your own item." };
-  if (
-    isPremiumCategory(sellable.category) &&
-    !(await platformHasTier(profile.id, "premium"))
-  ) {
-    return { error: "Premium membership required to buy this item." };
+  if (guestLivePreviewCheckoutBlocked()) {
+    return { error: "Guest checkout is disabled in this preview environment." };
   }
-  const isGear = sellable.kind === "product";
-
-  // Gear with sizes needs one of them. Digital files are bought once; gear can be ordered again.
-  let size: string | null = null;
-  if (isGear && sellable.sizes.length > 0) {
-    size = sellable.sizes.find((option) => option === request.data.size) ?? null;
-    if (!size) return { error: "Choose a size." };
-  }
-  if (!isGear) {
-    const { data: owned } = await supabase
-      .from("purchases")
-      .select("id")
-      .eq("item_id", sellable.id)
-      .eq("member_id", profile.id)
-      .is("refunded_at", null)
-      .limit(1);
-    if (owned?.length) return { error: "You already own this. Use the Download button." };
-  }
-
-  // A coach's sale goes to their Stripe account with GYMX2's fee kept back.
-  // GYMX2's own items (added by an admin) are paid to GYMX2 in full.
-  // Members can't read admin profiles, so the seller's role is looked up with the server key.
-  const { data: seller } = await createAdminClient()
-    .from("profiles")
-    .select("role")
-    .eq("id", sellable.coach_id)
-    .maybeSingle();
-  const isPlatformItem = seller?.role === "admin";
-  let destination: string | null = null;
-  if (!isPlatformItem) {
-    const { data: account } = await createAdminClient()
-      .from("payout_accounts")
-      .select("stripe_account_id, charges_enabled")
-      .eq("coach_id", sellable.coach_id)
-      .maybeSingle();
-    let ready = Boolean(account?.charges_enabled);
-    if (account && !ready) {
-      ready = (await refreshPayoutAccount(sellable.coach_id, account.stripe_account_id as string)).charges_enabled;
-    }
-    if (!account || !ready) return { error: "This coach hasn't finished setting up payments yet." };
-    destination = account.stripe_account_id as string;
-  }
-
-  // The fee is taken from the item price only. The seller keeps the shipping fee to cover postage.
-  const shipping = isGear ? sellable.shipping_cents : 0;
-  const fee = isPlatformItem ? 0 : platformFeeCents(sellable.price_cents);
-  const site = getSiteUrl();
-  const embedded = Boolean(stripePublishableKey());
-  const returnUrl = `${site}/armory/${sellable.id}?purchase=done&session_id={CHECKOUT_SESSION_ID}`;
-  let url: string | null;
-  let clientSecret: string | null;
-  try {
-    const session = await getStripe().checkout.sessions.create({
-      mode: "payment",
-      ...(embedded
-        ? { ui_mode: "embedded" as const, return_url: returnUrl }
-        : { success_url: returnUrl, cancel_url: `${site}/armory/${sellable.id}` }),
-      customer_email: email || undefined,
-      client_reference_id: profile.id,
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: "usd",
-            unit_amount: sellable.price_cents,
-            product_data: { name: size ? `${sellable.title} (size ${size})` : sellable.title },
-          },
-        },
-      ],
-      ...(isGear
-        ? {
-            shipping_address_collection: { allowed_countries: ["US"] },
-            shipping_options: [
-              {
-                shipping_rate_data: {
-                  type: "fixed_amount",
-                  display_name: shipping > 0 ? "Standard shipping" : "Free shipping",
-                  fixed_amount: { amount: shipping, currency: "usd" },
-                },
-              },
-            ],
-          }
-        : {}),
-      payment_intent_data: destination
-        ? { application_fee_amount: fee, transfer_data: { destination } }
-        : undefined,
-      metadata: {
-        item_id: sellable.id,
-        member_id: profile.id,
-        seller_id: sellable.coach_id,
-        item_title: sellable.title.slice(0, 120),
-        kind: sellable.kind,
-        size: size ?? "",
-        // What GYMX2 keeps: the 10% fee on a coach sale, or everything on GYMX2's own items.
-        fee_cents: String(isPlatformItem ? sellable.price_cents + shipping : fee),
-      },
-    });
-    url = session.url;
-    clientSecret = session.client_secret;
-  } catch (error) {
-    console.error(error);
-    return { error: "We couldn't start checkout. Please try again." };
-  }
-  if (embedded && clientSecret) return { clientSecret };
-  if (!url) return { error: "We couldn't start checkout. Please try again." };
-  redirect(url);
+  const request = guestPurchaseRequestSchema.safeParse({
+    item_id: formData.get("item_id"),
+    size: formData.get("size") ?? "",
+    email: formData.get("email"),
+  });
+  if (!request.success) return { error: "Enter a valid email address and choose any required size." };
+  const result = await createArmoryCheckout({
+    itemId: request.data.item_id,
+    size: request.data.size,
+    email: request.data.email,
+    profile: null,
+    embedded: false,
+    locale: await getLocale(),
+  });
+  if ("error" in result) return { error: result.error };
+  if ("clientSecret" in result) return { error: "We couldn't start checkout. Please try again." };
+  redirect(result.url);
 }
 
 // The seller (or an admin, for GYMX2's own gear) marks an order shipped, with an optional tracking number.

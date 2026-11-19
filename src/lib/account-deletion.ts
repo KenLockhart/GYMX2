@@ -70,7 +70,17 @@ async function removeStoredFiles(userId: string) {
     "credential-docs",
   ]) {
     const { data } = await storage.from(bucket).list(userId, { limit: 1000 });
-    const paths = (data ?? []).map((file) => `${userId}/${file.name}`);
+    let paths = (data ?? []).map((file) => `${userId}/${file.name}`);
+    if (bucket === "armory-files" && paths.length) {
+      const { data: retained, error } = await createAdminClient()
+        .from("armory_checkout_intents")
+        .select("file_path")
+        .in("file_path", paths)
+        .in("status", ["pending", "paid"]);
+      if (error) continue;
+      const retainedPaths = new Set((retained ?? []).map((row) => row.file_path as string));
+      paths = paths.filter((path) => !retainedPaths.has(path));
+    }
     if (paths.length) await storage.from(bucket).remove(paths);
   }
 }

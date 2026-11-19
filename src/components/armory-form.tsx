@@ -15,10 +15,16 @@ import {
 import {
   DEFAULT_SIZES,
   categoriesFor,
+  parseSizes,
   PLATFORM_FEE_PERCENT,
   describeSize,
   type ArmoryKind,
 } from "@/lib/armory";
+import {
+  buildPrintfulVariantRows,
+  serializePrintfulVariantMappings,
+  type PrintfulVariantMapping,
+} from "@/lib/printful-mapping";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { T, useTr } from "@/i18n/t";
 
@@ -40,6 +46,9 @@ export type ArmoryFormValues = {
   made_to_order: boolean;
   delivery_min_weeks: number | null;
   delivery_max_weeks: number | null;
+  printful_sku: string | null;
+  printful_sync_variant_id: string | null;
+  printful_variant_mappings: PrintfulVariantMapping[];
 };
 
 type Upload = {
@@ -166,7 +175,19 @@ export function ArmoryForm({
   const [kind, setKind] = useState<ArmoryKind>(initial.kind);
   const [category, setCategory] = useState(initial.category);
   const [madeToOrder, setMadeToOrder] = useState(initial.made_to_order);
+  const [sizesText, setSizesText] = useState(initial.sizes);
+  const [printfulSku, setPrintfulSku] = useState(initial.printful_sku ?? "");
+  const [printfulSyncVariantId, setPrintfulSyncVariantId] = useState(
+    initial.printful_sync_variant_id ?? "",
+  );
+  const [printfulVariantMappings, setPrintfulVariantMappings] = useState(
+    initial.printful_variant_mappings ?? [],
+  );
   const categories = categoriesFor(kind, category);
+  const physicalKind = kind === "product" || kind === "preview";
+  const printfulCategory = category === "gear" || category === "accessories";
+  const printfulOptions = parseSizes(sizesText);
+  const printfulRows = buildPrintfulVariantRows(sizesText, printfulVariantMappings);
   // Choosing gear picks the Gear category; a digital file can't stay in Gear.
   function chooseKind(next: ArmoryKind) {
     setKind(next);
@@ -185,6 +206,29 @@ export function ArmoryForm({
     <ActionForm action={saveArmoryItem} className="max-w-xl space-y-5">
       <input type="hidden" name="id" value={initial.id} />
       <input type="hidden" name="kind" value={kind} />
+      {physicalKind && (
+        <>
+          <input
+            type="hidden"
+            name="printful_sku"
+            value={printfulCategory && printfulOptions.length === 0 ? printfulSku : ""}
+          />
+          <input
+            type="hidden"
+            name="printful_sync_variant_id"
+            value={printfulCategory && printfulOptions.length === 0 ? printfulSyncVariantId : ""}
+          />
+          <input
+            type="hidden"
+            name="printful_variant_mappings"
+            value={
+              printfulCategory
+                ? serializePrintfulVariantMappings(sizesText, printfulVariantMappings)
+                : ""
+            }
+          />
+        </>
+      )}
       <input
         type="hidden"
         name="file_path"
@@ -346,12 +390,96 @@ export function ArmoryForm({
           <Field
             label={tr("Sizes (optional)")}
             name="sizes"
+            maxLength={4096}
             placeholder={DEFAULT_SIZES}
-            defaultValue={initial.sizes}
+            value={sizesText}
+            onChange={(event) => setSizesText(event.target.value)}
             hint={tr(
               "Separate with commas. Buyers must pick one. Leave blank if there's only one version.",
             )}
           />
+          {printfulCategory ? (
+          <fieldset className="space-y-3 rounded-lg border border-border p-4">
+            <legend className="px-1 text-sm font-semibold">
+              <T>Printful reference</T>
+            </legend>
+            {printfulOptions.length === 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label={tr("Printful SKU (optional)")}
+                  value={printfulSku}
+                  onChange={(event) => setPrintfulSku(event.target.value)}
+                  maxLength={128}
+                  autoComplete="off"
+                />
+                <Field
+                  label={tr("Printful Sync Variant ID (optional)")}
+                  value={printfulSyncVariantId}
+                  onChange={(event) => setPrintfulSyncVariantId(event.target.value)}
+                  inputMode="numeric"
+                  maxLength={64}
+                  autoComplete="off"
+                />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted">
+                  <T>Map each listed size to its exact Printful variant. Leave every field blank for manual fulfillment.</T>
+                </p>
+                {printfulRows.map((mapping, index) => (
+                  <div
+                    key={`${mapping.option}-${index}`}
+                    className="grid gap-3 rounded-md bg-surface p-3 sm:grid-cols-2"
+                  >
+                    <Field
+                      label={tr("SKU for {option}", { option: mapping.option })}
+                      value={mapping.sku}
+                      onChange={(event) => {
+                        const rows = buildPrintfulVariantRows(sizesText, printfulVariantMappings);
+                        setPrintfulVariantMappings(
+                          rows.map((row) =>
+                            row.option === mapping.option
+                              ? { ...row, sku: event.target.value }
+                              : row,
+                          ),
+                        );
+                      }}
+                      maxLength={128}
+                      autoComplete="off"
+                    />
+                    <Field
+                      label={tr("Sync Variant ID for {option} (optional)", { option: mapping.option })}
+                      value={mapping.sync_variant_id ?? ""}
+                      onChange={(event) => {
+                        const rows = buildPrintfulVariantRows(sizesText, printfulVariantMappings);
+                        setPrintfulVariantMappings(
+                          rows.map((row) =>
+                            row.option === mapping.option
+                              ? { ...row, sync_variant_id: event.target.value || null }
+                              : row,
+                          ),
+                        );
+                      }}
+                      inputMode="numeric"
+                      maxLength={64}
+                      autoComplete="off"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted">
+              <T>Manual reference only. GYMX2 does not sync products or automatically fulfill orders.</T>
+            </p>
+            <p className="text-xs text-muted">
+              <T>Color options need separate listings.</T>
+            </p>
+          </fieldset>
+          ) : (
+            <p className="text-sm text-muted">
+              <T>Printful references are available for Gear and Accessories listings.</T>
+            </p>
+          )}
           <label className="flex items-start gap-3 text-sm">
             <input
               type="checkbox"

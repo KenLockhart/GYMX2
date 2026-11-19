@@ -33,6 +33,27 @@ function matchesPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
+const PUBLIC_ARMORY_DETAIL = /^\/armory\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requiresArmorySignIn(pathname: string) {
+  if (
+    pathname === "/armory" ||
+    pathname === "/armory/checkout-complete" ||
+    pathname === "/armory/claim" ||
+    PUBLIC_ARMORY_DETAIL.test(pathname)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function requiresSignIn(pathname: string) {
+  return PROTECTED_PREFIXES.some((prefix) => {
+    if (!matchesPrefix(pathname, prefix)) return false;
+    return prefix !== "/armory" || requiresArmorySignIn(pathname);
+  });
+}
+
 export async function updateSession(request: NextRequest) {
   const { url, publishableKey } = getSupabaseEnv();
   let response = NextResponse.next({ request });
@@ -57,7 +78,7 @@ export async function updateSession(request: NextRequest) {
   const signedIn = Boolean(data?.claims);
   const { pathname, search } = request.nextUrl;
 
-  if (signedIn || !PROTECTED_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) {
+  if (signedIn || !requiresSignIn(pathname)) {
     return response;
   }
 

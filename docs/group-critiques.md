@@ -7,13 +7,20 @@ the cleanup worker, and verified against the preset rules below.
 
 ## Current readiness (2026-11-18)
 
-PR72 and PR73 are merged and deployed. Hosted migration history contains 49 applied migrations;
-latest is `20261117230000`. Platform migrations `20261117220000` and `20261117230000` are applied;
-group migration `20261116010000` is not applied.
-Five non-secret RealtimeKit settings are configured: account, app, and the three preset names. The
-RealtimeKit API token is still pending setup through the correct Vercel authentication. No group
-cleanup heartbeat has been recorded, so the feature remains unavailable until the database migration,
-secret, and real cleanup heartbeat are in place.
+PR71 is merged and closed on main at `3216484`; PR72 and PR73 are also merged. Production deployment
+`dpl_9V7Vj6fw7nVSts7Vnc9cA9rQ6BWg` is Ready at `https://gymx2.com` (deployment URL
+`gymx-2-htc6d5p9c-ken-lockhart.vercel.app`). The group migration `20261116010000` was applied on
+2026-11-18 with its exact 135-statement migration history entry. Platform migrations
+`20261117220000` and `20261117230000` remain applied. The RealtimeKit server secret is installed in
+Production and Preview, and the five non-secret settings and three presets are configured.
+
+The actual scheduled cleanup job is active every minute; its latest observed run succeeded at
+`2026-11-19T01:31:00Z`. The database reports the account/app pair bound, with
+`group_critique_provider_bound()` and `group_critique_provider_ready()` both true. At the read,
+`last_cleanup_at` was `2026-11-19T01:31:00.49085Z`, 13.9 seconds old and within the three-minute
+window. This was an actual scheduled cleanup heartbeat; no manual heartbeat was written. The
+production feature is configured under the 25-member-plus-coach application cap, but full-room media
+capacity remains unverified.
 
 The latest 26-participant attempt joined all 26 actors, staged all 25 members, and completed publish
 for all 26 actors. Final receive samples had 0/650 active audio pairs and 375/650 active video pairs.
@@ -34,10 +41,10 @@ confirmed. Evidence:
 `.vercel/group-critique-qa/results/run-0b27a0df-b210-46f4-9ead-e18f85ed8593.json`. This control does
 not establish 26-participant capacity.
 
-The combined current tree passed `npm run lint`, `npx next typegen`, `npx tsc --noEmit --pretty false`,
+The PR71 release tree passed `npm run lint`, `npx next typegen`, `npx tsc --noEmit --pretty false`,
 `npm test -- --maxWorkers=2` (673 tests across 69 files), and `npm run build` (75 static pages).
-PR71 remains unmerged; the current 25-member application cap still needs a successful media-capacity
-verification before rollout.
+These checks apply to the merged PR71 release tree, not the in-progress public-armory worktree. No
+new full-room SDK capacity test has been run; the 26-participant result remains unverified.
 
 ## Provider setup
 

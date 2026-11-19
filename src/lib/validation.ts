@@ -369,6 +369,8 @@ export const purchaseRequestSchema = z.object({
   size: z.string().trim().max(40),
 });
 
+export const guestPurchaseRequestSchema = purchaseRequestSchema.extend({ email });
+
 export const shipOrderSchema = z.object({
   purchase_id: z.uuid(),
   tracking: z
