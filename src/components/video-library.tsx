@@ -10,7 +10,12 @@ import {
 } from "@/app/(app)/library/actions";
 import { useLocale, useT } from "@/i18n/client";
 import type { Messages } from "@/i18n/messages";
+import type { Locale } from "@/i18n/config";
 import { translateServerText } from "@/i18n/server-text";
+import {
+  DAILY_CONTENT_VIDEO_DELETE_BLOCKED,
+  DAILY_FUEL_VIDEO_DELETE_BLOCKED,
+} from "@/lib/daily-content";
 import { formatDuration } from "@/lib/format";
 import {
   type LibraryCard,
@@ -29,6 +34,18 @@ function rowTitle(title: string, t: Messages["library"]) {
 }
 
 type Viewer = { id: string; role: string };
+
+export function videoLibraryDeleteErrorMessage(
+  error: string,
+  copy: Messages["library"],
+  locale: Locale,
+) {
+  if (error === DAILY_CONTENT_VIDEO_DELETE_BLOCKED)
+    return copy.dailyContentReferenceError;
+  if (error === DAILY_FUEL_VIDEO_DELETE_BLOCKED)
+    return copy.dailyFuelReferenceError;
+  return translateServerText(error, locale);
+}
 
 export function VideoLibrary({
   videos,
@@ -423,7 +440,7 @@ function CardMenu({
           role="alert"
           className="absolute right-0 top-full z-10 mt-1 w-56 rounded-lg border border-danger bg-surface p-2 text-xs text-danger"
         >
-          {translateServerText(error, locale)}
+          {videoLibraryDeleteErrorMessage(error, t, locale)}
         </p>
       )}
     </div>

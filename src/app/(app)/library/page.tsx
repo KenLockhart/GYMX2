@@ -106,6 +106,11 @@ export default async function LibraryPage() {
               {t.savedVideos}
             </Link>
           )}
+          {isCoach && (
+            <Link href="/library/daily-content" className="btn-secondary">
+              {t.dailyContent.open}
+            </Link>
+          )}
           {canUpload && (
             <Link href="/library/upload" className="btn-primary">
               {t.upload}

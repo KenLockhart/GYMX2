@@ -5,6 +5,8 @@ export const nav = {
     "/tasks": "Tasks",
     "/calendar": "Calendar",
     "/library": "Library",
+    "/library/daily-content": "Daily content",
+    "/admin/daily-content": "Daily content",
     "/community": "Community",
     "/programs": "Programs",
     "/members": "Members",

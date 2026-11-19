@@ -49,7 +49,11 @@ describe("menus", () => {
     expect(has("moderator", "/moderation")).toBe(true);
     expect(has("coach", "/moderation")).toBe(true);
     expect(has("admin", "/admin/users")).toBe(true);
+    expect(has("admin", "/admin/daily-content")).toBe(true);
     expect(has("coach", "/admin/users")).toBe(false);
+    expect(has("coach", "/library/daily-content")).toBe(true);
+    expect(has("member", "/library/daily-content")).toBe(false);
+    expect(has("moderator", "/library/daily-content")).toBe(false);
   });
   it("puts every admin page in the sidebar once", () => {
     const hrefs = [

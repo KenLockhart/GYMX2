@@ -37,6 +37,9 @@ const dailyFuel = {
   video: null,
   videoError: false,
   bookmarkError: false,
+  quote: null,
+  quoteError: false,
+  affirmation: null,
   affirmed: false,
   affirmationError: false,
 };

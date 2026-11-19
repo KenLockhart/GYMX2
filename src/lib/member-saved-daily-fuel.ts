@@ -62,10 +62,92 @@ async function getMemberAccount() {
   return profile;
 }
 
+async function readPlaybackAuthorization(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  memberId: string,
+  videoId: string,
+): Promise<{ authorized: boolean; savedAt: string | null; error: boolean }> {
+  const currentDay = todayKey();
+  const [bookmark, assignment, grant] = await Promise.all([
+    supabase
+      .from("member_daily_fuel_bookmarks")
+      .select("video_id, created_at")
+      .eq("member_id", memberId)
+      .eq("video_id", videoId)
+      .maybeSingle(),
+    supabase
+      .from("member_daily_fuel_assignments")
+      .select("video_id, day")
+      .eq("member_id", memberId)
+      .eq("video_id", videoId)
+      .lte("day", currentDay)
+      .order("day", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("member_daily_content_video_grants")
+      .select("video_id, day")
+      .eq("member_id", memberId)
+      .eq("video_id", videoId)
+      .lte("day", currentDay)
+      .order("day", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (bookmark.error || assignment.error || grant.error)
+    return { authorized: false, savedAt: null, error: true };
+
+  const hasLegacyAssignment =
+    assignment.data?.video_id === videoId &&
+    typeof assignment.data.day === "string" &&
+    assignment.data.day <= currentDay;
+  const hasDailyContentGrant =
+    grant.data?.video_id === videoId &&
+    typeof grant.data.day === "string" &&
+    grant.data.day <= currentDay;
+  const savedBookmark = bookmark.data;
+  const hasOwnBookmark =
+    savedBookmark !== null && savedBookmark.video_id === videoId;
+
+  return {
+    authorized: hasOwnBookmark && (hasLegacyAssignment || hasDailyContentGrant),
+    savedAt:
+      hasOwnBookmark && typeof savedBookmark.created_at === "string"
+        ? savedBookmark.created_at
+        : null,
+    error: false,
+  };
+}
+
+async function readEligibleVideo(videoId: string): Promise<{
+  video: VideoRow | null;
+  error: boolean;
+}> {
+  const { data: rawVideo, error } = await createAdminClient()
+    .from("videos")
+    .select(
+      "id, title, description, status, visibility, duration_seconds, category, cloudflare_uid, coach:profiles!coach_id(display_name)",
+    )
+    .eq("id", videoId)
+    .maybeSingle();
+  const video = rawVideo as unknown as VideoRow | null;
+  if (error) return { video: null, error: true };
+  if (
+    !video ||
+    video.id !== videoId ||
+    video.status !== "ready" ||
+    (video.visibility !== "members" && video.visibility !== "private") ||
+    !video.cloudflare_uid
+  )
+    return { video: null, error: false };
+  return { video, error: false };
+}
+
 /**
- * Reads only videos that have both the caller's own bookmark and a legitimate
- * Daily Fuel assignment on or before the current Eastern day. The user client
- * proves those grants through RLS before the service client reads video details.
+ * Reads only videos that have the caller's own bookmark and either a nonfuture
+ * legacy Daily Fuel assignment or an exact saved Daily Content grant. The user
+ * client proves those grants through RLS before the service client reads details.
  */
 export async function loadSavedMemberDailyFuelVideos(): Promise<{
   videos: SavedDailyFuelCard[];
@@ -93,32 +175,63 @@ export async function loadSavedMemberDailyFuelVideos(): Promise<{
   const bookmarkIds = [...savedAtByVideo.keys()];
   if (bookmarkIds.length === 0) return { videos: [], error: false };
 
-  const assignmentResults = await Promise.all(
-    Array.from(
-      { length: Math.ceil(bookmarkIds.length / ASSIGNMENT_QUERY_BATCH_SIZE) },
-      (_, index) =>
-        supabase
-          .from("member_daily_fuel_assignments")
-          .select("video_id, day")
-          .eq("member_id", profile.id)
-          .in(
-            "video_id",
-            bookmarkIds.slice(
-              index * ASSIGNMENT_QUERY_BATCH_SIZE,
-              (index + 1) * ASSIGNMENT_QUERY_BATCH_SIZE,
-            ),
-          )
-          .lte("day", currentDay)
-          .order("day", { ascending: false })
-          .limit(1000),
+  const [assignmentResults, grantResults] = await Promise.all([
+    Promise.all(
+      Array.from(
+        { length: Math.ceil(bookmarkIds.length / ASSIGNMENT_QUERY_BATCH_SIZE) },
+        (_, index) =>
+          supabase
+            .from("member_daily_fuel_assignments")
+            .select("video_id, day")
+            .eq("member_id", profile.id)
+            .in(
+              "video_id",
+              bookmarkIds.slice(
+                index * ASSIGNMENT_QUERY_BATCH_SIZE,
+                (index + 1) * ASSIGNMENT_QUERY_BATCH_SIZE,
+              ),
+            )
+            .lte("day", currentDay)
+            .order("day", { ascending: false })
+            .limit(1000),
+      ),
     ),
-  );
-  if (assignmentResults.some((result) => result.error))
+    Promise.all(
+      Array.from(
+        { length: Math.ceil(bookmarkIds.length / ASSIGNMENT_QUERY_BATCH_SIZE) },
+        (_, index) =>
+          supabase
+            .from("member_daily_content_video_grants")
+            .select("video_id, day")
+            .eq("member_id", profile.id)
+            .in(
+              "video_id",
+              bookmarkIds.slice(
+                index * ASSIGNMENT_QUERY_BATCH_SIZE,
+                (index + 1) * ASSIGNMENT_QUERY_BATCH_SIZE,
+              ),
+            )
+            .lte("day", currentDay)
+            .order("day", { ascending: false })
+            .limit(1000),
+      ),
+    ),
+  ]);
+  if (
+    assignmentResults.some((result) => result.error) ||
+    grantResults.some((result) => result.error)
+  )
     return { videos: [], error: true };
   const assignments = assignmentResults.flatMap((result) => result.data ?? []);
+  const grants = grantResults.flatMap((result) => result.data ?? []);
 
   const authorizedIds = new Set<string>();
   for (const row of assignments ?? []) {
+    const id = idSchema.safeParse(row.video_id);
+    if (id.success && typeof row.day === "string" && row.day <= currentDay)
+      authorizedIds.add(id.data);
+  }
+  for (const row of grants ?? []) {
     const id = idSchema.safeParse(row.video_id);
     if (id.success && typeof row.day === "string" && row.day <= currentDay)
       authorizedIds.add(id.data);
@@ -155,8 +268,8 @@ export async function loadSavedMemberDailyFuelVideos(): Promise<{
 }
 
 /**
- * Revalidates bookmark + nonfuture assignment using the authenticated user
- * client before using the server-only Stream credential for this single clip.
+ * Revalidates the own bookmark plus either a nonfuture assignment or exact saved
+ * Daily Content grant before server-signing this single clip.
  */
 export async function loadSavedMemberDailyFuelPlayback(
   videoId: string,
@@ -165,59 +278,58 @@ export async function loadSavedMemberDailyFuelPlayback(
   const parsedVideoId = idSchema.safeParse(videoId);
   if (!profile || !parsedVideoId.success) return { video: null, error: false };
 
-  const currentDay = todayKey();
   const supabase = await createClient();
-  const [bookmark, assignment] = await Promise.all([
-    supabase
-      .from("member_daily_fuel_bookmarks")
-      .select("video_id, created_at")
-      .eq("member_id", profile.id)
-      .eq("video_id", parsedVideoId.data)
-      .maybeSingle(),
-    supabase
-      .from("member_daily_fuel_assignments")
-      .select("video_id, day")
-      .eq("member_id", profile.id)
-      .eq("video_id", parsedVideoId.data)
-      .lte("day", currentDay)
-      .order("day", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+  const authorization = await readPlaybackAuthorization(
+    supabase,
+    profile.id,
+    parsedVideoId.data,
+  );
+  if (authorization.error) return { video: null, error: true };
+  if (!authorization.authorized || !authorization.savedAt)
+    return { video: null, error: false };
+
+  const initialVideo = await readEligibleVideo(parsedVideoId.data);
+  if (initialVideo.error || !initialVideo.video)
+    return { video: null, error: initialVideo.error };
+
+  if (!isStreamConfigured())
+    return {
+      video: { ...toCard(initialVideo.video, authorization.savedAt), playerUrl: null },
+      error: true,
+    };
+
+  let playerUrl: string;
+  try {
+    playerUrl = await getPlayerUrl(initialVideo.video.cloudflare_uid);
+  } catch {
+    return {
+      video: { ...toCard(initialVideo.video, authorization.savedAt), playerUrl: null },
+      error: true,
+    };
+  }
+
+  // The signed URL is short-lived, but signing may take long enough for a
+  // bookmark, grant, assignment day, or source video to change. Recheck all
+  // authorization and media eligibility immediately before returning it.
+  const [latestAuthorization, latestVideo] = await Promise.all([
+    readPlaybackAuthorization(supabase, profile.id, parsedVideoId.data),
+    readEligibleVideo(parsedVideoId.data),
   ]);
-  if (bookmark.error || assignment.error)
+  if (latestAuthorization.error || latestVideo.error)
     return { video: null, error: true };
   if (
-    bookmark.data?.video_id !== parsedVideoId.data ||
-    assignment.data?.video_id !== parsedVideoId.data ||
-    typeof assignment.data.day !== "string" ||
-    assignment.data.day > currentDay
+    !latestAuthorization.authorized ||
+    !latestAuthorization.savedAt ||
+    !latestVideo.video ||
+    latestVideo.video.cloudflare_uid !== initialVideo.video.cloudflare_uid
   )
     return { video: null, error: false };
 
-  const { data: rawVideo, error: videoError } = await createAdminClient()
-    .from("videos")
-    .select(
-      "id, title, description, status, visibility, duration_seconds, category, cloudflare_uid, coach:profiles!coach_id(display_name)",
-    )
-    .eq("id", parsedVideoId.data)
-    .maybeSingle();
-  const video = rawVideo as unknown as VideoRow | null;
-  if (
-    videoError ||
-    !video ||
-    video.id !== parsedVideoId.data ||
-    video.status !== "ready" ||
-    (video.visibility !== "members" && video.visibility !== "private") ||
-    !video.cloudflare_uid
-  )
-    return { video: null, error: Boolean(videoError) };
-
-  const card = toCard(video, bookmark.data.created_at);
-  if (!isStreamConfigured()) return { video: { ...card, playerUrl: null }, error: true };
-  try {
-    const playerUrl = await getPlayerUrl(video.cloudflare_uid);
-    return { video: { ...card, playerUrl }, error: false };
-  } catch {
-    return { video: { ...card, playerUrl: null }, error: true };
-  }
+  return {
+    video: {
+      ...toCard(latestVideo.video, latestAuthorization.savedAt),
+      playerUrl,
+    },
+    error: false,
+  };
 }

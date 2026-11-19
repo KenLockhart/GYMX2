@@ -24,6 +24,9 @@ export type MemberDailyFuelData = {
   video: MemberDailyFuelVideo | null;
   videoError: boolean;
   bookmarkError: boolean;
+  quote: { text: string; attribution: string | null; revisionId: string } | null;
+  quoteError: boolean;
+  affirmation: { text: string; revisionId: string } | null;
   affirmed: boolean;
   affirmationError: boolean;
 };
@@ -63,31 +66,34 @@ export async function loadMemberDailyFuel(
     throw new Error("A valid member and Eastern day are required.");
 
   const supabase = await createClient();
-  const [assignmentResult, affirmationResult] = await Promise.all([
-    supabase
-      .from("member_daily_fuel_assignments")
-      .select("video_id")
-      .eq("member_id", profile.id)
-      .eq("day", day)
-      .maybeSingle(),
-    supabase
-      .from("member_daily_affirmations")
-      .select("affirmed_at")
-      .eq("member_id", profile.id)
-      .eq("day", day)
-      .maybeSingle(),
-  ]);
+  const resolution = await supabase.rpc("resolve_member_daily_content");
+  const row = Array.isArray(resolution.data)
+    ? resolution.data[0]
+    : resolution.data;
+  const resolutionIsCurrent = !resolution.error && !!row && row.day === day;
 
   const base: MemberDailyFuelData = {
     day,
     video: null,
-    videoError: Boolean(assignmentResult.error),
+    videoError: !resolutionIsCurrent,
     bookmarkError: false,
-    affirmed: Boolean(affirmationResult.data?.affirmed_at),
-    affirmationError: Boolean(affirmationResult.error),
+    quote: resolutionIsCurrent && row?.quote_text && row?.quote_revision_id
+      ? {
+          text: row.quote_text,
+          attribution: row.quote_attribution ?? null,
+          revisionId: row.quote_revision_id,
+        }
+      : null,
+    quoteError: !resolutionIsCurrent,
+    affirmation: resolutionIsCurrent && row?.affirmation_text && row?.affirmation_revision_id
+      ? { text: row.affirmation_text, revisionId: row.affirmation_revision_id }
+      : null,
+    affirmed: resolutionIsCurrent && Boolean(row?.affirmation_acknowledged),
+    affirmationError: !resolutionIsCurrent,
   };
-  const videoId = assignmentResult.data?.video_id;
-  if (!videoId || assignmentResult.error) return base;
+  if (!resolutionIsCurrent) return base;
+  const videoId = row?.video_id;
+  if (!videoId) return base;
   const parsedVideoId = idSchema.safeParse(videoId);
   if (!parsedVideoId.success) return { ...base, videoError: true };
 
@@ -127,10 +133,31 @@ export async function loadMemberDailyFuel(
   if (playerResult.status !== "fulfilled")
     return { ...base, videoError: true };
 
+  // A content slot or legacy assignment can change while Cloudflare mints a short-lived
+  // playback token. Only return the token if the same authenticated resolver still grants it.
+  const latestResolution = await supabase.rpc("resolve_member_daily_content");
+  const latestRow = Array.isArray(latestResolution.data)
+    ? latestResolution.data[0]
+    : latestResolution.data;
+  if (
+    latestResolution.error ||
+    !latestRow ||
+    latestRow.day !== day ||
+    latestRow?.video_id !== parsedVideoId.data ||
+    latestRow?.video_source !== row?.video_source ||
+    latestRow?.video_slot_id !== row?.video_slot_id ||
+    latestRow?.video_revision_id !== row?.video_revision_id ||
+    latestRow?.quote_revision_id !== row?.quote_revision_id ||
+    latestRow?.affirmation_revision_id !== row?.affirmation_revision_id
+  ) {
+    return { ...base, videoError: true, quoteError: true, affirmationError: true };
+  }
+
   const coach = relationOne(video.coach);
   const parsedDuration = Number(video.duration_seconds);
   return {
     ...base,
+    affirmed: Boolean(latestRow.affirmation_acknowledged),
     bookmarkError:
       bookmarkResult.status !== "fulfilled" ||
       Boolean(bookmarkResult.value.error),

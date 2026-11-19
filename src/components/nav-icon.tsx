@@ -40,6 +40,7 @@ const ICONS: Record<IconName, React.ComponentType<LucideProps>> = {
   tasks: ListChecks,
   calendar: CalendarDays,
   library: BookOpen,
+  dailyContent: CalendarDays,
   armory: ShoppingCart,
   community: Users,
   programs: Layers,
