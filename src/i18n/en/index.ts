@@ -12,6 +12,7 @@ import { programs } from "./programs";
 import { tasks } from "./tasks";
 import { track } from "./track";
 import { welcome } from "./welcome";
+import { intake } from "./intake";
 
 export const en = {
   auth,
@@ -31,4 +32,5 @@ export const en = {
   tasks,
   track,
   welcome,
+  intake,
 };

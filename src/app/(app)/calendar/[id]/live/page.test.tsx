@@ -8,10 +8,19 @@ const mocks = vi.hoisted(() => ({
   getT: vi.fn(),
   readPrivateLiveSession: vi.fn(),
   readGroupCritiqueSnapshot: vi.fn(),
+  getMemberCoachIntakeClearance: vi.fn(),
+  redirect: vi.fn((url: string) => { throw new Error(`NEXT_REDIRECT:${url}`); }),
   tables: [] as string[],
 }));
 
 vi.mock("@/lib/auth", () => ({ requireAccount: mocks.requireAccount }));
+vi.mock("@/lib/member-intake-server", () => ({
+  getMemberCoachIntakeClearance: mocks.getMemberCoachIntakeClearance,
+}));
+vi.mock("next/navigation", () => ({
+  redirect: mocks.redirect,
+  notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: mocks.createAdminClient,
@@ -139,6 +148,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.tables.length = 0;
   mocks.requireAccount.mockResolvedValue({ profile: { id: coachId, role: "coach" } });
+  mocks.getMemberCoachIntakeClearance.mockResolvedValue("cleared");
   mocks.getT.mockResolvedValue({
     calendar: {
       edit: { back: "Back" },
@@ -254,6 +264,27 @@ describe("live page mode selection", () => {
       },
     });
     expect(mocks.tables).not.toContain("session_live");
+  });
+
+  it("routes an invited member with pending intake through their internal live return path", async () => {
+    installData("broadcast");
+    mocks.requireAccount.mockResolvedValue({ profile: { id: memberId, role: "member" } });
+    mocks.getMemberCoachIntakeClearance.mockResolvedValue("needs_intake");
+
+    await expect(LivePage({ params: Promise.resolve({ id: sessionId }) }))
+      .rejects.toThrow(`NEXT_REDIRECT:/intake?coach=${coachId}&returnTo=${encodeURIComponent(`/calendar/${sessionId}/live`)}`);
+    expect(mocks.readGroupCritiqueSnapshot).not.toHaveBeenCalled();
+    expect(mocks.readPrivateLiveSession).not.toHaveBeenCalled();
+  });
+
+  it("sends a member without a confirmed booking back to session RSVP before live access", async () => {
+    installData("broadcast");
+    mocks.requireAccount.mockResolvedValue({ profile: { id: memberId, role: "member" } });
+    mocks.getMemberCoachIntakeClearance.mockResolvedValue("needs_booking");
+
+    await expect(LivePage({ params: Promise.resolve({ id: sessionId }) }))
+      .rejects.toThrow(`NEXT_REDIRECT:/calendar/${sessionId}`);
+    expect(mocks.readGroupCritiqueSnapshot).not.toHaveBeenCalled();
   });
 
   it("keeps the coach recovery room available when a closed private session has multiple invites", async () => {
