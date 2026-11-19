@@ -8,6 +8,7 @@ export type IconName =
   | "tasks"
   | "calendar"
   | "library"
+  | "dailyContent"
   | "armory"
   | "community"
   | "programs"
@@ -120,6 +121,7 @@ export function menuGroups(role: Role): NavGroup[] {
           item("/plans", "Memberships", "memberships"),
           item("/insights", "Insights", "insights"),
           item("/checkins", "Check-ins", "checkin"),
+          item("/library/daily-content", "Daily content", "dailyContent"),
           item("/groups", "My community", "groups"),
           item("/moderation", "Reports", "reports"),
         ],
@@ -181,6 +183,7 @@ export const ADMIN_NAV: { overview: NavItem; groups: NavGroup[] } = {
         item("/admin/matching", "Match weights", "weights"),
         item("/admin/reviews", "Reviews", "reviews"),
         item("/admin/messages", "Conversations", "conversations"),
+        item("/admin/daily-content", "Daily content", "dailyContent"),
         item("/admin/emails", "Emails", "emails"),
       ],
     },
