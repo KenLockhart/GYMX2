@@ -9,6 +9,7 @@ const navigation = [
   { label: "Disciplines", href: "#disciplines" },
   { label: "Community", href: "#community" },
   { label: "About", href: "#about" },
+  { label: "Armory", href: "/armory" },
 ] as const;
 
 export function HomepageHeader() {

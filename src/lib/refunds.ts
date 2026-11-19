@@ -10,6 +10,10 @@ import {
   invoicePaymentIntent,
 } from "@/lib/membership-server";
 import { getStripe } from "@/lib/stripe";
+import {
+  isArmoryChargeRefunded,
+  isLegacyPurchaseFullyRefunded,
+} from "@/lib/armory-commerce-core";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 
@@ -20,12 +24,13 @@ type PurchaseForRefund = {
   item_title: string;
   amount_cents: number;
   stripe_session_id: string;
+  checkout_intent_id: string | null;
   fulfillment_status: string;
   refunded_at: string | null;
 };
 
 const COLUMNS =
-  "id, member_id, seller_id, item_title, amount_cents, stripe_session_id, fulfillment_status, refunded_at";
+  "id, member_id, seller_id, item_title, amount_cents, stripe_session_id, checkout_intent_id, fulfillment_status, refunded_at";
 
 // Refunds an order in full through Stripe, then records it. For a coach's sale, the coach's share
 // is taken back and GYMX2 returns its fee, so the buyer gets everything back.
@@ -120,6 +125,27 @@ export async function recordRefund(
           buyer.email,
           refundEmail({ ...common, locale: buyer.locale, audience: "buyer" }),
         );
+      else if (purchase.checkout_intent_id) {
+        const { data: buyerIntent } = await createAdminClient()
+          .from("armory_checkout_intents")
+          .select("buyer_was_guest, guest_email, locale")
+          .eq("id", purchase.checkout_intent_id)
+          .maybeSingle<{
+            buyer_was_guest: boolean;
+            guest_email: string | null;
+            locale: "en" | "es";
+          }>();
+        if (buyerIntent?.buyer_was_guest && buyerIntent.guest_email) {
+          await sendEmail(
+            buyerIntent.guest_email,
+            refundEmail({
+              ...common,
+              locale: buyerIntent.locale,
+              audience: "buyer",
+            }),
+          );
+        }
+      }
       if (purchase.seller_id && purchase.seller_id !== refundedBy) {
         const seller = await loadRecipient(purchase.seller_id);
         if (seller)
@@ -142,14 +168,45 @@ export async function recordRefund(
 
 // A full refund made in the Stripe dashboard: find the order it belongs to and record it.
 export async function recordRefundFromCharge(charge: Stripe.Charge) {
-  if (!charge.refunded || typeof charge.payment_intent !== "string") return;
+  const paymentIntentId =
+    typeof charge.payment_intent === "string"
+      ? charge.payment_intent
+      : charge.payment_intent?.id;
+  if (!paymentIntentId) return;
+
+  const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
+  if (paymentIntent.metadata.kind === "armory_purchase") {
+    if (!isArmoryChargeRefunded({ refunded: charge.refunded, amountRefunded: charge.amount_refunded })) return;
+    const { data: purchaseId, error } = await createAdminClient().rpc(
+      "mark_armory_payment_refunded",
+      {
+        target_payment_intent_id: paymentIntentId,
+        target_charge_id: charge.id,
+      },
+    );
+    if (error) throw error;
+    if (typeof purchaseId === "string") {
+      const { data: purchase } = await createAdminClient()
+        .from("purchases")
+        .select(COLUMNS)
+        .eq("id", purchaseId)
+        .maybeSingle<PurchaseForRefund>();
+      if (purchase && !purchase.refunded_at) await recordRefund(purchase, null);
+    }
+    return;
+  }
+
+  // Keep the historical coach/legacy path full-refund-only. Partial refunds for that namespace
+  // must not revoke the whole purchase or void its full commission.
+  if (!isLegacyPurchaseFullyRefunded(charge.refunded)) return;
+
   const sessions = await getStripe().checkout.sessions.list({
-    payment_intent: charge.payment_intent,
+    payment_intent: paymentIntentId,
     limit: 1,
   });
   const sessionId =
     sessions.data[0]?.id ??
-    (await invoiceForPaymentIntent(charge.payment_intent));
+    (await invoiceForPaymentIntent(paymentIntentId));
   if (!sessionId) return;
   const { data: purchase } = await createAdminClient()
     .from("purchases")

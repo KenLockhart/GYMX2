@@ -321,6 +321,54 @@ export function orderShippedEmail(input: {
   );
 }
 
+export function guestArmoryOrderEmail(input: {
+  locale?: Locale;
+  siteUrl: string;
+  itemTitle: string;
+  amountCents: number;
+  size: string | null;
+  downloadUrl: string | null;
+}): Email {
+  const tr = trFor(input.locale);
+  const blocks: Block[] = [
+    {
+      kind: "p",
+      text: input.size
+        ? tr("Your order for {item} (size {size}) is confirmed.", {
+            item: input.itemTitle,
+            size: input.size,
+          })
+        : tr("Your order for {item} is confirmed.", { item: input.itemTitle }),
+    },
+    {
+      kind: "p",
+      text: tr("Total charged: {amount}.", { amount: money(input.amountCents) }),
+    },
+    ...(input.downloadUrl
+      ? [{ kind: "p" as const, text: tr("This secure download link expires in 7 days.") }]
+      : [
+          {
+            kind: "p" as const,
+            text: tr("We’ll email you when your order ships."),
+          },
+        ]),
+  ];
+  return build(
+    input.locale,
+    "armory.guest.receipt",
+    { item: input.itemTitle, amount: money(input.amountCents) },
+    {
+      subject: tr("Armory order confirmed: {p0}", { p0: oneLine(input.itemTitle) }),
+      heading: tr("Your Armory order is confirmed"),
+      blocks,
+      button: input.downloadUrl
+        ? { label: tr("Download your file"), url: input.downloadUrl }
+        : { label: tr("Browse the Armory"), url: `${input.siteUrl}/armory` },
+      footer: tr(ORDER_FOOTER),
+    },
+  );
+}
+
 export function newMessageEmail(input: {
   locale?: Locale;
   siteUrl: string;

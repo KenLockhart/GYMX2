@@ -102,5 +102,31 @@ export type ArmoryItem = {
   made_to_order: boolean;
   delivery_min_weeks: number | null;
   delivery_max_weeks: number | null;
+  printful_sku: string | null;
+  printful_sync_variant_id: string | null;
+  printful_variant_mappings: {
+    option: string;
+    sku: string;
+    sync_variant_id: string | null;
+  }[];
   created_at: string;
 };
+
+export type PublicArmoryItem = Pick<
+  ArmoryItem,
+  | "id"
+  | "coach_id"
+  | "kind"
+  | "category"
+  | "title"
+  | "description"
+  | "price_cents"
+  | "buy_url"
+  | "sizes"
+  | "shipping_cents"
+  | "image_path"
+  | "made_to_order"
+  | "delivery_min_weeks"
+  | "delivery_max_weeks"
+  | "created_at"
+> & { seller_label: string };

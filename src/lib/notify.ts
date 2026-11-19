@@ -34,6 +34,7 @@ type PurchaseRow = {
   id: string;
   // Empty once the buyer has deleted their account; the order is kept for records.
   member_id: string | null;
+  checkout_intent_id: string | null;
   seller_id: string | null;
   item_title: string;
   amount_cents: number;
@@ -49,7 +50,7 @@ async function loadPurchase(purchaseId: string) {
   const { data } = await createAdminClient()
     .from("purchases")
     .select(
-      "id, member_id, seller_id, item_title, amount_cents, fee_cents, size, shipping_name, shipping_address, fulfillment_status, tracking_number",
+      "id, member_id, checkout_intent_id, seller_id, item_title, amount_cents, fee_cents, size, shipping_name, shipping_address, fulfillment_status, tracking_number",
     )
     .eq("id", purchaseId)
     .maybeSingle<PurchaseRow>();
@@ -79,7 +80,7 @@ export function notifyNewSale(purchaseId: string) {
         locale,
         siteUrl: getSiteUrl(),
         itemTitle: purchase.item_title,
-        buyerName: buyer?.name ?? translate("A member", locale),
+        buyerName: buyer?.name ?? translate("A guest buyer", locale),
         amountCents: purchase.amount_cents,
         feeCents: purchase.seller_id ? purchase.fee_cents : 0,
         size: purchase.size,
@@ -98,15 +99,30 @@ export function notifyNewSale(purchaseId: string) {
 export function notifyOrderShipped(purchaseId: string) {
   return safely("order shipped", async () => {
     const purchase = await loadPurchase(purchaseId);
-    if (!purchase?.member_id || purchase.fulfillment_status !== "shipped")
-      return;
+    if (!purchase || purchase.fulfillment_status !== "shipped") return;
 
-    const [buyer, seller] = await Promise.all([
-      loadRecipient(purchase.member_id),
+    const [memberBuyer, seller] = await Promise.all([
+      purchase.member_id ? loadRecipient(purchase.member_id) : Promise.resolve(null),
       purchase.seller_id
         ? loadRecipient(purchase.seller_id)
         : Promise.resolve(null),
     ]);
+    let guestBuyer: { email: string; locale: Locale } | null = null;
+    if (!memberBuyer && purchase.checkout_intent_id) {
+      const { data } = await createAdminClient()
+        .from("armory_checkout_intents")
+        .select("buyer_was_guest, guest_email, locale")
+        .eq("id", purchase.checkout_intent_id)
+        .maybeSingle<{
+          buyer_was_guest: boolean;
+          guest_email: string | null;
+          locale: Locale;
+        }>();
+      if (data?.buyer_was_guest && data.guest_email) {
+        guestBuyer = { email: data.guest_email, locale: data.locale };
+      }
+    }
+    const buyer = memberBuyer ?? guestBuyer;
     if (!buyer) return;
 
     await sendEmail(

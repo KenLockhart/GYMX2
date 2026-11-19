@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const OWNER = "00000000-0000-4000-8000-000000000003";
 const mocks = vi.hoisted(() => ({ insert: vi.fn(), update: vi.fn() }));
+vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("redirect"); } }));
 vi.mock("@/lib/auth", () => ({ requireCoachOrAdmin: async () => ({ profile: { id: "00000000-0000-4000-8000-000000000003", role: "admin" } }) }));

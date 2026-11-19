@@ -50,6 +50,9 @@ export default async function NewArmoryItemPage() {
           made_to_order: false,
           delivery_min_weeks: null,
           delivery_max_weeks: null,
+          printful_sku: null,
+          printful_sync_variant_id: null,
+          printful_variant_mappings: [],
         }}
       />
     </div>
