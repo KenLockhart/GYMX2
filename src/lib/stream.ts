@@ -4,6 +4,14 @@ import type { VideoStatus } from "./types";
 
 const MAX_DURATION_SECONDS = 2 * 60 * 60;
 const UPLOAD_WINDOW_MS = 6 * 60 * 60 * 1000;
+const VIDEO_UID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const CREATOR_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+function videoUidPath(uid: string) {
+  if (typeof uid !== "string" || !VIDEO_UID_PATTERN.test(uid))
+    throw new Error("Invalid Cloudflare video identifier.");
+  return encodeURIComponent(uid);
+}
 
 function getStreamEnv() {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -147,7 +155,7 @@ export async function getVideoState(uid: string): Promise<{
   status: VideoStatus;
   durationSeconds: number | null;
 }> {
-  const response = await streamRequest(`/${uid}`);
+  const response = await streamRequest(`/${videoUidPath(uid)}`);
   if (response.status === 404)
     return { status: "failed", durationSeconds: null };
   if (!response.ok)
@@ -173,7 +181,9 @@ export async function getVideoState(uid: string): Promise<{
 // Links expire after an hour, so a shared link stops working. Fine for up to 1,000 plays a day;
 // Cloudflare recommends switching to a signing key above that.
 export async function getPlayerUrl(uid: string) {
-  const response = await streamRequest(`/${uid}/token`, { method: "POST" });
+  const response = await streamRequest(`/${videoUidPath(uid)}/token`, {
+    method: "POST",
+  });
   if (!response.ok)
     throw new Error(
       `Cloudflare couldn't start the video (${response.status}).`,
@@ -186,7 +196,9 @@ export async function getPlayerUrl(uid: string) {
 
 // A still from the video, through the same short-lived token as playback.
 export async function getThumbnailUrl(uid: string) {
-  const response = await streamRequest(`/${uid}/token`, { method: "POST" });
+  const response = await streamRequest(`/${videoUidPath(uid)}/token`, {
+    method: "POST",
+  });
   if (!response.ok)
     throw new Error(
       `Cloudflare couldn't make a thumbnail link (${response.status}).`,
@@ -196,8 +208,53 @@ export async function getThumbnailUrl(uid: string) {
   return `https://customer-${customerCode}.cloudflarestream.com/${result.token}/thumbnails/thumbnail.jpg?time=2s&height=360&fit=crop`;
 }
 
-export async function deleteVideo(uid: string) {
-  const response = await streamRequest(`/${uid}`, { method: "DELETE" });
+type VideoCreatorLookup =
+  | { exists: false; creatorId: null }
+  | { exists: true; creatorId: string | null };
+
+async function lookupVideoCreator(uid: string): Promise<VideoCreatorLookup> {
+  const response = await streamRequest(`/${videoUidPath(uid)}`);
+  if (response.status === 404) return { exists: false, creatorId: null };
+  if (!response.ok)
+    throw new Error(
+      `Cloudflare couldn't verify the video owner (${response.status}).`,
+    );
+
+  const body = (await response.json()) as {
+    result?: { creator?: unknown } | null;
+  };
+  const creatorId = body.result?.creator;
+  return {
+    exists: true,
+    creatorId:
+      typeof creatorId === "string" && creatorId.length > 0
+        ? creatorId
+        : null,
+  };
+}
+
+// Who started an upload (set from the signed-in person when the upload began).
+export async function getVideoCreator(uid: string) {
+  const result = await lookupVideoCreator(uid);
+  return result.exists ? result.creatorId : null;
+}
+
+export async function deleteVideo(uid: string, expectedCreatorId: string) {
+  const path = videoUidPath(uid);
+  if (
+    typeof expectedCreatorId !== "string" ||
+    !CREATOR_ID_PATTERN.test(expectedCreatorId)
+  )
+    throw new Error("The expected video owner is invalid.");
+
+  // The database row that references a UID is not proof that the provider UID belongs to the
+  // same person. Verify the authoritative Cloudflare creator before every VOD delete.
+  const ownership = await lookupVideoCreator(uid);
+  if (!ownership.exists) return;
+  if (ownership.creatorId !== expectedCreatorId)
+    throw new Error("Cloudflare video ownership could not be confirmed.");
+
+  const response = await streamRequest(`/${path}`, { method: "DELETE" });
   if (!response.ok && response.status !== 404) {
     throw new Error(
       `Cloudflare couldn't delete the video (${response.status}).`,
@@ -343,12 +400,4 @@ export async function findLiveInputsByMetaName(metaName: string): Promise<string
     matches.push(candidate.uid);
   }
   return matches;
-}
-
-// Who started an upload (set from the signed-in person when the upload began).
-export async function getVideoCreator(uid: string) {
-  const response = await streamRequest(`/${uid}`);
-  if (!response.ok) return null;
-  const { result } = await response.json();
-  return (result?.creator as string | undefined) ?? null;
 }

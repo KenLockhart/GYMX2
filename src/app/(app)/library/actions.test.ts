@@ -61,7 +61,12 @@ function userClient(options: {
   };
 }
 
-function adminClient(options: { uid?: string | null; error?: unknown; order?: string[] } = {}) {
+function adminClient(options: {
+  uid?: string | null;
+  coachId?: string | null;
+  error?: unknown;
+  order?: string[];
+} = {}) {
   const order = options.order ?? [];
   return {
     from: vi.fn((table: string) => ({
@@ -71,7 +76,19 @@ function adminClient(options: { uid?: string | null; error?: unknown; order?: st
             order.push(`admin-read:${table}`);
             return options.error
               ? { data: null, error: options.error }
-              : { data: options.uid === null ? null : { cloudflare_uid: options.uid ?? uid }, error: null };
+              : {
+                  data:
+                    options.uid === null
+                      ? null
+                      : {
+                          cloudflare_uid: options.uid ?? uid,
+                          coach_id:
+                            options.coachId === undefined
+                              ? coachId
+                              : options.coachId,
+                        },
+                  error: null,
+                };
           },
         }),
       }),
@@ -126,7 +143,7 @@ describe("Library video deletion reservation", () => {
       "provider-delete",
       "db-delete:videos",
     ]);
-    expect(mockDeleteStreamVideo).toHaveBeenCalledWith(uid);
+    expect(mockDeleteStreamVideo).toHaveBeenCalledWith(uid, coachId);
     expect(mockRevalidatePath).toHaveBeenCalledWith("/library/saved");
     expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard");
   });
@@ -146,5 +163,16 @@ describe("Library video deletion reservation", () => {
       "admin-read:videos",
     ]);
     expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("does not call the provider when the stored video owner is missing", async () => {
+    const user = userClient();
+    mockCreateClient.mockResolvedValue(user);
+    mockCreateAdminClient.mockReturnValue(adminClient({ coachId: null }));
+
+    await expect(deleteVideo({}, formData())).resolves.toEqual({
+      error: "We couldn't delete that video. Please try again.",
+    });
+    expect(mockDeleteStreamVideo).not.toHaveBeenCalled();
   });
 });

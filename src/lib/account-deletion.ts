@@ -135,9 +135,9 @@ async function removeVideos(userId: string) {
       .not("video_uid", "is", null),
   ]);
   for (const video of data ?? [])
-    await deleteVideo(video.cloudflare_uid as string);
+    await deleteVideo(video.cloudflare_uid as string, userId);
   for (const video of postVideos ?? [])
-    await deleteVideo(video.video_uid as string);
+    await deleteVideo(video.video_uid as string, userId);
 }
 
 async function removePayoutAccount(userId: string) {

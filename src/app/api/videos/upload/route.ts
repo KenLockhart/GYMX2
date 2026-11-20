@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     });
     if (error) {
       // Nothing points at this upload now, so don't leave it behind in Cloudflare.
-      await deleteVideo(uid).catch(console.error);
+      await deleteVideo(uid, account.profile.id).catch(console.error);
       throw new Error(`The video couldn't be saved (${error.code}).`);
     }
 
