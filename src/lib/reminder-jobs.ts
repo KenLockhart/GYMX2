@@ -12,6 +12,7 @@ import type { Locale } from "@/i18n/config";
 import { messages } from "@/i18n/messages";
 import { translate } from "@/i18n/phrases";
 import { loadRecipient, sendEmail } from "@/lib/email";
+import { loadProgramReminderCandidates } from "@/lib/program-progress-data";
 import {
   checkinReminderEmail,
   sessionReminderEmail,
@@ -29,7 +30,6 @@ import {
   tomorrowKey,
 } from "@/lib/reminders";
 import { weekStart } from "@/lib/checkins";
-import { unlockedThrough } from "@/lib/programs";
 import { sendPush } from "@/lib/push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
@@ -354,7 +354,8 @@ async function remindStreaks(now: Date) {
   return sent;
 }
 
-// Members with notifications on hear when today's program day unlocks (day 2 onward), once.
+// Members with notifications on hear when the canonical progress service says today's lesson is
+// newly unlocked and unfinished. The RPC applies current version/payment eligibility.
 async function pushProgramDays(now: Date) {
   const db = createAdminClient();
   const { data: devices } = await db
@@ -369,53 +370,37 @@ async function pushProgramDays(now: Date) {
   const today = todayKey(now);
   let sent = 0;
   for (let start = 0; start < userIds.length; start += 200) {
-    const { data } = await db
-      .from("program_enrollments")
-      .select(
-        "id, member_id, started_on, program:programs(id, title, program_days(id, day_number, title)), program_day_completions(day_id)",
-      )
-      .in("member_id", userIds.slice(start, start + 200))
-      .is("completed_at", null)
-      .limit(5000);
-    const rows = (data ?? []) as unknown as {
-      id: string;
-      member_id: string;
-      started_on: string;
-      program: {
-        id: string;
-        title: string;
-        program_days: { id: string; day_number: number; title: string }[];
-      } | null;
-      program_day_completions: { day_id: string }[];
-    }[];
-    for (const row of rows) {
-      const dayNumber = unlockedThrough(row.started_on, today);
-      const day = row.program?.program_days.find(
-        (item) => item.day_number === dayNumber,
-      );
-      if (
-        dayNumber < 2 ||
-        !day ||
-        row.program_day_completions.some((done) => done.day_id === day.id)
-      )
-        continue;
+    let candidates;
+    try {
+      candidates = await loadProgramReminderCandidates({
+        memberIds: userIds.slice(start, start + 200),
+        easternToday: today,
+      });
+    } catch (error) {
+      console.error("Program reminder lookup failed", error);
+      continue;
+    }
+    for (const candidate of candidates) {
       const { data: claimed } = await db
         .from("reminder_log")
         .upsert(
           {
-            user_id: row.member_id,
+            user_id: candidate.member_id,
             kind: "program",
-            ref: `${row.id}:${dayNumber}`,
+            ref: candidate.reminder_key,
           },
           { onConflict: "user_id,kind,ref", ignoreDuplicates: true },
         )
         .select("user_id");
       if (!claimed?.length) continue;
-      sent += await sendPush([row.member_id], {
-        title: { text: "Day {n} is ready", vars: { n: dayNumber } },
-        body: `${row.program?.title}: ${day.title}`,
-        url: `/programs/${row.program?.id}`,
-        tag: `program-${row.id}`,
+      sent += await sendPush([candidate.member_id], {
+        title: {
+          text: "Day {n} is ready",
+          vars: { n: candidate.timeline_day_number },
+        },
+        body: `${candidate.program_title}: ${candidate.lesson_title}`,
+        url: `/programs/${candidate.program_id}`,
+        tag: `program-${candidate.enrollment_id}`,
       });
     }
   }

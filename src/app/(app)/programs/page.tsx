@@ -8,10 +8,14 @@ import {
 } from "@/components/form-parts";
 import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
-import { progressPercent, unlockedThrough } from "@/lib/programs";
-import { todayKey } from "@/lib/reminders";
+import { progressPercent } from "@/lib/programs";
 import { createClient } from "@/lib/supabase/server";
 import { createProgram, startProgram } from "./actions";
+import {
+  loadOwnProgramProgressSummaries,
+  loadProgramCatalogLessonCounts,
+  loadProgramProgressSummariesForProgram,
+} from "@/lib/program-progress-data";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT()).programs.title };
@@ -26,7 +30,6 @@ type Program = {
   platform_owned: boolean;
   coach: { display_name: string } | null;
   program_days: { count: number }[];
-  program_enrollments?: { count: number }[];
 };
 
 export default async function ProgramsPage() {
@@ -39,7 +42,7 @@ export default async function ProgramsPage() {
     const query = supabase
       .from("programs")
       .select(
-        "id, coach_id, title, description, published, platform_owned, coach:profiles!coach_id(display_name), program_days(count), program_enrollments(count)",
+        "id, coach_id, title, description, published, platform_owned, coach:profiles!coach_id(display_name), program_days(count)",
       )
       .order("created_at", { ascending: false });
     const [{ data }, { data: videoData }] = await Promise.all([
@@ -53,6 +56,27 @@ export default async function ProgramsPage() {
     ]);
     const programs = (data ?? []) as unknown as Program[];
     const introVideos = (videoData ?? []) as { id: string; title: string }[];
+    const progressByProgram = new Map<
+      string,
+      Awaited<ReturnType<typeof loadProgramProgressSummariesForProgram>>
+    >();
+    for (let start = 0; start < programs.length; start += 8) {
+      const batch = programs.slice(start, start + 8);
+      const summaries = await Promise.all(
+        batch.map((program) =>
+          loadProgramProgressSummariesForProgram(program.id, supabase),
+        ),
+      );
+      batch.forEach((program, index) => {
+        progressByProgram.set(program.id, summaries[index]);
+      });
+    }
+    const catalogCounts = await loadProgramCatalogLessonCounts(
+      programs.map((program) => ({
+        id: program.id,
+        dayCount: program.program_days[0]?.count ?? 0,
+      })),
+    );
     return (
       <div className="space-y-8">
         <div>
@@ -129,8 +153,8 @@ export default async function ProgramsPage() {
                       : !isCoach
                         ? `${program.coach?.display_name ?? t.aCoach} · `
                         : ""}
-                    {t.weeks(program.program_days[0]?.count ?? 0)} ·{" "}
-                    {t.started(program.program_enrollments?.[0]?.count ?? 0)} ·{" "}
+                    {t.weeks(catalogCounts.get(program.id) ?? 0)} ·{" "}
+                    {t.started(progressByProgram.get(program.id)?.length ?? 0)} ·{" "}
                     {program.published ? t.published : t.draft}
                   </p>
                 </div>
@@ -143,15 +167,8 @@ export default async function ProgramsPage() {
   }
 
   // Members: programs they've started, and published programs from coaches they joined.
-  const today = todayKey();
-  const [{ data: enrolled }, { data: available }] = await Promise.all([
-    supabase
-      .from("program_enrollments")
-      .select(
-        "id, started_on, program:programs(id, title, coach:profiles!coach_id(display_name), program_days(count)), program_day_completions(count)",
-      )
-      .eq("member_id", profile.id)
-      .order("created_at", { ascending: false }),
+  const [ownSummaries, { data: available }] = await Promise.all([
+    loadOwnProgramProgressSummaries(),
     supabase
       .from("programs")
       .select(
@@ -160,19 +177,28 @@ export default async function ProgramsPage() {
       .eq("published", true)
       .order("created_at", { ascending: false }),
   ]);
-  const mine = (enrolled ?? []) as unknown as {
-    id: string;
-    started_on: string;
-    program: {
-      id: string;
-      title: string;
-      coach: { display_name: string } | null;
-      program_days: { count: number }[];
-    } | null;
-    program_day_completions: { count: number }[];
-  }[];
-  const startedIds = new Set(mine.map((row) => row.program?.id));
-  const open = ((available ?? []) as unknown as Program[]).filter(
+  const mine = ownSummaries.filter((row) => row.mode !== "not_enrolled");
+  const openPrograms = (available ?? []) as unknown as Program[];
+  const openProgramIds = new Set(openPrograms.map((program) => program.id));
+  const catalogCounts = await loadProgramCatalogLessonCounts(
+    openPrograms.map((program) => ({
+      id: program.id,
+      dayCount: program.program_days[0]?.count ?? 0,
+    })),
+  );
+  const startedIds = new Set(
+    mine
+      .filter((row) => {
+        if (!row.program_exists) return false;
+        if (row.mode === "paid_order") return true;
+        return (
+          (row.mode === "legacy_free" || row.mode === "free_snapshot") &&
+          row.enrollment_id !== null
+        );
+      })
+      .map((row) => row.program_id),
+  );
+  const open = openPrograms.filter(
     (program) => !startedIds.has(program.id),
   );
 
@@ -191,35 +217,46 @@ export default async function ProgramsPage() {
           </p>
         ) : (
           <ul className="grid gap-3 md:grid-cols-2">
-            {mine.map((row) => {
-              const total = row.program?.program_days[0]?.count ?? 0;
-              const done = row.program_day_completions[0]?.count ?? 0;
+          {mine.map((row) => {
+              const total = row.required_count;
+              const done = Math.min(row.current_completed_count, total);
               const percent = progressPercent(done, total);
+              const linked =
+                row.program_exists && openProgramIds.has(row.program_id);
+              const currentProgress =
+                row.program_exists &&
+                (row.mode === "paid_order" ||
+                  ((row.mode === "legacy_free" ||
+                    row.mode === "free_snapshot") &&
+                    row.enrollment_id !== null));
               return (
                 <li
-                  key={row.id}
+                  key={row.program_id}
                   className="rounded-lg border border-border bg-surface p-4"
                 >
-                  <Link
-                    href={`/programs/${row.program?.id}`}
-                    className="text-link font-semibold"
-                  >
-                    {row.program?.title ?? t.program}
-                  </Link>
+                  {linked ? (
+                    <Link
+                      href={`/programs/${row.program_id}`}
+                      className="text-link font-semibold"
+                    >
+                      {row.program_title}
+                    </Link>
+                  ) : (
+                    <p className="font-semibold">{row.program_title}</p>
+                  )}
                   <p className="text-sm text-muted">
-                    {row.program?.coach?.display_name} ·{" "}
-                    {t.dayOf(
-                      Math.min(unlockedThrough(row.started_on, today), total),
-                      total,
-                      done,
-                    )}
+                    {currentProgress
+                      ? t.currentProgress(done, total)
+                      : t.historyProgress(row.completed_once_count)}
                   </p>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-raised">
-                    <div
-                      className="h-full rounded-full bg-accent"
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
+                  {currentProgress && (
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-raised">
+                      <div
+                        className="h-full rounded-full bg-accent"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -250,7 +287,7 @@ export default async function ProgramsPage() {
                     {program.platform_owned
                       ? t.platform
                       : program.coach?.display_name ?? t.aCoach}{" "}·{" "}
-                    {t.weeks(program.program_days[0]?.count ?? 0)}
+                    {t.weeks(catalogCounts.get(program.id) ?? 0)}
                   </p>
                 </div>
                 {program.description && (

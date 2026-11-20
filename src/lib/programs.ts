@@ -1,5 +1,7 @@
 // Program rules: one day unlocks each day after a member starts. Days follow Eastern time.
 
+export { canReadProgramVersionedLesson } from "./program-versioned-progress";
+
 function dayNumberSince(startedOn: string, today: string) {
   const start = new Date(`${startedOn}T12:00:00Z`).getTime();
   const now = new Date(`${today}T12:00:00Z`).getTime();
