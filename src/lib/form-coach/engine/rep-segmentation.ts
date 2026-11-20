@@ -126,9 +126,9 @@ export class CurlRepSegmenter {
     }
     this.processedSamples += 1;
     if (Number.isFinite(this.lastTimestampMs) && sample.timestampMs - this.lastTimestampMs > this.options.maxGapMs) {
-      this.rejectCandidate(sample.timestampMs, "sample_gap", rejected);
-      this.lastBottom = null;
-      this.changePhase("seeking_bottom", sample.timestampMs, transitions);
+      const invalidated = this.invalidateCurrentCandidate(sample.timestampMs, "sample_gap");
+      transitions.push(...invalidated.transitions);
+      rejected.push(...invalidated.rejected);
     }
     this.lastTimestampMs = sample.timestampMs;
 
@@ -141,18 +141,9 @@ export class CurlRepSegmenter {
       !Number.isFinite(confidence) ||
       confidence < this.options.minimumConfidence
     ) {
-      if (this.candidate) {
-        const badRep = {
-          startMs: this.candidate.startMs,
-          endMs: sample.timestampMs,
-          reason: "low_confidence" as const,
-        };
-        this.rejected.push(badRep);
-        rejected.push(badRep);
-      }
-      this.candidate = null;
-      this.lastBottom = null;
-      this.changePhase("seeking_bottom", sample.timestampMs, transitions);
+      const invalidated = this.invalidateCurrentCandidate(sample.timestampMs, "low_confidence");
+      transitions.push(...invalidated.transitions);
+      rejected.push(...invalidated.rejected);
       return { transitions, completed, rejected, stopReason: null };
     }
     if (
@@ -160,9 +151,9 @@ export class CurlRepSegmenter {
       !Number.isFinite(sample.torsoSwingDeg) || sample.torsoSwingDeg < 0 || sample.torsoSwingDeg > 180 ||
       !Number.isFinite(sample.shoulderShrugRatio)
     ) {
-      if (this.candidate) this.rejectCandidate(sample.timestampMs, "invalid_metrics", rejected);
-      this.lastBottom = null;
-      this.changePhase("seeking_bottom", sample.timestampMs, transitions);
+      const invalidated = this.invalidateCurrentCandidate(sample.timestampMs, "invalid_metrics");
+      transitions.push(...invalidated.transitions);
+      rejected.push(...invalidated.rejected);
       return { transitions, completed, rejected, stopReason: null };
     }
 
@@ -267,6 +258,35 @@ export class CurlRepSegmenter {
     }
     this.lastBottom = null;
     this.changePhase("seeking_bottom", atMs, transitions);
+    return { transitions, completed: [], rejected, stopReason: this.stopReason };
+  }
+
+  /**
+   * Drops the current rep candidate and prior bottom anchor without clearing completed reps,
+   * rejection history, set samples, or the segmenter's timestamp epoch. This is used when the
+   * adapter observes an unusable pose or a timestamp discontinuity outside `push()`.
+   */
+  invalidateCurrentCandidate(
+    atMs: number | undefined,
+    reason: "low_confidence" | "sample_gap" | "invalid_metrics",
+  ): SegmenterUpdate {
+    const transitions: PhaseTransition[] = [];
+    const rejected: RejectedRep[] = [];
+    if (this.stopReason) return { transitions, completed: [], rejected, stopReason: this.stopReason };
+
+    const safeTimestamp = Number.isFinite(atMs)
+      ? Math.max(atMs as number, this.lastTimestampMs)
+      : this.lastTimestampMs;
+    if (this.candidate) {
+      const rejectionTime = Number.isFinite(safeTimestamp) ? safeTimestamp : this.candidate.startMs;
+      this.rejectCandidate(rejectionTime, reason, rejected);
+    }
+    this.lastBottom = null;
+    if (Number.isFinite(safeTimestamp)) {
+      this.changePhase("seeking_bottom", safeTimestamp, transitions);
+    } else {
+      this.currentPhase = "seeking_bottom";
+    }
     return { transitions, completed: [], rejected, stopReason: this.stopReason };
   }
 

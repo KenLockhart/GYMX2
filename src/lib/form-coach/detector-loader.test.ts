@@ -142,6 +142,16 @@ describe("injected Form Coach detector loader", () => {
     expect(sdk.createPoseDetector).toHaveBeenCalledTimes(1);
   });
 
+  it("can start a fresh Worker session on CPU without creating a GPU context", async () => {
+    const { deps, calls } = dependencies();
+    const loader = createDetectorLoader(deps);
+    const result = await loader.start("lite", true);
+
+    expect(result).toMatchObject({ status: "ready", model: "lite", delegate: "CPU" });
+    expect(deps.createGpuCanvas).not.toHaveBeenCalled();
+    expect(calls).not.toContain("gpu-canvas");
+  });
+
   it("lets stop win over a pending SDK import and never creates a detector", async () => {
     const sdkDeferred = deferred<DetectorSdkFacade>();
     const loadStarted = deferred<void>();

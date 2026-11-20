@@ -44,6 +44,7 @@ export interface FrameSender<F extends TransferableFrameLike> {
   getState(): FrameSenderState;
   getDroppedFrameCount(): number;
   hasInFlightFrame(): boolean;
+  recordDroppedFrame(count?: number): boolean;
   offer(frame: F, captureTimestampMs: number): FrameOfferResult;
   complete(sequence: number, captureTimestampMs: number, completionTimestampMs: number): FrameCompletionResult;
   reject(sequence: number, code: FrameWorkerFailure): FrameRejectResult;
@@ -132,6 +133,10 @@ export function createFrameSender<F extends TransferableFrameLike>(options: Fram
     getState: () => state,
     getDroppedFrameCount: () => totalDroppedFrames,
     hasInFlightFrame: () => inFlight !== null,
+    recordDroppedFrame(count = 1) {
+      if (state !== "active") return false;
+      return countDrop(count);
+    },
 
     offer(frame, captureTimestampMs) {
       if (state !== "active") {

@@ -204,6 +204,20 @@ describe("standing curl state-machine segmentation", () => {
     expect(result.rejected.map(({ reason }) => reason)).toContain("low_confidence");
   });
 
+  it("invalidates the active candidate without changing accumulated set accounting", () => {
+    const segmenter = new CurlRepSegmenter({ maxSessionSamples: 3 });
+    segmenter.push(angleSample(0, 160));
+    segmenter.push(angleSample(100, 140));
+
+    const invalidated = segmenter.invalidateCurrentCandidate(150, "low_confidence");
+    expect(invalidated.rejected).toEqual([{ startMs: 100, endMs: 150, reason: "low_confidence" }]);
+    expect(segmenter.phase).toBe("seeking_bottom");
+
+    expect(segmenter.push(angleSample(200, 160)).stopReason).toBeNull();
+    expect(segmenter.push(angleSample(300, 140)).stopReason).toBe("session_sample_limit");
+    expect(segmenter.result().rejected).toContainEqual({ startMs: 100, endMs: 150, reason: "low_confidence" });
+  });
+
   it("rejects incomplete numeric metrics instead of treating missing measurements as zero", () => {
     const incomplete = {
       ...angleSample(600, 120),

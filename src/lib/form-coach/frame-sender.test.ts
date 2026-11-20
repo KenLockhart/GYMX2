@@ -29,6 +29,25 @@ function setup(send?: (message: WorkerFrameMessage<FakeFrame>, transfer: readonl
 }
 
 describe("single-credit frame sender", () => {
+  it("counts callback frames skipped before bitmap creation and attaches drops to the next completion", () => {
+    const { sender, sent } = setup();
+    expect(sender.recordDroppedFrame()).toBe(true);
+    expect(sender.recordDroppedFrame(2)).toBe(true);
+    expect(sender.offer(new FakeFrame(), 50)).toEqual({ status: "sent", sequence: 1 });
+    expect(sent[0]?.droppedFramesSincePrevious).toBe(3);
+    expect(sender.complete(1, 50, 60)).toMatchObject({ status: "processed", droppedFramesSincePrevious: 3 });
+    expect(sender.getDroppedFrameCount()).toBe(3);
+  });
+
+  it("rejects invalid skipped-frame counts and stops counting after teardown", () => {
+    const { sender } = setup();
+    expect(sender.recordDroppedFrame(0)).toBe(true);
+    expect(sender.recordDroppedFrame(-1)).toBe(false);
+    sender.stop();
+    expect(sender.recordDroppedFrame()).toBe(false);
+    expect(sender.getDroppedFrameCount()).toBe(0);
+  });
+
   it("transfers only one frame and carries busy drops to the next processed frame", () => {
     const { sender, sent, transfers } = setup();
     const first = new FakeFrame();

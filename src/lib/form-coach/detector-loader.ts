@@ -6,7 +6,7 @@ const ASSET_ROOT = "/form-coach-assets/1.2.3-assets1";
 const LITE_MODEL_HASH = "59929E1D1EE95287735DDD833B19CF4AC46D29BC7AFDDBBF6753C459690D574A";
 const FULL_MODEL_HASH = "4EAA5EB7A98365221087693FCC286334CF0858E2EB6E15B506AA4A7ECDCEC4AD";
 const NOTICE_HASH = "990FC65872D97964D2C68AD4AA3906610D9D43B9290B390A744F5466D083994B";
-export const FORM_COACH_WASM_BASE_PATH = `${ASSET_ROOT}/wasm/`;
+export const FORM_COACH_WASM_BASE_PATH = `${ASSET_ROOT}/wasm`;
 
 /** Public output paths produced by the offline, hash-pinned asset copy step. */
 export const FORM_COACH_ASSET_PATHS = Object.freeze({
@@ -77,7 +77,7 @@ export interface DetectorLoaderDependencies {
 
 export interface DetectorLoader {
   getState(): DetectorLoaderState;
-  start(model: FormCoachModel): Promise<DetectorLoadResult>;
+  start(model: FormCoachModel, forceCpu?: boolean): Promise<DetectorLoadResult>;
   stop(): Promise<void>;
 }
 
@@ -164,7 +164,7 @@ export function createDetectorLoader(dependencies: DetectorLoaderDependencies): 
     };
   }
 
-  async function start(model: FormCoachModel): Promise<DetectorLoadResult> {
+  async function start(model: FormCoachModel, forceCpu = false): Promise<DetectorLoadResult> {
     if (state !== "idle") {
       return { status: "failed", code: state === "stopped" ? "stopped" : "already-started" };
     }
@@ -210,6 +210,20 @@ export function createDetectorLoader(dependencies: DetectorLoaderDependencies): 
       return fail("fileset-failed", runEpoch);
     }
     if (!isCurrent(runEpoch)) return { status: "failed", code: "stopped" };
+
+    if (forceCpu) {
+      let cpuDetector: PoseDetectorHandle;
+      try {
+        cpuDetector = await makeDetector(sdk, fileset, selectedModelPath, "CPU");
+      } catch {
+        return fail("cpu-init-failed", runEpoch);
+      }
+      if (!isCurrent(runEpoch)) return stopStaleAttempt(cpuDetector, null);
+      detector = cpuDetector;
+      detectorCanvas = null;
+      state = "ready";
+      return { status: "ready", model, delegate: "CPU", detector: cpuDetector };
+    }
 
     let gpuCanvas: unknown | null = null;
     let gpuDetector: PoseDetectorHandle | null = null;
