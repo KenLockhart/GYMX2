@@ -17,6 +17,16 @@ export const featurePricing = {
     portalButton: "Open billing portal",
     portalUnavailable: "The billing portal is unavailable for this account right now.",
     noOffer: "No verified price is available for your account.",
+    assessmentTrial: {
+      title: "Free assessment trial",
+      description: (count: number) => `Claim ${count} assessment${count === 1 ? "" : "s"} once. This is a one-time trial, not a paid checkout.`,
+      claim: "Claim free assessments",
+      claimed: "Your free assessment trial is ready.",
+      alreadyClaimed: "A Form Coach trial was already claimed for this account.",
+      comingSoon: "The assessment trial is not available right now.",
+      invalid: "The trial request could not be verified. Refresh and try again.",
+      unavailable: "The trial could not be recorded. Your account was not granted trial access.",
+    },
     offerTitle: {
       monthlyPlan: "Monthly plan",
       annualPlan: "Annual plan",

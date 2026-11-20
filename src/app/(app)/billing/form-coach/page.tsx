@@ -9,7 +9,7 @@ import {
   type FormCoachBillingPageData,
 } from "@/lib/form-coach/checkout-server";
 import { getFormCoachOfferTitle } from "@/lib/form-coach/offer-title";
-import { openFormCoachBillingPortal, startFormCoachCheckout } from "./actions";
+import { claimFormCoachAssessmentTrialAction, openFormCoachBillingPortal, startFormCoachCheckout } from "./actions";
 
 type PageProps = Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -59,6 +59,13 @@ function statusMessage(status: string | null, copy: Awaited<ReturnType<typeof ge
     case "account_deleting": return copy.status.account_deleting;
     case "membership_required": return copy.status.membership_required;
     case "portal_unavailable": return copy.status.portal_unavailable;
+    case "trial_claimed": return copy.assessmentTrial.claimed;
+    case "trial_already_claimed": return copy.assessmentTrial.alreadyClaimed;
+    case "trial_coming_soon": return copy.assessmentTrial.comingSoon;
+    case "trial_invalid": return copy.assessmentTrial.invalid;
+    case "trial_account_deleting": return copy.status.account_deleting;
+    case "trial_payer_mismatch": return copy.assessmentTrial.unavailable;
+    case "trial_unavailable": return copy.assessmentTrial.unavailable;
     default: return null;
   }
 }
@@ -101,7 +108,7 @@ export default async function FormCoachBillingPage({ searchParams }: PageProps) 
   const { profile } = await requireAuthenticatedAccount();
   const params = await searchParams;
   const copy = (await getT()).featurePricing.billing;
-  const data = await loadFormCoachBillingPage(profile.id);
+  const data = await loadFormCoachBillingPage(profile.id, profile.role);
   const checkoutParam = single(params.checkout);
   const returnedSession = checkoutParam === "returned"
     ? await reconcileFormCoachCheckoutReturn(profile.id, single(params.request_id))
@@ -167,6 +174,17 @@ export default async function FormCoachBillingPage({ searchParams }: PageProps) 
           </>
         )}
       </section>
+
+      {data.assessmentTrialEnabled && data.canClaimAssessmentTrial && (
+        <section className="space-y-3 rounded-xl border border-border bg-surface p-5" aria-labelledby="form-coach-trial">
+          <h2 id="form-coach-trial" className="text-xl font-semibold">{copy.assessmentTrial.title}</h2>
+          <p className="text-sm text-muted">{copy.assessmentTrial.description(data.assessmentTrialCount)}</p>
+          <form action={claimFormCoachAssessmentTrialAction}>
+            <input type="hidden" name="request_id" value={randomUUID()} />
+            <button type="submit" className="btn-primary">{copy.assessmentTrial.claim}</button>
+          </form>
+        </section>
+      )}
 
       <section className="space-y-3" aria-labelledby="form-coach-billing-summary">
         <h2 id="form-coach-billing-summary" className="text-xl font-semibold">{copy.billingHeading}</h2>

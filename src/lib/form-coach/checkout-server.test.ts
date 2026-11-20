@@ -39,6 +39,8 @@ function pricing(overrides: Record<string, unknown> = {}) {
     displayName: "Form Coach",
     description: "Synthetic description",
     marketingCopy: "Synthetic copy",
+    trialDays: 0,
+    trialAssessments: 0,
     offers: [{
       priceKey: "monthly",
       amountCents: 1200,
@@ -70,6 +72,7 @@ function checkoutRow(overrides: Record<string, unknown> = {}) {
     credits_per_pack: null,
     quoted_credits: 0,
     total_amount_cents: 1200,
+    trial_days: 0,
     state: "reserved",
     stripe_checkout_session_id: null,
     stripe_customer_id: null,
@@ -146,13 +149,14 @@ function historicCheckoutRow(overrides: Record<string, unknown> = {}) {
 
 function sessionForReservation(row: ReturnType<typeof historicCheckoutRow>, status: "open" | "expired") {
   const base = session();
+  const lineTotal = row.trial_days > 0 ? 0 : row.total_amount_cents;
   return session({
     ...base,
     id: row.stripe_checkout_session_id,
     status,
     mode: row.credits_per_pack === null ? "subscription" : "payment",
-    amount_subtotal: row.total_amount_cents,
-    amount_total: row.total_amount_cents,
+    amount_subtotal: lineTotal,
+    amount_total: lineTotal,
     metadata: {
       ...base.metadata,
       reservation_id: row.id,
@@ -166,10 +170,10 @@ function sessionForReservation(row: ReturnType<typeof historicCheckoutRow>, stat
       data: [{
         quantity: row.pack_quantity,
         currency: row.currency.toLowerCase(),
-        amount_subtotal: row.total_amount_cents,
+        amount_subtotal: lineTotal,
         amount_discount: 0,
         amount_tax: 0,
-        amount_total: row.total_amount_cents,
+        amount_total: lineTotal,
         price: {
           id: row.stripe_price_id,
           product: row.stripe_product_id,
@@ -341,6 +345,40 @@ describe("Form Coach checkout server contract", () => {
         customer_create_attempt_id: customerAttemptId,
       },
     });
+  });
+
+  it("uses only the frozen subscription trial snapshot and requires a zero-total trial session", async () => {
+    const trialRow = checkoutRow({ trial_days: 14 });
+    const zeroTrialSession = session({
+      amount_subtotal: 0,
+      amount_total: 0,
+      total_details: { amount_discount: 0, amount_shipping: null, amount_tax: 0 },
+      line_items: { has_more: false, data: [{ quantity: 1, currency: "usd", amount_subtotal: 0,
+        amount_discount: 0, amount_tax: 0, amount_total: 0,
+        price: { id: priceId, product: productId, unit_amount: 1200, currency: "usd", type: "recurring" } }] },
+    });
+    const { store } = makeStore({ row: trialRow });
+    const { stripe } = makeStripe({ currentSession: zeroTrialSession });
+    const result = await createFormCoachCheckout({
+      payerId, payerRole: "coach", email: "coach@example.test", displayName: "Coach", priceKey: "monthly", quantity: 1, requestId,
+    }, dependencies(store, stripe, { pricing: async () => pricing({ trialDays: 14 }) }));
+
+    expect(result).toEqual({ kind: "redirect", url: "https://checkout.stripe.com/c/pay/synthetic" });
+    const createCall = (stripe as Stripe).checkout.sessions.create as unknown as ReturnType<typeof vi.fn>;
+    const [params] = createCall.mock.calls[0] as [Stripe.Checkout.SessionCreateParams];
+    expect(params.subscription_data?.trial_period_days).toBe(14);
+    expect(params.line_items).toEqual([{ price: priceId, quantity: 1 }]);
+  });
+
+  it("refuses a stale trial-day quote before creating provider resources", async () => {
+    const { store } = makeStore({ row: { trial_days: 0 } });
+    const { stripe } = makeStripe();
+    await expect(createFormCoachCheckout({
+      payerId, payerRole: "coach", email: "coach@example.test", displayName: "Coach", priceKey: "monthly", quantity: 1, requestId,
+    }, dependencies(store, stripe, { pricing: async () => pricing({ trialDays: 14 }) })))
+      .resolves.toEqual({ kind: "status", status: "unavailable" });
+    expect(store.reserveCustomer).not.toHaveBeenCalled();
+    expect((stripe as Stripe).checkout.sessions.create).not.toHaveBeenCalled();
   });
 
   it("fails closed for stale pricing, wrong payer role, and a deletion tombstone", async () => {

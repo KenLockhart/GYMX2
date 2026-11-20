@@ -9,6 +9,7 @@ import {
   syncPlatformSubscriptionById,
 } from "@/lib/platform-membership-server";
 import { updateArmoryCheckoutStatus } from "@/lib/armory-purchases";
+import { dispatchFormCoachStripeEvent } from "@/lib/form-coach/stripe-webhook-server";
 
 // Stripe calls this after a payment. The signature check proves the message really came from Stripe.
 export async function POST(request: NextRequest) {
@@ -21,6 +22,17 @@ export async function POST(request: NextRequest) {
     event = getStripe().webhooks.constructEvent(await request.text(), signature, secret);
   } catch {
     return new NextResponse("Invalid signature", { status: 400 });
+  }
+
+  // Form Coach uses a separate Stripe namespace and must be reconciled before
+  // generic membership, Armory, or Connect handlers inspect the same event.
+  try {
+    if (await dispatchFormCoachStripeEvent(event)) {
+      return NextResponse.json({ received: true });
+    }
+  } catch {
+    // Keep provider payloads and SDK errors out of logs and ask Stripe to retry.
+    return new NextResponse("Could not reconcile billing", { status: 500 });
   }
 
   // Memberships: keep each subscription's status in step, and record every paid invoice.

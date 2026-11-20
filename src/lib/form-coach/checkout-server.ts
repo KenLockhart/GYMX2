@@ -56,6 +56,8 @@ export type FormCoachPricingSnapshot = Readonly<{
   displayName: string;
   description: string;
   marketingCopy: string;
+  trialDays: number;
+  trialAssessments: number;
   offers: readonly SafeCheckoutOffer[];
 }>;
 
@@ -90,12 +92,33 @@ export type FormCoachBillingPageData = Readonly<{
   history: readonly FormCoachPaymentHistory[];
   canManageBilling: boolean;
   checkoutEnabled: boolean;
+  assessmentTrialEnabled: boolean;
+  assessmentTrialCount: number;
+  canClaimAssessmentTrial: boolean;
   readError: boolean;
   returnState: "none" | "processing" | "confirmed" | "expired" | "unavailable";
 }>;
 
 export function isFormCoachCheckoutEnabled(): boolean {
   return process.env.FORM_COACH_CHECKOUT_ENABLED === "true";
+}
+
+export function isFormCoachAssessmentTrialEnabled(): boolean {
+  return process.env.FORM_COACH_ASSESSMENT_TRIAL_ENABLED === "true";
+}
+
+export async function readFormCoachAssessmentTrialOffer(payerRole: string): Promise<Readonly<{ enabled: boolean; count: number }>> {
+  if (!isFormCoachAssessmentTrialEnabled()) return { enabled: false, count: 0 };
+  try {
+    const pricing = await readCurrentPricing();
+    const count = pricing?.trialAssessments ?? 0;
+    return {
+      enabled: Boolean(pricing && pricing.status === "live" && pricing.payer === payerRole && count > 0),
+      count: Number.isSafeInteger(count) && count > 0 ? count : 0,
+    };
+  } catch {
+    return { enabled: false, count: 0 };
+  }
 }
 
 /**
@@ -198,6 +221,8 @@ async function readPricingRevision(revision: number): Promise<InternalPricingSna
     displayName: parsed.data.displayName,
     description: parsed.data.description,
     marketingCopy: parsed.data.marketingCopy,
+    trialDays: parsed.data.trialDays,
+    trialAssessments: parsed.data.trialAssessments,
     offers: parsed.data.priceOptions.map(({ priceKey, amountCents, currency, interval, creditsPerPack, stripeProductId, stripePriceId }) => ({
       priceKey,
       amountCents,
@@ -238,6 +263,7 @@ type CheckoutReservation = Readonly<{
   credits_per_pack: number | null;
   quoted_credits: number;
   total_amount_cents: number;
+  trial_days: number;
   state: string;
   stripe_checkout_session_id: string | null;
   stripe_customer_id: string | null;
@@ -379,6 +405,7 @@ function parseCheckoutReservation(value: unknown): CheckoutReservation | null {
   const creditsPerPack = row.credits_per_pack === null ? null : integer(row.credits_per_pack);
   const quotedCredits = integer(row.quoted_credits);
   const totalAmount = integer(row.total_amount_cents);
+  const trialDays = integer(row.trial_days);
   const state = text(row.state);
   const sessionId = row.stripe_checkout_session_id === null ? null : text(row.stripe_checkout_session_id);
   const customerId = row.stripe_customer_id === null ? null : text(row.stripe_customer_id);
@@ -388,6 +415,7 @@ function parseCheckoutReservation(value: unknown): CheckoutReservation | null {
   if (!id || !requestId || !idempotencyKey || !featureKey || revision === null || !payerRole || !payerId
     || !priceKey || !productId || !priceId || unitAmount === null || !currency || quantity === null
     || (creditsPerPack === null && row.credits_per_pack !== null) || quotedCredits === null || totalAmount === null
+    || trialDays === null || trialDays < 0 || trialDays > 365
     || !state || (sessionId === null && row.stripe_checkout_session_id !== null)
     || (customerId === null && row.stripe_customer_id !== null) || (subscriptionId === null && row.stripe_subscription_id !== null)
     || !expiresAt || !createdAt) return null;
@@ -396,7 +424,7 @@ function parseCheckoutReservation(value: unknown): CheckoutReservation | null {
     config_revision: revision, payer_role: payerRole, payer_id: payerId, price_key: priceKey,
     stripe_product_id: productId, stripe_price_id: priceId, unit_amount_cents: unitAmount, currency,
     pack_quantity: quantity, credits_per_pack: creditsPerPack, quoted_credits: quotedCredits,
-    total_amount_cents: totalAmount, state, stripe_checkout_session_id: sessionId,
+    total_amount_cents: totalAmount, trial_days: trialDays, state, stripe_checkout_session_id: sessionId,
     stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, expires_at: expiresAt, created_at: createdAt,
   };
 }
@@ -463,7 +491,7 @@ function createCheckoutStore(): FormCoachCheckoutStore {
     },
     async readUnresolvedCheckout(payerId) {
       const { data, error } = await db.from("feature_checkout_reservations")
-        .select("id,request_id,idempotency_key,feature_key,config_revision,payer_role,payer_id,price_key,stripe_product_id,stripe_price_id,unit_amount_cents,currency,pack_quantity,credits_per_pack,quoted_credits,total_amount_cents,state,stripe_checkout_session_id,stripe_customer_id,stripe_subscription_id,expires_at,created_at")
+        .select("id,request_id,idempotency_key,feature_key,config_revision,payer_role,payer_id,price_key,stripe_product_id,stripe_price_id,unit_amount_cents,currency,pack_quantity,credits_per_pack,quoted_credits,total_amount_cents,trial_days,state,stripe_checkout_session_id,stripe_customer_id,stripe_subscription_id,expires_at,created_at")
         .eq("feature_key", FORM_COACH_FEATURE_KEY)
         .eq("payer_id", payerId)
         .in("state", ["reserved", "unknown", "bound", "cancel_required"])
@@ -474,7 +502,7 @@ function createCheckoutStore(): FormCoachCheckoutStore {
     },
     async readCheckoutReservation(reservationId) {
       const { data, error } = await db.from("feature_checkout_reservations")
-        .select("id,request_id,idempotency_key,feature_key,config_revision,payer_role,payer_id,price_key,stripe_product_id,stripe_price_id,unit_amount_cents,currency,pack_quantity,credits_per_pack,quoted_credits,total_amount_cents,state,stripe_checkout_session_id,stripe_customer_id,stripe_subscription_id,expires_at,created_at")
+        .select("id,request_id,idempotency_key,feature_key,config_revision,payer_role,payer_id,price_key,stripe_product_id,stripe_price_id,unit_amount_cents,currency,pack_quantity,credits_per_pack,quoted_credits,total_amount_cents,trial_days,state,stripe_checkout_session_id,stripe_customer_id,stripe_subscription_id,expires_at,created_at")
         .eq("id", reservationId).eq("feature_key", FORM_COACH_FEATURE_KEY).maybeSingle();
       if (error) throw new Error("Checkout reconciliation is unavailable");
       return parseCheckoutReservation(data);
@@ -579,6 +607,7 @@ function sessionMatchesReservation(session: Stripe.Checkout.Session, row: Checko
   const expectedMode = row.credits_per_pack === null ? "subscription" : "payment";
   const expectedPriceType = expectedMode === "subscription" ? "recurring" : "one_time";
   const total = row.total_amount_cents;
+  const sessionTotal = row.trial_days > 0 ? 0 : total;
   return session.id === row.stripe_checkout_session_id
     && metadata !== null
     && Object.keys(metadata).length === 8
@@ -594,8 +623,8 @@ function sessionMatchesReservation(session: Stripe.Checkout.Session, row: Checko
     && customerIdFromSession(session) === row.stripe_customer_id
     && session.client_reference_id === row.payer_id
     && session.currency === row.currency.toLowerCase()
-    && session.amount_subtotal === total
-    && session.amount_total === total
+    && session.amount_subtotal === sessionTotal
+    && session.amount_total === sessionTotal
     && session.allow_promotion_codes === false
     && (session.discounts?.length ?? 0) === 0
     && session.automatic_tax?.enabled === false
@@ -614,10 +643,10 @@ function sessionMatchesReservation(session: Stripe.Checkout.Session, row: Checko
     && price.type === expectedPriceType
     && lineItem.quantity === row.pack_quantity
     && lineItem.currency === row.currency.toLowerCase()
-    && lineItem.amount_subtotal === total
+    && lineItem.amount_subtotal === sessionTotal
     && lineItem.amount_discount === 0
     && lineItem.amount_tax === 0
-    && lineItem.amount_total === total;
+    && lineItem.amount_total === sessionTotal;
 }
 
 async function retrieveOwnedSession(
@@ -789,6 +818,7 @@ function reservationMatchesQuote(
     && row.credits_per_pack === input.offer.creditsPerPack
     && row.quoted_credits === expectedCredits
     && row.total_amount_cents === input.offer.amountCents * input.quantity
+    && row.trial_days === (input.pricing.billingModel === "subscription" ? input.pricing.trialDays : 0)
     && row.request_id === input.reservationRequestId
     && row.idempotency_key === `form-coach:${row.request_id}`
     && row.stripe_product_id === input.offer.stripeProductId
@@ -803,7 +833,7 @@ function frozenReservationPricing(
   const billingModel = row.credits_per_pack === null ? "subscription" : "per_assessment";
   const expectedTotal = row.unit_amount_cents * row.pack_quantity;
   const expectedCredits = (row.credits_per_pack ?? 0) * row.pack_quantity;
-  if (!historical || historical.status !== "live" || historical.featureKey !== FORM_COACH_FEATURE_KEY
+  if (!historical || historical.featureKey !== FORM_COACH_FEATURE_KEY
     || historical.revision !== row.config_revision || historical.payer !== payer
     || historical.billingModel !== billingModel || row.feature_key !== FORM_COACH_FEATURE_KEY || !payer
     || !Number.isSafeInteger(row.config_revision) || row.config_revision <= 0
@@ -814,7 +844,9 @@ function frozenReservationPricing(
     || (row.credits_per_pack !== null && (!Number.isSafeInteger(row.credits_per_pack) || row.credits_per_pack <= 0))
     || !Number.isSafeInteger(expectedTotal) || row.total_amount_cents !== expectedTotal
     || !Number.isSafeInteger(expectedCredits) || row.quoted_credits !== expectedCredits
-    || !Number.isFinite(Date.parse(row.created_at)) || !Number.isFinite(Date.parse(row.expires_at))) return null;
+    || !Number.isFinite(Date.parse(row.created_at)) || !Number.isFinite(Date.parse(row.expires_at))
+    || (billingModel === "subscription" && row.trial_days !== historical.trialDays)
+    || (billingModel === "per_assessment" && row.trial_days !== 0)) return null;
   const offer = historical.offers.find((item) => item.priceKey === row.price_key);
   if (!offer || offer.amountCents !== row.unit_amount_cents || offer.currency !== row.currency
     || offer.creditsPerPack !== row.credits_per_pack || offer.stripeProductId !== row.stripe_product_id
@@ -923,15 +955,6 @@ async function replayFrozenReservation(
   );
   if (recovered) return recovered;
   if (!selectionMatches) return { kind: "status", status: "pending" };
-  let currentPricing: InternalPricingSnapshot | null;
-  try {
-    currentPricing = await dependencies.pricing();
-  } catch {
-    currentPricing = null;
-  }
-  if (!currentPricing || currentPricing.status !== "live" || currentPricing.featureKey !== FORM_COACH_FEATURE_KEY) {
-    return { kind: "status", status: "pending" };
-  }
   let historicalPricing: InternalPricingSnapshot | null;
   try {
     historicalPricing = await dependencies.pricingRevision(unresolved.config_revision);
@@ -940,6 +963,12 @@ async function replayFrozenReservation(
   }
   const frozenPricing = frozenReservationPricing(unresolved, historicalPricing);
   if (!frozenPricing) return { kind: "status", status: "pending" };
+  let currentPricing: InternalPricingSnapshot | null;
+  try {
+    currentPricing = await dependencies.pricing();
+  } catch {
+    currentPricing = null;
+  }
   const authorizedPricing = authorizeFrozenQuoteForCreate(frozenPricing, currentPricing);
   if (!authorizedPricing) return { kind: "status", status: "pending" };
   const frozenStore: FormCoachCheckoutStore = {
@@ -1187,6 +1216,7 @@ async function createNewFormCoachCheckout(
       },
       ...(pricing.billingModel === "subscription" ? {
         subscription_data: {
+          ...(row.trial_days > 0 ? { trial_period_days: row.trial_days } : {}),
           metadata: {
             feature_namespace: FORM_COACH_FEATURE_KEY,
             feature_key: FORM_COACH_FEATURE_KEY,
@@ -1231,7 +1261,7 @@ async function createNewFormCoachCheckout(
   return { kind: "status", status: validated?.kind === "expired" ? "expired" : "pending" };
 }
 
-export async function loadFormCoachBillingPage(profileId: string): Promise<FormCoachBillingPageData> {
+export async function loadFormCoachBillingPage(profileId: string, profileRole: string): Promise<FormCoachBillingPageData> {
   const pricingPromise = readCurrentPricing().catch(() => null);
   const userDbPromise = createClient();
   let billing: FormCoachBillingSummary[] = [];
@@ -1301,6 +1331,8 @@ export async function loadFormCoachBillingPage(profileId: string): Promise<FormC
       displayName: internalPricing.displayName,
       description: internalPricing.description,
       marketingCopy: internalPricing.marketingCopy,
+      trialDays: internalPricing.trialDays,
+      trialAssessments: internalPricing.trialAssessments,
       offers: internalPricing.offers.map((offer) => ({
         priceKey: offer.priceKey,
         amountCents: offer.amountCents,
@@ -1311,12 +1343,36 @@ export async function loadFormCoachBillingPage(profileId: string): Promise<FormC
     }
     : null;
   const liveOffer = Boolean(pricing?.status === "live" && pricing.offers.length > 0);
+  const assessmentTrialEnabled = Boolean(
+    isFormCoachAssessmentTrialEnabled()
+      && pricing?.status === "live"
+      && pricing.payer === profileRole
+      && pricing.trialAssessments > 0,
+  );
+  let canClaimAssessmentTrial = false;
+  if (assessmentTrialEnabled) {
+    try {
+      const admin = createAdminClient();
+      const [claims, grants, lots] = await Promise.all([
+        admin.from("feature_trial_claims").select("id").eq("feature_key", FORM_COACH_FEATURE_KEY).eq("payer_id", profileId).limit(1),
+        admin.from("feature_trial_access_grants").select("id").eq("feature_key", FORM_COACH_FEATURE_KEY).eq("user_id", profileId).limit(1),
+        admin.from("feature_credit_lots").select("id").eq("feature_key", FORM_COACH_FEATURE_KEY).eq("user_id", profileId).eq("lot_kind", "assessment_trial").limit(1),
+      ]);
+      if (claims.error || grants.error || lots.error) readError = true;
+      else canClaimAssessmentTrial = !claims.data?.length && !grants.data?.length && !lots.data?.length;
+    } catch {
+      readError = true;
+    }
+  }
   return {
     pricing,
     billing,
     history,
     canManageBilling,
     checkoutEnabled: isFormCoachCheckoutEnabled() && isStripeConfigured() && liveOffer,
+    assessmentTrialEnabled,
+    assessmentTrialCount: assessmentTrialEnabled ? pricing?.trialAssessments ?? 0 : 0,
+    canClaimAssessmentTrial,
     readError,
     returnState: "none",
   };

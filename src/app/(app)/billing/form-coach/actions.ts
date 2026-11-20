@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireAuthenticatedAccount } from "@/lib/auth";
 import { getPlatformEntitlement } from "@/lib/platform-membership-server";
 import { createFormCoachBillingPortalForPayer } from "@/lib/form-coach/billing-portal-server";
+import { claimFormCoachAssessmentTrial } from "@/lib/form-coach/billing-lifecycle-server";
 import { isFormCoachCheckoutEnabled, startFormCoachCheckoutForAccount } from "@/lib/form-coach/checkout-server";
 
 const CheckoutInput = z.object({
@@ -12,6 +13,8 @@ const CheckoutInput = z.object({
   quantity: z.number().int().min(1).max(100),
   requestId: z.string().uuid(),
 }).strict();
+
+const TrialInput = z.object({ requestId: z.string().uuid() }).strict();
 
 function pageStatus(status: string): never {
   redirect(`/billing/form-coach?status=${encodeURIComponent(status)}`);
@@ -46,6 +49,27 @@ export async function startFormCoachCheckout(formData: FormData): Promise<never>
   }
   if (result.kind === "redirect") redirect(result.url);
   pageStatus(result.status);
+}
+
+export async function claimFormCoachAssessmentTrialAction(formData: FormData): Promise<never> {
+  const { profile } = await requireAuthenticatedAccount();
+  const parsed = TrialInput.safeParse({ requestId: formData.get("request_id") });
+  if (!parsed.success) pageStatus("trial_invalid");
+  if (profile.role === "member") {
+    const entitlement = await getPlatformEntitlement(profile.id);
+    if (!entitlement.ok || !entitlement.entitlement) pageStatus("membership_required");
+  }
+  let state: Awaited<ReturnType<typeof claimFormCoachAssessmentTrial>>;
+  try {
+    state = await claimFormCoachAssessmentTrial({
+      payerId: profile.id,
+      payerRole: profile.role,
+      requestId: parsed.data.requestId,
+    });
+  } catch {
+    pageStatus("unavailable");
+  }
+  pageStatus(`trial_${state}`);
 }
 
 export async function openFormCoachBillingPortal(): Promise<never> {

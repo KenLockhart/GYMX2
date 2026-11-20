@@ -19,6 +19,16 @@ export const featurePricing: Messages["featurePricing"] = {
     portalButton: "Abrir portal de facturación",
     portalUnavailable: "El portal de facturación no está disponible para esta cuenta en este momento.",
     noOffer: "No hay un precio verificado disponible para tu cuenta.",
+    assessmentTrial: {
+      title: "Prueba gratuita de evaluaciones",
+      description: (count) => `Solicita ${count} evaluación${count === 1 ? "" : "es"} una sola vez. Es una prueba única, no un pago.`,
+      claim: "Solicitar evaluaciones gratis",
+      claimed: "Tu prueba gratuita de evaluaciones está lista.",
+      alreadyClaimed: "Esta cuenta ya solicitó una prueba de Form Coach.",
+      comingSoon: "La prueba de evaluaciones no está disponible ahora.",
+      invalid: "No se pudo verificar la solicitud. Actualiza la página e inténtalo de nuevo.",
+      unavailable: "No se pudo registrar la prueba. No se concedió acceso de prueba a tu cuenta.",
+    },
     offerTitle: {
       monthlyPlan: "Plan mensual",
       annualPlan: "Plan anual",
