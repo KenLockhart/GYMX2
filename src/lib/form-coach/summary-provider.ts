@@ -266,7 +266,11 @@ function validateGeneratedText(text: string): string | null {
 }
 
 export function createFormCoachSummaryProvider(options: ProviderOptions = {}) {
-  const env = options.env ?? process.env;
+  const env: SummaryEnvironment = options.env ?? {
+    FORM_COACH_LLM_PROVIDER: process.env.FORM_COACH_LLM_PROVIDER,
+    FORM_COACH_LLM_MODEL: process.env.FORM_COACH_LLM_MODEL,
+    FORM_COACH_LLM_API_KEY: process.env.FORM_COACH_LLM_API_KEY,
+  };
   const fetchImpl = options.fetchImpl ?? fetch;
 
   return {
