@@ -77,6 +77,10 @@ export const programs: Messages["programs"] = {
   byCoach: (coach) => `Programa · ${coach}`,
   yourCoach: "tu coach",
   daysDone: (done, total) => `${done} de ${total} días hechos`,
+  currentProgress: (done, total) =>
+    `Versión actual · ${done} de ${total} lecciones completadas`,
+  historyProgress: (count) =>
+    `${count} lecciones completadas en el historial guardado`,
   upNext: (n) => `Sigue: día ${n}`,
   caughtUp: "Estás al día",
   watch: (title) => `Ver: ${title}`,

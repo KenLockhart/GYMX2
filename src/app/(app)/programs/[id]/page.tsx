@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -13,13 +14,12 @@ import { LOCALE_TAG, type Locale } from "@/i18n/config";
 import type { Messages } from "@/i18n/messages";
 import { getLocale, getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
+import { loadProgramProgressSummariesForProgram } from "@/lib/program-progress-data";
+import { parseProgramVersionedProgress } from "@/lib/program-versioned-progress";
 import {
   canPreviewProgramIntro,
-  nextDay,
   progressPercent,
-  unlockedThrough,
 } from "@/lib/programs";
-import { todayKey } from "@/lib/reminders";
 import { getPlayerUrl, isStreamConfigured } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -250,6 +250,17 @@ export default async function ProgramPage({
   const locale = await getLocale();
 
   const supabase = await createClient();
+  let ownProgress = null as ReturnType<typeof parseProgramVersionedProgress>;
+  if (profile.role === "member") {
+    const { data, error } = await supabase.rpc("get_program_versioned_progress", {
+      target_program_id: id,
+      target_member_id: null,
+    });
+    ownProgress = error ? null : parseProgramVersionedProgress(data);
+    if (ownProgress && (ownProgress.programId !== id || ownProgress.memberId !== profile.id)) {
+      ownProgress = null;
+    }
+  }
   const { data: program } = await supabase
     .from("programs")
     .select(
@@ -257,21 +268,46 @@ export default async function ProgramPage({
     )
     .eq("id", id)
     .maybeSingle();
-  if (!program) notFound();
-  const isOwner = program.coach_id === profile.id;
+  if (!program) {
+    if (profile.role === "member" && ownProgress) {
+      return (
+        <div className="max-w-3xl space-y-5">
+          <Link href="/programs" className="text-link text-sm">
+            {t.back}
+          </Link>
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-widest text-accent">
+              {t.program}
+            </p>
+            <h1 className="mt-1 text-4xl">{ownProgress.programTitle}</h1>
+            <p className="mt-2 text-sm text-muted">
+              {t.historyProgress(ownProgress.lifetimeCompletedCount)}
+            </p>
+          </div>
+          {ownProgress.history.length > 0 && (
+            <ol className="space-y-2">
+              {ownProgress.history.map((entry) => (
+                <li key={`${entry.eventSequence}:${entry.lessonId}`} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                  <span aria-hidden="true">{entry.state === "completed" ? "✓" : "↶"}</span>{" "}
+                  {t.dayTitle(entry.lessonOrdinal, entry.title)}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      );
+    }
+    notFound();
+  }
+  const isOwner =
+    program.coach_id === profile.id &&
+    ((profile.role === "coach" && !program.platform_owned) ||
+      (profile.role === "admin" && program.platform_owned));
   const coachName = program.platform_owned
     ? t.platform
     : (program.coach as unknown as { display_name: string } | null)
         ?.display_name ?? t.yourCoach;
 
-  const { data: dayData } = await supabase
-    .from("program_days")
-    .select(
-      "id, day_number, title, instructions, pillar, video_id, video:videos(title)",
-    )
-    .eq("program_id", id)
-    .order("day_number");
-  const days = (dayData ?? []) as unknown as Day[];
   const intro = await loadProgramIntro({
     videoId: program.intro_video_id,
     creatorId: program.coach_id,
@@ -280,7 +316,14 @@ export default async function ProgramPage({
   });
 
   if (isOwner) {
-    const [{ data: videoData }, { data: enrollmentData }] = await Promise.all([
+    const [{ data: dayData }, { data: videoData }, { data: enrollmentData }, summaries] = await Promise.all([
+      supabase
+        .from("program_days")
+        .select(
+          "id, day_number, title, instructions, pillar, video_id, video:videos(title)",
+        )
+        .eq("program_id", id)
+        .order("day_number"),
       supabase
         .from("videos")
         .select("id, title")
@@ -289,19 +332,25 @@ export default async function ProgramPage({
         .order("created_at", { ascending: false }),
       supabase
         .from("program_enrollments")
-        .select(
-          "id, started_on, member:profiles!member_id(display_name), program_day_completions(count)",
-        )
+        .select("id, member_id")
         .eq("program_id", id)
         .order("created_at", { ascending: false }),
+      loadProgramProgressSummariesForProgram(id),
     ]);
+    const days = (dayData ?? []) as unknown as Day[];
     const videos = (videoData ?? []) as { id: string; title: string }[];
-    const enrollments = (enrollmentData ?? []) as unknown as {
-      id: string;
-      started_on: string;
-      member: { display_name: string } | null;
-      program_day_completions: { count: number }[];
-    }[];
+    const enrolledMemberIds = (enrollmentData ?? []).map((row) => row.member_id);
+    const summaryMemberIds = summaries.map((row) => row.member_id);
+    const memberIds = [...new Set([...enrolledMemberIds, ...summaryMemberIds])];
+    const { data: memberProfiles } = memberIds.length
+      ? await supabase
+          .from("profiles")
+          .select("id, display_name")
+          .in("id", memberIds)
+      : { data: [] };
+    const memberNames = new Map(
+      (memberProfiles ?? []).map((row) => [row.id, row.display_name]),
+    );
     const nextNumber = (days.at(-1)?.day_number ?? 0) + 1;
 
     return (
@@ -437,32 +486,25 @@ export default async function ProgramPage({
 
         <section className="space-y-3">
           <h2 className="text-2xl">{t.membersOn}</h2>
-          {enrollments.length === 0 ? (
+          {summaries.length === 0 ? (
             <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
               {t.nobody}
             </p>
           ) : (
             <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
-              {enrollments.map((row) => {
-                const done = row.program_day_completions[0]?.count ?? 0;
+              {summaries.map((row) => {
                 return (
-                  <li
-                    key={row.id}
-                    className="flex flex-wrap justify-between gap-2 p-3"
-                  >
+                  <li key={`${row.member_id}:${row.program_id}`} className="flex flex-wrap justify-between gap-2 p-3">
                     <span className="font-medium">
-                      {row.member?.display_name ?? t.aMember}
+                      {memberNames.get(row.member_id) ?? t.aMember}
                     </span>
                     <span className="text-muted">
-                      {t.memberProgress(
-                        Math.min(
-                          unlockedThrough(row.started_on, todayKey()),
-                          days.length,
-                        ),
-                        done,
-                        days.length,
-                        progressPercent(done, days.length),
-                      )}
+                      {row.mode === "history_only"
+                        ? t.historyProgress(row.completed_once_count)
+                        : t.currentProgress(
+                            row.current_completed_count,
+                            row.required_count,
+                          )}
                     </span>
                   </li>
                 );
@@ -488,28 +530,106 @@ export default async function ProgramPage({
     );
   }
 
-  // Members and admins.
-  const { data: enrollment } = await supabase
-    .from("program_enrollments")
-    .select("id, started_on")
-    .eq("program_id", id)
-    .eq("member_id", profile.id)
-    .maybeSingle();
-  const { data: completionData } = enrollment
-    ? await supabase
-        .from("program_day_completions")
-        .select("day_id")
-        .eq("enrollment_id", enrollment.id)
-    : { data: [] };
-  const completed = new Set(
-    (completionData ?? []).map((row) => row.day_id as string),
+  if (profile.role === "admin") {
+    // The request-bound Program query above is the authorization gate. Admins may
+    // preview its current lessons, but this path deliberately exposes no actions.
+    const { data: dayData } = await createAdminClient()
+      .from("program_days")
+      .select(
+        "id, program_id, day_number, title, instructions, pillar, video_id, video:videos(title)",
+      )
+      .eq("program_id", program.id)
+      .order("day_number");
+    const days = ((dayData ?? []) as unknown as (Day & { program_id: string })[]).filter(
+      (day) => day.program_id === program.id,
+    );
+
+    return (
+      <div className="space-y-8">
+        <Link href="/programs" className="text-link text-sm">
+          {t.back}
+        </Link>
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-widest text-accent">
+            {t.byCoach(coachName)}
+          </p>
+          <h1 className="mt-1 text-5xl">{program.title}</h1>
+          <p className="mt-2 text-sm text-muted">{t.weeks(days.length)}</p>
+          {program.description && (
+            <p className="mt-3 max-w-2xl whitespace-pre-line">
+              {program.description}
+            </p>
+          )}
+        </div>
+
+        {intro && <ProgramIntroPreview intro={intro} t={t} />}
+
+        <section className="space-y-4">
+          <h2 className="text-2xl">{t.days(t.weeks(days.length))}</h2>
+          {days.map((day) => (
+            <div
+              key={day.id}
+              className="space-y-2 rounded-lg border border-border bg-surface p-4"
+            >
+              <p className="flex items-center gap-2 font-semibold">
+                {t.dayTitle(day.day_number, day.title)}{" "}
+                <PillarTag pillar={day.pillar} />
+              </p>
+              {day.instructions && (
+                <p className="whitespace-pre-line text-sm">
+                  {day.instructions}
+                </p>
+              )}
+              {day.video_id && (
+                <Link
+                  href={`/programs/${program.id}/days/${day.id}`}
+                  className="text-link text-sm"
+                >
+                  {t.watch(day.video?.title ?? t.theVideo)}
+                </Link>
+              )}
+            </div>
+          ))}
+        </section>
+      </div>
+    );
+  }
+
+  if (profile.role !== "member") notFound();
+  const progress = ownProgress;
+  if (!progress) {
+    notFound();
+  }
+  const requiredLessons = progress.requiredLessons;
+  const completed = new Set(progress.completedLessonIds);
+  const accessible = new Map(
+    progress.accessibleLessons.map((lesson) => [lesson.id, lesson]),
   );
-  const today = todayKey();
-  const unlocked = enrollment
-    ? unlockedThrough(enrollment.started_on, today)
-    : 0;
-  const upNext = enrollment ? nextDay(days, completed, unlocked) : null;
-  const percent = progressPercent(completed.size, days.length);
+  const nextLesson = progress.accessibleLessons.find(
+    (lesson) => !completed.has(lesson.id),
+  );
+  const percent = progressPercent(
+    progress.currentCompletedCount,
+    progress.requiredCount,
+  );
+  const canStartFreeProgram =
+    !progress.enrollmentId &&
+    (progress.mode === "legacy_free" || progress.mode === "free_snapshot");
+  const canChangeProgress = progress.accessAuthorized &&
+    (progress.mode === "legacy_free" ||
+      progress.mode === "free_snapshot" ||
+      progress.mode === "paid_order");
+  const legacyVideoRows =
+    progress.mode === "legacy_free" && progress.accessibleLessonIds.length > 0
+      ? (await supabase
+          .from("program_days")
+          .select("id, video_id, video:videos(title)")
+          .eq("program_id", id)
+          .in("id", progress.accessibleLessonIds)).data ?? []
+      : [];
+  const legacyVideos = new Map(
+    legacyVideoRows.map((row) => [row.id, row]),
+  );
 
   return (
     <div className="space-y-8">
@@ -521,7 +641,7 @@ export default async function ProgramPage({
           {t.byCoach(coachName)}
         </p>
         <h1 className="mt-1 text-5xl">{program.title}</h1>
-        <p className="mt-2 text-sm text-muted">{t.weeks(days.length)}</p>
+        <p className="mt-2 text-sm text-muted">{t.weeks(progress.requiredCount)}</p>
         {program.description && (
           <p className="mt-3 max-w-2xl whitespace-pre-line">
             {program.description}
@@ -531,12 +651,14 @@ export default async function ProgramPage({
 
       {intro && <ProgramIntroPreview intro={intro} t={t} />}
 
-      {enrollment ? (
+      {progress.enrollmentId || progress.mode === "paid_order" ? (
         <div className="max-w-2xl space-y-2">
           <div className="flex justify-between text-sm">
-            <span>{t.daysDone(completed.size, days.length)}</span>
+            <span>
+              {t.daysDone(progress.currentCompletedCount, progress.requiredCount)}
+            </span>
             <span className="text-muted">
-              {upNext ? t.upNext(upNext.day_number) : t.caughtUp}
+              {nextLesson ? t.upNext(nextLesson.lessonOrdinal) : t.caughtUp}
             </span>
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-surface-raised">
@@ -546,30 +668,35 @@ export default async function ProgramPage({
             />
           </div>
         </div>
-      ) : (
-        profile.role === "member" && (
-          <ActionForm action={startProgram}>
-            <input type="hidden" name="program_id" value={program.id} />
-            <SubmitButton pendingText={t.starting} className="btn-primary">
-              {t.startToday}
-            </SubmitButton>
-            <FormStatus />
-          </ActionForm>
-        )
-      )}
+      ) : canStartFreeProgram ? (
+        <ActionForm action={startProgram}>
+          <input type="hidden" name="program_id" value={program.id} />
+          <SubmitButton pendingText={t.starting} className="btn-primary">
+            {t.startToday}
+          </SubmitButton>
+          <FormStatus />
+        </ActionForm>
+      ) : progress.mode === "history_only" ? (
+        <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">
+          {t.historyProgress(progress.lifetimeCompletedCount)}
+        </p>
+      ) : null}
 
       <ol className="space-y-3">
-        {days.map((day) => {
-          const isOpen =
-            profile.role === "admin" ||
-            !enrollment ||
-            day.day_number <= unlocked;
-          const isDone = completed.has(day.id);
+        {requiredLessons.map((lesson) => {
+          const isOpen = accessible.has(lesson.id);
+          const isDone = completed.has(lesson.id);
+          const content = accessible.get(lesson.id);
+          const legacyMedia =
+            progress.mode === "legacy_free" ? legacyVideos.get(lesson.id) : null;
+          const legacyVideo = legacyMedia?.video as { title: string } | null | undefined;
+          const canToggle = canChangeProgress && isOpen;
+          const unlockStart = progress.startedOn ?? progress.accessStartedOn;
           return (
             <li
-              key={day.id}
+              key={lesson.id}
               className={`rounded-lg border p-4 ${
-                upNext?.id === day.id
+                nextLesson?.id === lesson.id
                   ? "border-accent bg-surface"
                   : isOpen
                     ? "border-border bg-surface"
@@ -580,34 +707,32 @@ export default async function ProgramPage({
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2 font-semibold">
                     {isDone && <span aria-hidden="true">✓</span>}
-                    {t.dayTitle(day.day_number, day.title)}{" "}
-                    <PillarTag pillar={day.pillar} />
+                    {t.dayTitle(lesson.timelineDayNumber, lesson.title)}{" "}
+                    <PillarTag pillar={lesson.pillar} />
                   </p>
                   {isOpen ? (
                     <>
-                      {day.instructions && (
+                      {content?.instructions && (
                         <p className="mt-2 max-w-2xl whitespace-pre-line text-sm">
-                          {day.instructions}
+                          {content.instructions}
                         </p>
                       )}
-                      {day.video_id &&
-                        (profile.role === "admin" ||
-                          (profile.role === "member" && enrollment)) && (
+                      {legacyMedia?.video_id && (
                           <Link
-                            href={`/programs/${program.id}/days/${day.id}`}
+                            href={`/programs/${program.id}/days/${lesson.id}`}
                             className="text-link mt-2 inline-block text-sm"
                           >
-                            {t.watch(day.video?.title ?? t.theVideo)}
+                            {t.watch(legacyVideo?.title ?? t.theVideo)}
                           </Link>
-                        )}
+                      )}
                     </>
                   ) : (
-                    enrollment && (
+                    unlockStart && progress.mode !== "paid_order" && (
                       <p className="mt-1 text-sm text-muted">
                         {t.unlocks(
                           shiftDay(
-                            enrollment.started_on,
-                            day.day_number - 1,
+                            unlockStart,
+                            lesson.timelineDayNumber - 1,
                             locale,
                           ),
                         )}
@@ -615,15 +740,15 @@ export default async function ProgramPage({
                     )
                   )}
                 </div>
-                {enrollment && isOpen && (
+                {canToggle && (
                   <ActionForm action={setProgramDayDone} className="space-y-1">
+                    <input type="hidden" name="day_id" value={lesson.id} />
+                    <input type="hidden" name="program_id" value={program.id} />
                     <input
                       type="hidden"
-                      name="enrollment_id"
-                      value={enrollment.id}
+                      name="operation_id"
+                      value={randomUUID()}
                     />
-                    <input type="hidden" name="day_id" value={day.id} />
-                    <input type="hidden" name="program_id" value={program.id} />
                     <input
                       type="hidden"
                       name="done"
@@ -648,12 +773,12 @@ export default async function ProgramPage({
         })}
       </ol>
 
-      {enrollment && (
+      {progress.enrollmentId && progress.mode !== "paid_order" && (
         <ActionForm
           action={leaveProgram}
           confirmMessage={t.confirmLeave(program.title)}
         >
-          <input type="hidden" name="enrollment_id" value={enrollment.id} />
+          <input type="hidden" name="enrollment_id" value={progress.enrollmentId} />
           <SubmitButton
             pendingText={t.leaving}
             className="text-sm text-muted hover:text-danger"
