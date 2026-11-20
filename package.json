@@ -14,12 +14,14 @@
     "test:db": "supabase test db"
   },
   "dependencies": {
+    "@ai-sdk/openai": "4.0.122",
     "@cloudflare/realtimekit": "2.0.4",
     "@mediapipe/tasks-vision": "1.2.3",
     "@stripe/react-stripe-js": "7.0.1",
     "@stripe/stripe-js": "10.2.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
+    "ai": "7.0.178",
     "lucide-react": "1.62.0",
     "next": "16.4.5",
     "react": "19.3.0",
