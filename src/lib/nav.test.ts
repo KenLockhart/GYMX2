@@ -70,6 +70,13 @@ describe("menus", () => {
       expect(allDestinations(role).some((item) => item.href === href)).toBe(false);
     }
   });
+
+  it("keeps Form Coach billing reachable from the account menu for every signed-in role", () => {
+    for (const role of roles) {
+      expect(menuGroups(role).find((group) => group.title === "Account")?.items.map((entry) => entry.href))
+        .toContain("/billing/form-coach");
+    }
+  });
 });
 
 describe("isActive", () => {
