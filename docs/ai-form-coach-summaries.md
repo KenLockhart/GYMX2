@@ -15,13 +15,19 @@ Set these server-side environment variables to enable the provider:
 | `FORM_COACH_LLM_MODEL` | An explicit OpenAI model ID; this deployment is configured for `gpt-6-luna`. There is no model fallback. |
 | `FORM_COACH_LLM_API_KEY` | A dedicated OpenAI API key, configured in Vercel's encrypted environment settings. |
 
+The scheduled job route also requires `FORM_COACH_JOBS_ENABLED=true` and the
+existing `CRON_SECRET` bearer header. The new flag defaults to false. Provider
+configuration is checked before the summary outbox is claimed, so a missing
+key leaves queued summaries untouched.
+
 Keep the API key out of source control, `.env.example`, browser configuration,
 logs, prompts, and error results. Until the key is provisioned, the provider
 returns `unconfigured` without making a network request. The caller can retain
 the completed attempt independently of the summary result.
 
 The implementation calls the fixed `https://api.openai.com/v1` Responses API
-endpoint with `store: false`, reasoning effort `none`, an 8-second timeout, a
+endpoint with `store: false`, reasoning effort `none`, an 8-second maximum
+timeout (shortened by the worker's remaining local authorization budget), a
 180-token output limit, no SDK retries, and SDK telemetry disabled. It does not
 configure tools, files, images, audio, prior response IDs, conversations,
 metadata, or caller-selected URLs. For stateless reasoning requests, the SDK
@@ -37,8 +43,11 @@ characters, and contain no HTML. Invalid, blocked, truncated, empty, or
 provider-error responses map to sanitized outcomes and never expose raw SDK
 errors.
 
-This change provides the bounded provider and prompt only. It does not connect
-the provider to the durable summary outbox, add a worker or cron, or complete
-the user interface flow. Those pieces require a separately reviewed adapter
-that claims only coach-owned programs and preserves attempts when generation is
-unconfigured or unavailable.
+The durable worker uses a one-use, short-lived database authorization before it
+can start a provider request. It claims at most one summary per pass, never
+retries an already-authorized request after a lost response, and records only a
+sanitized completion, delayed retry, or unavailable outcome. Expired or
+deletion-fenced output is not written to an attempt. See
+[`ai-form-coach-jobs.md`](ai-form-coach-jobs.md) for the queue, cleanup, expiry,
+and scheduled-work contracts. This work does not add a notification delivery
+path or complete a user interface flow.

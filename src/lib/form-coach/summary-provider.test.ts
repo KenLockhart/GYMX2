@@ -127,8 +127,9 @@ function createFetchMock(
 function createProvider(
   fetchImpl: typeof fetch,
   providerEnv: TestEnvironment = env,
+  monotonicNow?: () => number,
 ) {
-  return createFormCoachSummaryProvider({ env: providerEnv, fetchImpl });
+  return createFormCoachSummaryProvider({ env: providerEnv, fetchImpl, monotonicNow });
 }
 
 describe("Form Coach summary provider", () => {
@@ -191,6 +192,7 @@ describe("Form Coach summary provider", () => {
     const { fetchImpl } = createFetchMock();
     const provider = createProvider(fetchImpl, missingEnv);
 
+    expect(provider.isConfigured()).toBe(false);
     await expect(provider.summarize(summary)).resolves.toEqual({
       status: "unconfigured",
     });
@@ -308,6 +310,50 @@ describe("Form Coach summary provider", () => {
     expect(result).toEqual({ status: "retryable", category: "network" });
     expect(JSON.stringify(result)).not.toContain(apiKey);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start transport when provider preparation crosses the grant deadline", async () => {
+    const { fetchImpl } = createFetchMock();
+    const monotonicNow = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(151);
+    const provider = createProvider(fetchImpl, env, monotonicNow);
+
+    const result = await provider.summarize(summary, {
+      timeoutMs: 50,
+      deadlineAtMonotonic: 150,
+    });
+
+    expect(result).toEqual({ status: "retryable", category: "timeout" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("passes the worker abort signal through to the active transport", async () => {
+    const controller = new AbortController();
+    let transportSignal: AbortSignal | undefined;
+    const fetchImpl: typeof fetch = vi.fn((input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      transportSignal = request.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        request.signal.addEventListener(
+          "abort",
+          () => reject(new DOMException("Synthetic timeout", "AbortError")),
+          { once: true },
+        );
+      });
+    });
+    const provider = createProvider(fetchImpl);
+
+    const pending = provider.summarize(summary, {
+      signal: controller.signal,
+      timeoutMs: FORM_COACH_SUMMARY_TIMEOUT_MS,
+    });
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    controller.abort();
+
+    await expect(pending).resolves.toEqual({
+      status: "retryable",
+      category: "timeout",
+    });
+    expect(transportSignal?.aborted).toBe(true);
   });
 
   it("aborts a hanging fetch at the configured deadline without retrying", async () => {

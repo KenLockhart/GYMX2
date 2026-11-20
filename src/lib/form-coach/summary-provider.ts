@@ -73,6 +73,13 @@ type SummaryEnvironment = Readonly<{
 type ProviderOptions = Readonly<{
   env?: SummaryEnvironment;
   fetchImpl?: typeof fetch;
+  monotonicNow?: () => number;
+}>;
+
+export type FormCoachSummaryRequestOptions = Readonly<{
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  deadlineAtMonotonic?: number;
 }>;
 
 type SummaryConfig = Readonly<{ model: string; apiKey: string }>;
@@ -272,20 +279,61 @@ export function createFormCoachSummaryProvider(options: ProviderOptions = {}) {
     FORM_COACH_LLM_API_KEY: process.env.FORM_COACH_LLM_API_KEY,
   };
   const fetchImpl = options.fetchImpl ?? fetch;
+  const monotonicNow = options.monotonicNow ?? (() => performance.now());
 
   return {
-    async summarize(input: unknown): Promise<FormCoachSummaryResult> {
+    isConfigured(): boolean {
+      return readConfig(env) !== null;
+    },
+
+    async summarize(
+      input: unknown,
+      requestOptions: FormCoachSummaryRequestOptions = {},
+    ): Promise<FormCoachSummaryResult> {
       const numericSummary = normalizeNumericSummary(input);
       if (!numericSummary) return { status: "invalid_input" };
 
       const config = readConfig(env);
       if (!config) return { status: "unconfigured" };
 
+      if (requestOptions.signal?.aborted) {
+        return { status: "retryable", category: "timeout" };
+      }
+
+      const startedAt = monotonicNow();
+      const requestedTimeout = requestOptions.timeoutMs ?? FORM_COACH_SUMMARY_TIMEOUT_MS;
+      const deadlineAtMonotonic = Math.min(
+        requestOptions.deadlineAtMonotonic ??
+          startedAt + FORM_COACH_SUMMARY_TIMEOUT_MS,
+        startedAt + FORM_COACH_SUMMARY_TIMEOUT_MS,
+      );
+      const timeoutMs = Math.floor(
+        Math.min(requestedTimeout, deadlineAtMonotonic - startedAt),
+      );
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        return { status: "retryable", category: "timeout" };
+      }
+
+      const guardedFetch: typeof fetch = async (input, init) => {
+        if (requestOptions.signal?.aborted) {
+          throw new DOMException("Summary deadline expired", "TimeoutError");
+        }
+        if (monotonicNow() >= deadlineAtMonotonic) {
+          throw new DOMException("Summary deadline expired", "TimeoutError");
+        }
+        const transportSignal =
+          init?.signal ?? (input instanceof Request ? input.signal : undefined);
+        if (transportSignal?.aborted) {
+          throw new DOMException("Summary deadline expired", "TimeoutError");
+        }
+        return fetchImpl(input, init);
+      };
+
       try {
         const openai = createOpenAI({
           apiKey: config.apiKey,
           baseURL: OPENAI_BASE_URL,
-          fetch: fetchImpl,
+          fetch: guardedFetch,
         });
         const generated = await generateText({
           model: openai.responses(config.model),
@@ -299,7 +347,8 @@ export function createFormCoachSummaryProvider(options: ProviderOptions = {}) {
           },
           maxOutputTokens: FORM_COACH_SUMMARY_MAX_OUTPUT_TOKENS,
           maxRetries: 0,
-          timeout: FORM_COACH_SUMMARY_TIMEOUT_MS,
+          abortSignal: requestOptions.signal,
+          timeout: timeoutMs,
           telemetry: {
             isEnabled: false,
             recordInputs: false,
