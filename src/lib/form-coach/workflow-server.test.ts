@@ -19,6 +19,7 @@ import {
   createFormCoachReferenceReadUrl,
   getFormCoachWorkflowDetail,
   listCoachFormCoachAssessments,
+  listMyFormCoachAssessments,
 } from "./workflow-server";
 import {
   FORM_COACH_REFERENCE_SIGNED_URL_MAX_TTL_SECONDS,
@@ -32,7 +33,7 @@ const itemId = "f1000000-0000-4000-8000-000000000004";
 const versionId = "f1000000-0000-4000-8000-000000000006";
 const assetId = "f1000000-0000-4000-8000-000000000007";
 
-function queuePage() {
+function queuePage(page = 1) {
   return {
     rows: [{
       assessment_id: assessmentId,
@@ -45,6 +46,23 @@ function queuePage() {
       item_count: 1,
       finished_attempt_count: 0,
       allow_member_clip: false,
+    }],
+    page,
+    has_more: false,
+  };
+}
+
+function memberPage() {
+  return {
+    rows: [{
+      assessment_id: assessmentId,
+      source_kind: "manual",
+      program_title: null,
+      sent_at: "2026-11-20T12:00:00.000Z",
+      due_at: "2026-11-27T12:00:00.000Z",
+      status: "sent",
+      item_count: 1,
+      finished_attempt_count: 0,
     }],
     page: 1,
     has_more: false,
@@ -125,14 +143,14 @@ afterEach(() => {
 
 describe("Form Coach workflow server boundary", () => {
   it("uses the authenticated coach RPC and validates its bounded page", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: queuePage(), error: null });
+    const rpc = vi.fn().mockResolvedValue({ data: queuePage(2), error: null });
     mocks.createClient.mockResolvedValue(createUserClient(rpc));
 
-    await expect(listCoachFormCoachAssessments({ page: 2, pageSize: 10, status: "sent" }))
-      .resolves.toMatchObject({ kind: "ready", value: queuePage() });
+    await expect(listCoachFormCoachAssessments({ page: 2, pageSize: 50, status: "sent" }))
+      .resolves.toMatchObject({ kind: "ready", value: queuePage(2) });
     expect(rpc).toHaveBeenCalledWith("list_coach_form_coach_assessments", {
       target_page: 2,
-      target_page_size: 10,
+      target_page_size: 20,
       target_status: "sent",
     });
   });
@@ -142,6 +160,35 @@ describe("Form Coach workflow server boundary", () => {
       .resolves.toEqual({ kind: "unavailable" });
     expect(mocks.requireCoach).not.toHaveBeenCalled();
     expect(mocks.createClient).not.toHaveBeenCalled();
+  });
+
+  it("uses the authenticated member list RPC with a bounded page size", async () => {
+    mocks.requireAuthenticatedAccount.mockResolvedValue({ profile: { id: memberId, role: "member" } });
+    const rpc = vi.fn().mockResolvedValue({ data: memberPage(), error: null });
+    mocks.createClient.mockResolvedValue(createUserClient(rpc));
+
+    await expect(listMyFormCoachAssessments({ page: 1, pageSize: 50 })).resolves.toMatchObject({
+      kind: "ready",
+      value: memberPage(),
+    });
+    expect(rpc).toHaveBeenCalledWith("list_my_form_coach_assessments", {
+      target_page: 1,
+      target_page_size: 20,
+    });
+    expect(mocks.requireAuthenticatedAccount).toHaveBeenCalledOnce();
+  });
+
+  it("rejects non-member inbox reads before database work and validates the member projection", async () => {
+    await expect(listMyFormCoachAssessments()).resolves.toEqual({ kind: "not_authorized" });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+
+    mocks.requireAuthenticatedAccount.mockResolvedValue({ profile: { id: memberId, role: "member" } });
+    const rpc = vi.fn().mockResolvedValue({
+      data: { ...memberPage(), rows: [{ ...memberPage().rows[0], member_email: "private@example.test" }] },
+      error: null,
+    });
+    mocks.createClient.mockResolvedValue(createUserClient(rpc));
+    await expect(listMyFormCoachAssessments()).resolves.toEqual({ kind: "unavailable" });
   });
 
   it("fails closed when the coach RPC errors or returns a widened DTO", async () => {
@@ -168,7 +215,43 @@ describe("Form Coach workflow server boundary", () => {
     expect(rpc).toHaveBeenCalledWith("get_form_coach_workflow_detail", {
       target_assessment_id: assessmentId,
     });
+    expect(mocks.requireCoach).toHaveBeenCalledOnce();
     expect(mocks.createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("keeps authenticated member history available without an entitlement check", async () => {
+    mocks.requireAuthenticatedAccount.mockResolvedValue({ profile: { id: memberId, role: "member" } });
+    const { member_id: omittedMemberId, ...memberDetail } = detail();
+    expect(omittedMemberId).toBe(memberId);
+    const rpc = vi.fn().mockResolvedValue({ data: memberDetail, error: null });
+    mocks.createClient.mockResolvedValue(createUserClient(rpc));
+
+    await expect(getFormCoachWorkflowDetail(assessmentId, "member")).resolves.toMatchObject({
+      kind: "ready",
+      value: { assessment_id: assessmentId },
+    });
+    await expect(getFormCoachWorkflowDetail(assessmentId)).resolves.toMatchObject({ kind: "ready" });
+    expect(mocks.requireAuthenticatedAccount).toHaveBeenCalledTimes(2);
+    expect(mocks.requireCoach).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenNthCalledWith(1, "get_form_coach_workflow_detail", {
+      target_assessment_id: assessmentId,
+    });
+    expect(rpc).toHaveBeenNthCalledWith(2, "get_form_coach_workflow_detail", {
+      target_assessment_id: assessmentId,
+    });
+  });
+
+  it.each([
+    { actorRole: "member", expectedRole: "coach" },
+    { actorRole: "coach", expectedRole: "member" },
+  ] as const)("rejects a $actorRole actor on a $expectedRole detail route before RPC", async ({ actorRole, expectedRole }) => {
+    mocks.requireAuthenticatedAccount.mockResolvedValue({
+      profile: { id: actorRole === "member" ? memberId : coachId, role: actorRole },
+    });
+
+    await expect(getFormCoachWorkflowDetail(assessmentId, expectedRole)).resolves.toEqual({ kind: "not_authorized" });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.requireCoach).not.toHaveBeenCalled();
   });
 
   it("does not call a detail RPC for invalid IDs or an admin actor", async () => {

@@ -77,6 +77,17 @@ describe("menus", () => {
         .toContain("/billing/form-coach");
     }
   });
+
+  it("shows assessment navigation only to coaches and member Form Checks only to members", () => {
+    expect(allDestinations("coach").some((item) => item.href === "/form-coach/assessments")).toBe(true);
+    expect(allDestinations("member").some((item) => item.href === "/form-checks")).toBe(true);
+    for (const role of ["member", "moderator", "admin"] as const) {
+      expect(allDestinations(role).some((item) => item.href === "/form-coach/assessments")).toBe(false);
+    }
+    for (const role of ["coach", "moderator", "admin"] as const) {
+      expect(allDestinations(role).some((item) => item.href === "/form-checks")).toBe(false);
+    }
+  });
 });
 
 describe("isActive", () => {

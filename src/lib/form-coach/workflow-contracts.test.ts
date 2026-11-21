@@ -5,6 +5,9 @@ import {
   FormCoachRepSubmissionSchema,
   FORM_COACH_REFERENCE_SIGNED_URL_MAX_TTL_SECONDS,
   FORM_COACH_REFERENCE_SIGNING_RESERVE_SECONDS,
+  ListCoachFormCoachAssessmentsInputSchema,
+  ListMyFormCoachAssessmentsInputSchema,
+  MemberFormCoachAssessmentPageSchema,
   PinnedFormCoachReferenceAssetSchema,
   RepResultSchema,
   formCoachReferenceUrlTtlSeconds,
@@ -42,6 +45,40 @@ function referenceAsset(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Form Coach app workflow contracts", () => {
+  it("clamps list page sizes to twenty and allowlists persisted workflow statuses", () => {
+    expect(ListCoachFormCoachAssessmentsInputSchema.parse({ page: 3, pageSize: 50, status: "completed" }))
+      .toEqual({ page: 3, pageSize: 20, status: "completed" });
+    expect(ListCoachFormCoachAssessmentsInputSchema.safeParse({ status: "reviewed" }).success).toBe(false);
+    expect(ListMyFormCoachAssessmentsInputSchema.parse({ pageSize: 100 })).toEqual({ page: 1, pageSize: 20 });
+    expect(ListMyFormCoachAssessmentsInputSchema.safeParse({ page: 0 }).success).toBe(false);
+  });
+
+  it("accepts only the narrow member assessment list projection", () => {
+    const page = {
+      rows: [{
+        assessment_id: assessmentId,
+        source_kind: "manual",
+        program_title: null,
+        sent_at: now,
+        due_at: "2026-11-27T12:00:00.000Z",
+        status: "sent",
+        item_count: 1,
+        finished_attempt_count: 0,
+      }],
+      page: 1,
+      has_more: false,
+    };
+    expect(MemberFormCoachAssessmentPageSchema.parse(page)).toEqual(page);
+    expect(MemberFormCoachAssessmentPageSchema.safeParse({
+      ...page,
+      rows: [{ ...page.rows[0], member_email: "private@example.test" }],
+    }).success).toBe(false);
+    expect(MemberFormCoachAssessmentPageSchema.safeParse({
+      ...page,
+      rows: [{ ...page.rows[0], status: "reviewed" }],
+    }).success).toBe(false);
+  });
+
   it("keeps legacy detail reads compatible while validating new measured submissions", () => {
     const fastRep = {
       rep_number: 1,

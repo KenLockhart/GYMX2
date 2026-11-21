@@ -4,12 +4,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   ListCoachFormCoachAssessmentsInputSchema,
+  ListMyFormCoachAssessmentsInputSchema,
   FormCoachWorkflowDetailSchema,
   FORM_COACH_REFERENCE_SIGNING_RESERVE_SECONDS,
   formCoachReferenceUrlTtlSeconds,
   parseCoachFormCoachAssessmentPage,
+  parseMemberFormCoachAssessmentPage,
   parsePinnedFormCoachReferenceAsset,
   type CoachFormCoachAssessmentPage,
+  type MemberFormCoachAssessmentPage,
   type FormCoachWorkflowDetail,
 } from "@/lib/form-coach/workflow-contracts";
 
@@ -43,7 +46,37 @@ export async function listCoachFormCoachAssessments(
       target_status: parsedInput.data.status,
     });
     if (error) return { kind: "unavailable" };
-    return { kind: "ready", value: parseCoachFormCoachAssessmentPage(data) };
+    const page = parseCoachFormCoachAssessmentPage(data);
+    if (page.page !== parsedInput.data.page || page.rows.length > parsedInput.data.pageSize) {
+      return { kind: "unavailable" };
+    }
+    return { kind: "ready", value: page };
+  } catch {
+    return { kind: "unavailable" };
+  }
+}
+
+export async function listMyFormCoachAssessments(
+  input: Readonly<{ page?: number; pageSize?: number }> = {},
+): Promise<FormCoachWorkflowRead<MemberFormCoachAssessmentPage>> {
+  const parsedInput = ListMyFormCoachAssessmentsInputSchema.safeParse(input);
+  if (!parsedInput.success) return { kind: "unavailable" };
+
+  const account = await requireAuthenticatedAccount();
+  if (account.profile.role !== "member") return { kind: "not_authorized" };
+
+  try {
+    const client = await createClient();
+    const { data, error } = await client.rpc("list_my_form_coach_assessments", {
+      target_page: parsedInput.data.page,
+      target_page_size: parsedInput.data.pageSize,
+    });
+    if (error) return { kind: "unavailable" };
+    const page = parseMemberFormCoachAssessmentPage(data);
+    if (page.page !== parsedInput.data.page || page.rows.length > parsedInput.data.pageSize) {
+      return { kind: "unavailable" };
+    }
+    return { kind: "ready", value: page };
   } catch {
     return { kind: "unavailable" };
   }
@@ -51,12 +84,15 @@ export async function listCoachFormCoachAssessments(
 
 export async function getFormCoachWorkflowDetail(
   assessmentId: string,
+  expectedRole?: "member" | "coach",
 ): Promise<FormCoachWorkflowRead<FormCoachWorkflowDetail>> {
   if (!isUuid(assessmentId)) return { kind: "not_authorized" };
   const account = await requireAuthenticatedAccount();
   if (account.profile.role !== "member" && account.profile.role !== "coach") {
     return { kind: "not_authorized" };
   }
+  if (expectedRole && account.profile.role !== expectedRole) return { kind: "not_authorized" };
+  if (account.profile.role === "coach") await requireCoach();
 
   try {
     const client = await createClient();

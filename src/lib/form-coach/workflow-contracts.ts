@@ -13,11 +13,19 @@ export type FormCoachAssessmentStatus = z.infer<typeof FormCoachAssessmentStatus
 export const ListCoachFormCoachAssessmentsInputSchema = z
   .object({
     page: z.number().int().min(1).max(1_000_000).default(1),
-    pageSize: z.number().int().min(1).max(50).default(20),
+    pageSize: z.number().int().min(1).max(1_000_000).transform((size) => Math.min(size, 20)).default(20),
     status: FormCoachAssessmentStatusSchema.nullable().default(null),
   })
   .strict();
 export type ListCoachFormCoachAssessmentsInput = z.input<typeof ListCoachFormCoachAssessmentsInputSchema>;
+
+export const ListMyFormCoachAssessmentsInputSchema = z
+  .object({
+    page: z.number().int().min(1).max(1_000_000).default(1),
+    pageSize: z.number().int().min(1).max(1_000_000).transform((size) => Math.min(size, 20)).default(20),
+  })
+  .strict();
+export type ListMyFormCoachAssessmentsInput = z.input<typeof ListMyFormCoachAssessmentsInputSchema>;
 
 const IsoTimestampSchema = z.string().datetime({ offset: true });
 const UuidSchema = z.string().uuid();
@@ -41,13 +49,36 @@ export const CoachFormCoachAssessmentRowSchema = z
 
 export const CoachFormCoachAssessmentPageSchema = z
   .object({
-    rows: z.array(CoachFormCoachAssessmentRowSchema).max(50),
+    rows: z.array(CoachFormCoachAssessmentRowSchema).max(20),
     page: z.number().int().min(1).max(1_000_000),
     has_more: z.boolean(),
   })
   .strict();
 export type CoachFormCoachAssessmentRow = z.infer<typeof CoachFormCoachAssessmentRowSchema>;
 export type CoachFormCoachAssessmentPage = z.infer<typeof CoachFormCoachAssessmentPageSchema>;
+
+export const MemberFormCoachAssessmentRowSchema = z
+  .object({
+    assessment_id: UuidSchema,
+    source_kind: z.enum(["manual", "program"]),
+    program_title: z.string().min(1).max(120).nullable(),
+    sent_at: IsoTimestampSchema,
+    due_at: IsoTimestampSchema,
+    status: FormCoachAssessmentStatusSchema,
+    item_count: z.number().int().min(0).max(20),
+    finished_attempt_count: z.number().int().min(0).max(240),
+  })
+  .strict();
+
+export const MemberFormCoachAssessmentPageSchema = z
+  .object({
+    rows: z.array(MemberFormCoachAssessmentRowSchema).max(20),
+    page: z.number().int().min(1).max(1_000_000),
+    has_more: z.boolean(),
+  })
+  .strict();
+export type MemberFormCoachAssessmentRow = z.infer<typeof MemberFormCoachAssessmentRowSchema>;
+export type MemberFormCoachAssessmentPage = z.infer<typeof MemberFormCoachAssessmentPageSchema>;
 
 const ExerciseFaultSchema = z.enum([
   "elbow_drift",
@@ -254,6 +285,10 @@ export type PinnedFormCoachReferenceAsset = z.infer<typeof PinnedFormCoachRefere
 
 export function parseCoachFormCoachAssessmentPage(input: unknown): CoachFormCoachAssessmentPage {
   return CoachFormCoachAssessmentPageSchema.parse(input);
+}
+
+export function parseMemberFormCoachAssessmentPage(input: unknown): MemberFormCoachAssessmentPage {
+  return MemberFormCoachAssessmentPageSchema.parse(input);
 }
 
 export function parseFormCoachWorkflowDetail(input: unknown): FormCoachWorkflowDetail {
