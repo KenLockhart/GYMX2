@@ -5,10 +5,13 @@ import { createFrameSender, type FrameSender } from "./frame-sender";
 import { validateFormCoachAssetRequest } from "./session-network-policy";
 import { createWorkerController, type WorkerController, type WorkerControllerEvent, type WorkerPortLike, type WorkerErrorCode, type WorkerModel } from "./worker-controller";
 import {
+  hasExactKeys,
   isBoundedPoseOverlay,
   isCurlScoringTemplate,
   isFormCoachRepSummary,
   isFormCoachWorkerMessage,
+  isReferenceCaptureCandidateSummary,
+  isReferenceCapturePauseReason,
   type FormCoachRepSummary,
   type FormCoachRunMode,
   type NetworkAuditEntry,
@@ -18,6 +21,8 @@ import { STANDING_DUMBBELL_CURL } from "./engine/registry";
 import type { CameraView } from "./engine/types";
 import { serializeFormCoachRepResult, type PersistableFormCoachRepResult } from "./runtime-results";
 import type { CurlScoringTemplate, PoseLandmark, TrackedArm } from "./engine/types";
+import { safeParseExerciseTemplate, type ExerciseTemplate } from "./template-schema";
+import type { ReferenceCaptureCandidateSummary, ReferenceCapturePauseReason } from "./worker-protocol";
 
 const MANIFEST_PATH = "/form-coach-assets/form-coach-worker/manifest.json";
 const WORKER_PATH_PATTERN = /^\/form-coach-worker\/([a-f0-9]{64})\/worker\.js$/;
@@ -84,6 +89,38 @@ export interface FormCoachProcessingSession {
   readonly delegate: "GPU" | "CPU";
   readonly mode: FormCoachRunMode;
   stop(): Promise<void>;
+}
+
+export type ReferenceCaptureBuildFailureCode = "not-paused" | "stale-generation" | "invalid-selection" | "already-built" | "invalid-request" | "worker-failed";
+
+export type ReferenceCaptureBuildResult =
+  | Readonly<{ ok: true; template: ExerciseTemplate; requestId: number; candidateGeneration: number; selectedCandidateIds: readonly string[] }>
+  | Readonly<{ ok: false; code: ReferenceCaptureBuildFailureCode; requestId: number; candidateGeneration: number; selectedCandidateIds: readonly string[] }>;
+
+export interface FormCoachReferenceCaptureSession extends FormCoachProcessingSession {
+  readonly mode: "reference";
+  pauseCapture(reason?: "user_pause"): Promise<Readonly<{
+    sessionEpoch: number;
+    requestId: number;
+    lastProcessedSequence: number;
+    candidateGeneration: number;
+    reason: ReferenceCapturePauseReason;
+  }>>;
+  buildReference(selectedCandidateIds: readonly string[]): Promise<ReferenceCaptureBuildResult>;
+}
+
+export interface FormCoachReferenceCaptureOptions {
+  readonly baseTemplate: ExerciseTemplate;
+  readonly signal?: AbortSignal;
+  readonly forceCpu?: boolean;
+  readonly onReady?: (info: { readonly model: WorkerModel; readonly delegate: "GPU" | "CPU" }) => void;
+  readonly onSetup?: (step: SetupStep) => void;
+  readonly onCandidate?: (candidate: ReferenceCaptureCandidateSummary, candidateGeneration: number) => void;
+  readonly onPaused?: (value: { readonly candidateGeneration: number; readonly reason: ReferenceCapturePauseReason }) => void;
+  readonly onBuilt?: (result: Extract<ReferenceCaptureBuildResult, { ok: true }>) => void;
+  readonly onBuildRejected?: (result: Extract<ReferenceCaptureBuildResult, { ok: false }>) => void;
+  readonly onError?: (code: FormCoachRuntimeFailure) => void;
+  readonly onTimelineResetRequired?: () => void;
 }
 
 type FrameCallbackMetadata = Readonly<{ mediaTime: number }>;
@@ -247,6 +284,74 @@ class ControllerWorkerPort implements WorkerPortLike {
   }
 }
 
+/** Separate opt-in bridge; the existing controller port/filter remains unchanged. */
+class ReferenceCaptureWorkerPort implements WorkerPortLike {
+  private readonly messageListeners = new Map<(event: Readonly<{ data: unknown }>) => void, (event: MessageEvent<unknown>) => void>();
+  private readonly eventListeners = new Map<() => void, EventListener>();
+
+  constructor(
+    private readonly worker: Worker,
+    private readonly arm: TrackedArm,
+    private readonly cameraView: CameraView,
+    private readonly baseTemplate: ExerciseTemplate,
+    private readonly gpuCanvas: OffscreenCanvas | null,
+    private readonly forceCpu: boolean,
+  ) {}
+
+  postMessage(message: unknown, transfer: readonly unknown[] = []): void {
+    if (isFormCoachWorkerMessage(message) && message.type === "init") {
+      const init = {
+        ...message,
+        mode: "reference" as const,
+        arm: this.arm,
+        cameraView: this.cameraView,
+        referenceRepTarget: 3,
+        forceCpu: this.forceCpu,
+        gpuCanvas: this.forceCpu ? null : this.gpuCanvas,
+        referenceSelection: this.baseTemplate,
+      };
+      const transferables = [...transfer, ...(!this.forceCpu && this.gpuCanvas ? [this.gpuCanvas] : [])] as Transferable[];
+      this.worker.postMessage(init, transferables);
+      return;
+    }
+    this.worker.postMessage(message, transfer as Transferable[]);
+  }
+
+  addEventListener(type: "message", listener: (event: Readonly<{ data: unknown }>) => void): void;
+  addEventListener(type: "error" | "messageerror", listener: () => void): void;
+  addEventListener(type: "message" | "error" | "messageerror", listener: ((event: Readonly<{ data: unknown }>) => void) | (() => void)): void {
+    if (type === "message") {
+      const handler = (event: MessageEvent<unknown>) => {
+        if (isControllerMessage(event.data)) (listener as (event: Readonly<{ data: unknown }>) => void)({ data: event.data });
+      };
+      this.messageListeners.set(listener as (event: Readonly<{ data: unknown }>) => void, handler);
+      this.worker.addEventListener("message", handler);
+      return;
+    }
+    const handler: EventListener = () => (listener as () => void)();
+    this.eventListeners.set(listener as () => void, handler);
+    this.worker.addEventListener(type, handler);
+  }
+
+  removeEventListener(type: "message", listener: (event: Readonly<{ data: unknown }>) => void): void;
+  removeEventListener(type: "error" | "messageerror", listener: () => void): void;
+  removeEventListener(type: "message" | "error" | "messageerror", listener: ((event: Readonly<{ data: unknown }>) => void) | (() => void)): void {
+    if (type === "message") {
+      const handler = this.messageListeners.get(listener as (event: Readonly<{ data: unknown }>) => void);
+      if (handler) this.worker.removeEventListener("message", handler);
+      this.messageListeners.delete(listener as (event: Readonly<{ data: unknown }>) => void);
+      return;
+    }
+    const handler = this.eventListeners.get(listener as () => void);
+    if (handler) this.worker.removeEventListener(type, handler);
+    this.eventListeners.delete(listener as () => void);
+  }
+
+  terminate(): void {
+    this.worker.terminate();
+  }
+}
+
 function createTransferredGpuCanvas(): OffscreenCanvas | null {
   if (typeof document === "undefined" || typeof OffscreenCanvas === "undefined") return null;
   const canvas = document.createElement("canvas");
@@ -265,11 +370,42 @@ function createRuntimeError(code: FormCoachRuntimeFailure): FormCoachRuntimeErro
   return new FormCoachRuntimeError(code);
 }
 
+type ReferenceCaptureRuntimeConfig = Omit<FormCoachReferenceCaptureOptions, "baseTemplate" | "signal" | "forceCpu"> & Readonly<{ baseTemplate: ExerciseTemplate }>;
+
 /** Starts processing frames from an already supplied video element; it never requests camera or audio access. */
-export async function startFormCoachProcessing(
+export function startFormCoachProcessing(video: HTMLVideoElement, options: FormCoachRuntimeOptions): Promise<FormCoachProcessingSession> {
+  return startFormCoachProcessingInternal(video, options) as Promise<FormCoachProcessingSession>;
+}
+
+/** Starts the opt-in local candidate capture flow; it never requests camera or audio access. */
+export function startFormCoachReferenceCapture(
+  video: HTMLVideoElement,
+  options: FormCoachReferenceCaptureOptions,
+): Promise<FormCoachReferenceCaptureSession> {
+  const parsed = safeParseExerciseTemplate(options.baseTemplate);
+  if (!parsed.success || parsed.data.exerciseKey !== STANDING_DUMBBELL_CURL.exerciseKey) {
+    return Promise.reject(createRuntimeError("worker-start-failed"));
+  }
+  const baseTemplate = parsed.data;
+  const runtimeOptions: FormCoachRuntimeOptions = {
+    mode: "reference",
+    arm: baseTemplate.arm,
+    cameraView: baseTemplate.cameraView,
+    signal: options.signal,
+    forceCpu: options.forceCpu,
+    onReady: options.onReady,
+    onSetup: options.onSetup,
+    onError: options.onError,
+    onTimelineResetRequired: options.onTimelineResetRequired,
+  };
+  return startFormCoachProcessingInternal(video, runtimeOptions, { ...options, baseTemplate }) as Promise<FormCoachReferenceCaptureSession>;
+}
+
+async function startFormCoachProcessingInternal(
   video: HTMLVideoElement,
   options: FormCoachRuntimeOptions,
-): Promise<FormCoachProcessingSession> {
+  captureConfig?: ReferenceCaptureRuntimeConfig,
+): Promise<FormCoachProcessingSession | FormCoachReferenceCaptureSession> {
   if (
     typeof window === "undefined" || typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined" ||
     typeof createImageBitmap !== "function" || !video
@@ -330,6 +466,31 @@ export async function startFormCoachProcessing(
   let removeWorkerListeners = () => undefined;
   let removeAbortListener: () => void = () => {};
   let finalization: Promise<void> | null = null;
+  let captureState: "running" | "pausing" | "paused" | "closed" | "none" = captureConfig ? "running" : "none";
+  const captureSource = video.currentSrc || video.src || "";
+  const captureSourceObject = video.srcObject;
+  let captureDimensions: Readonly<{ width: number; height: number }> | null = null;
+  let candidateGeneration = 0;
+  let candidateIds: string[] = [];
+  let pauseRequestId = 0;
+  let buildRequestId = 0;
+  let pendingPauseTargetSequence: number | null = null;
+  let requestedPauseReason: ReferenceCapturePauseReason | null = null;
+  let workerRequiredPauseReason: ReferenceCapturePauseReason | null = null;
+  let pauseReasonForAck: ReferenceCapturePauseReason | null = null;
+  let lastPauseAck: Awaited<ReturnType<FormCoachReferenceCaptureSession["pauseCapture"]>> | null = null;
+  let pendingPauseResolve: ((value: Awaited<ReturnType<FormCoachReferenceCaptureSession["pauseCapture"]>>) => void) | null = null;
+  let pendingPauseReject: ((error: FormCoachRuntimeError) => void) | null = null;
+  let pendingBuild: Readonly<{
+    requestId: number;
+    candidateGeneration: number;
+    selectedCandidateIds: readonly string[];
+    resolve: (result: ReferenceCaptureBuildResult) => void;
+  }> | null = null;
+  let pendingBitmap: Promise<void> | null = null;
+  let frameDrainWaiters: Array<() => void> = [];
+  let lastProcessedSequence = 0;
+  let capturePausePromise: Promise<Awaited<ReturnType<FormCoachReferenceCaptureSession["pauseCapture"]>>> | null = null;
   const stopped = new Promise<void>((resolve) => { stoppedResolve = resolve; });
   const ready = new Promise<FormCoachProcessingSession>((resolve, reject) => {
     readyResolve = resolve;
@@ -347,6 +508,52 @@ export async function startFormCoachProcessing(
   function removeVideoListeners(): void {
     video.removeEventListener("seeking", onTimelineDiscontinuity);
     video.removeEventListener("ended", onVideoEnded);
+    if (captureConfig) {
+      video.removeEventListener("resize", onGeometryDiscontinuity);
+      video.removeEventListener("emptied", onCaptureSourceReset);
+      video.removeEventListener("loadstart", onCaptureSourceReset);
+      video.removeEventListener("loadedmetadata", onGeometryDiscontinuity);
+    }
+  }
+
+  function resolveFrameDrain(): void {
+    const waiters = frameDrainWaiters;
+    frameDrainWaiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  async function drainCaptureFrames(): Promise<void> {
+    while (pendingBitmap) await pendingBitmap;
+    while (frameSender?.hasInFlightFrame()) {
+      await new Promise<void>((resolve) => frameDrainWaiters.push(resolve));
+    }
+  }
+
+  function captureSourceIsCurrent(): boolean {
+    if (!captureConfig) return true;
+    const currentSource = video.currentSrc || video.src || "";
+    return currentSource === captureSource && video.srcObject === captureSourceObject;
+  }
+
+  function captureSessionIsClosed(): boolean {
+    return closed || captureState === "closed";
+  }
+
+  function onGeometryDiscontinuity(): void {
+    if (!captureConfig || closed || captureState === "closed") return;
+    if (!captureSourceIsCurrent()) {
+      onTimelineDiscontinuity();
+      return;
+    }
+    if (captureDimensions &&
+        (video.videoWidth !== captureDimensions.width || video.videoHeight !== captureDimensions.height)) {
+      onTimelineDiscontinuity();
+    }
+  }
+
+  function onCaptureSourceReset(): void {
+    if (!captureConfig || closed || captureState === "closed") return;
+    onTimelineDiscontinuity();
   }
 
   function finishWorkerAfterStop(): Promise<void> {
@@ -375,6 +582,21 @@ export async function startFormCoachProcessing(
       readyReject(createRuntimeError(code));
     }
     frameSender?.stop();
+    resolveFrameDrain();
+    if (captureConfig) {
+      captureState = "closed";
+      candidateIds = [];
+      requestedPauseReason = null;
+      workerRequiredPauseReason = null;
+      pauseReasonForAck = null;
+      pendingPauseReject?.(createRuntimeError(code));
+      pendingPauseReject = null;
+      pendingPauseResolve = null;
+      if (pendingBuild) {
+        pendingBuild.resolve({ ok: false, code: "worker-failed", requestId: pendingBuild.requestId, candidateGeneration: pendingBuild.candidateGeneration, selectedCandidateIds: pendingBuild.selectedCandidateIds });
+        pendingBuild = null;
+      }
+    }
     cancelCapture();
     if (performanceTimer !== null) clearInterval(performanceTimer);
     performanceTimer = null;
@@ -399,7 +621,7 @@ export async function startFormCoachProcessing(
   }
 
   function onTimelineDiscontinuity(): void {
-    if (closed || videoEnded) return;
+    if (closed || (videoEnded && !captureConfig)) return;
     options.onTimelineResetRequired?.();
     if (!errorNotified) {
       errorNotified = true;
@@ -410,14 +632,218 @@ export async function startFormCoachProcessing(
 
   function onVideoEnded(): void {
     videoEnded = true;
-    void stop();
+    if (captureConfig) void pauseCaptureInternal("video_end").catch(() => undefined);
+    else void stop();
+  }
+
+  function onReferenceCapturePauseRequired(data: Record<string, unknown>): void {
+    if (!captureConfig || closed || captureState === "closed" ||
+        !hasExactKeys(data, ["version", "type", "sessionEpoch", "reason", "lastProcessedSequence", "candidateGeneration"]) ||
+        data.version !== 1 || data.type !== "reference-capture-pause-required" || data.sessionEpoch !== epoch ||
+        !isReferenceCapturePauseReason(data.reason) || !Number.isSafeInteger(data.lastProcessedSequence) ||
+        !Number.isSafeInteger(data.candidateGeneration) || (data.candidateGeneration as number) !== candidateGeneration) {
+      if (captureConfig && !closed) notifyError("worker-failed");
+      return;
+    }
+    if ((workerRequiredPauseReason !== null && workerRequiredPauseReason !== data.reason) ||
+        (pendingPauseTargetSequence !== null && pendingPauseTargetSequence !== data.lastProcessedSequence)) {
+      notifyError("worker-failed");
+      return;
+    }
+    workerRequiredPauseReason = data.reason;
+    pendingPauseTargetSequence = data.lastProcessedSequence as number;
+    void pauseCaptureInternal(data.reason, true).catch(() => undefined);
+  }
+
+  function onReferenceCaptureMessage(data: Record<string, unknown>): void {
+    if (!captureConfig || closed || data.sessionEpoch !== epoch) return;
+    if (data.type === "reference-candidate") {
+      if (!hasExactKeys(data, ["version", "type", "sessionEpoch", "candidateGeneration", "candidate"]) ||
+          data.version !== 1 || !Number.isSafeInteger(data.candidateGeneration) ||
+          (data.candidateGeneration as number) !== candidateGeneration + 1 ||
+          (captureState !== "running" && captureState !== "pausing") ||
+          !isReferenceCaptureCandidateSummary(data.candidate)) {
+        notifyError("worker-failed");
+        return;
+      }
+      candidateGeneration = data.candidateGeneration as number;
+      candidateIds.push(data.candidate.id);
+      captureConfig.onCandidate?.(data.candidate, candidateGeneration);
+      return;
+    }
+    if (data.type === "reference-capture-pause-required") {
+      onReferenceCapturePauseRequired(data);
+      return;
+    }
+    if (data.type === "reference-capture-paused") {
+      if (!hasExactKeys(data, ["version", "type", "sessionEpoch", "requestId", "lastProcessedSequence", "candidateGeneration", "reason"]) ||
+          data.version !== 1 || !Number.isSafeInteger(data.requestId) || (data.requestId as number) !== pauseRequestId ||
+          !Number.isSafeInteger(data.lastProcessedSequence) || (data.lastProcessedSequence as number) !== lastProcessedSequence ||
+          (pendingPauseTargetSequence !== null && (data.lastProcessedSequence as number) !== pendingPauseTargetSequence) ||
+          !Number.isSafeInteger(data.candidateGeneration) || (data.candidateGeneration as number) !== candidateGeneration ||
+          !isReferenceCapturePauseReason(data.reason) || data.reason !== pauseReasonForAck || captureState !== "pausing") {
+        notifyError("worker-failed");
+        return;
+      }
+      captureState = "paused";
+      pendingPauseTargetSequence = null;
+      const ack = {
+        sessionEpoch: epoch,
+        requestId: pauseRequestId,
+        lastProcessedSequence,
+        candidateGeneration,
+        reason: data.reason,
+      } as const;
+      lastPauseAck = ack;
+      try {
+        captureConfig.onPaused?.({ candidateGeneration, reason: data.reason });
+      } catch {
+        // Observation callbacks cannot prevent the pause operation from settling.
+      }
+      pendingPauseResolve?.(ack);
+      pendingPauseResolve = null;
+      pendingPauseReject = null;
+      requestedPauseReason = null;
+      workerRequiredPauseReason = null;
+      pauseReasonForAck = null;
+      return;
+    }
+    if (data.type === "reference-built" || data.type === "reference-build-rejected") {
+      const pending = pendingBuild;
+      const expectedKeys = data.type === "reference-built"
+        ? ["version", "type", "sessionEpoch", "requestId", "candidateGeneration", "selectedCandidateIds", "template"]
+        : ["version", "type", "sessionEpoch", "requestId", "candidateGeneration", "selectedCandidateIds", "code"];
+      const idsMatch = Array.isArray(data.selectedCandidateIds) && pending &&
+        data.selectedCandidateIds.length === pending.selectedCandidateIds.length &&
+        data.selectedCandidateIds.every((id, index) => id === pending.selectedCandidateIds[index]);
+      if (!pending || !hasExactKeys(data, expectedKeys) || data.version !== 1 || data.sessionEpoch !== epoch ||
+          data.requestId !== pending.requestId || data.candidateGeneration !== pending.candidateGeneration ||
+          candidateGeneration !== pending.candidateGeneration || !idsMatch || captureState !== "paused") {
+        return;
+      }
+      pendingBuild = null;
+      if (data.type === "reference-build-rejected") {
+        const codes = ["not-paused", "stale-generation", "invalid-selection", "already-built", "invalid-request"];
+        if (!codes.includes(String(data.code))) {
+          pending.resolve({ ok: false, code: "worker-failed", requestId: pending.requestId, candidateGeneration: pending.candidateGeneration, selectedCandidateIds: pending.selectedCandidateIds });
+          return;
+        }
+        const result = { ok: false as const, code: data.code as ReferenceCaptureBuildFailureCode, requestId: pending.requestId, candidateGeneration: pending.candidateGeneration, selectedCandidateIds: pending.selectedCandidateIds };
+        try {
+          captureConfig.onBuildRejected?.(result);
+        } catch {
+          // Observation callbacks cannot prevent the build operation from settling.
+        }
+        pending.resolve(result);
+        return;
+      }
+      const parsed = safeParseExerciseTemplate(data.template);
+      if (!parsed.success) {
+        pending.resolve({ ok: false, code: "worker-failed", requestId: pending.requestId, candidateGeneration: pending.candidateGeneration, selectedCandidateIds: pending.selectedCandidateIds });
+        notifyError("worker-failed");
+        return;
+      }
+      const result = { ok: true as const, template: parsed.data, requestId: pending.requestId, candidateGeneration: pending.candidateGeneration, selectedCandidateIds: pending.selectedCandidateIds };
+      try {
+        captureConfig.onBuilt?.(result);
+      } catch {
+        // Observation callbacks cannot prevent the build operation from settling.
+      }
+      pending.resolve(result);
+      return;
+    }
+  }
+
+  function pauseCaptureInternal(reason: ReferenceCapturePauseReason, workerRequired = false): Promise<Awaited<ReturnType<FormCoachReferenceCaptureSession["pauseCapture"]>>> {
+    if (!captureConfig) return Promise.reject(createRuntimeError("worker-start-failed"));
+    if (captureState === "paused" && lastPauseAck) return Promise.resolve(lastPauseAck);
+    if (captureState === "pausing" && capturePausePromise) {
+      if (workerRequired) workerRequiredPauseReason = reason;
+      else if (reason === "video_end" && workerRequiredPauseReason === null) requestedPauseReason = reason;
+      return capturePausePromise;
+    }
+    if (captureState !== "running") return Promise.reject(createRuntimeError("cancelled"));
+    captureState = "pausing";
+    requestedPauseReason = reason;
+    if (workerRequired) workerRequiredPauseReason = reason;
+    else workerRequiredPauseReason = null;
+    cancelCapture();
+    const operation = (async () => {
+      await drainCaptureFrames();
+      if (captureSessionIsClosed()) throw createRuntimeError("cancelled");
+      onGeometryDiscontinuity();
+      if (captureSessionIsClosed()) throw createRuntimeError("timeline-reset-required");
+      if (pendingPauseTargetSequence !== null && pendingPauseTargetSequence !== lastProcessedSequence) {
+        notifyError("worker-failed");
+        throw createRuntimeError("worker-failed");
+      }
+      const finalReason = workerRequiredPauseReason ?? requestedPauseReason ?? reason;
+      pauseReasonForAck = finalReason;
+      pauseRequestId += 1;
+      const ack = new Promise<Awaited<ReturnType<FormCoachReferenceCaptureSession["pauseCapture"]>>>((resolve, reject) => {
+        pendingPauseResolve = resolve;
+        pendingPauseReject = reject;
+      });
+      void ack.catch(() => undefined);
+      try {
+        worker.postMessage({
+          version: 1,
+          type: "reference-capture-pause",
+          sessionEpoch: epoch,
+          requestId: pauseRequestId,
+          lastProcessedSequence,
+          reason: finalReason,
+        });
+      } catch {
+        notifyError("worker-failed");
+        throw createRuntimeError("worker-failed");
+      }
+      return await ack;
+    })();
+    capturePausePromise = operation.finally(() => { capturePausePromise = null; });
+    return capturePausePromise;
+  }
+
+  function buildReferenceInternal(selectedCandidateIds: readonly string[]): Promise<ReferenceCaptureBuildResult> {
+    if (!captureConfig) return Promise.resolve({ ok: false, code: "worker-failed", requestId: 0, candidateGeneration, selectedCandidateIds: [] });
+    const ids = Array.isArray(selectedCandidateIds) ? [...selectedCandidateIds] : [];
+    onGeometryDiscontinuity();
+    if (closed || captureState === "closed") return Promise.resolve({ ok: false, code: "worker-failed", requestId: buildRequestId, candidateGeneration, selectedCandidateIds: ids });
+    if (captureState !== "paused") return Promise.resolve({ ok: false, code: "not-paused", requestId: buildRequestId, candidateGeneration, selectedCandidateIds: ids });
+    if (ids.length < 3 || ids.length > 5 || new Set(ids).size !== ids.length || ids.some((id) => !candidateIds.includes(id))) {
+      return Promise.resolve({ ok: false, code: "invalid-selection", requestId: buildRequestId, candidateGeneration, selectedCandidateIds: ids });
+    }
+    if (pendingBuild) return Promise.resolve({ ok: false, code: "invalid-request", requestId: buildRequestId, candidateGeneration, selectedCandidateIds: ids });
+    buildRequestId += 1;
+    const requestId = buildRequestId;
+    return new Promise((resolve) => {
+      pendingBuild = { requestId, candidateGeneration, selectedCandidateIds: ids, resolve };
+      try {
+        worker.postMessage({
+          version: 1,
+          type: "reference-build",
+          sessionEpoch: epoch,
+          requestId,
+          candidateGeneration,
+          selectedCandidateIds: ids,
+        });
+      } catch {
+        pendingBuild = null;
+        resolve({ ok: false, code: "worker-failed", requestId, candidateGeneration, selectedCandidateIds: ids });
+        notifyError("worker-failed");
+      }
+    });
   }
 
   function scheduleCapture(): void {
-    if (closed) return;
+    if (closed || (captureConfig && captureState !== "running")) return;
     captureCallbackId = frameVideo.requestVideoFrameCallback?.((now, metadata) => {
       captureCallbackId = null;
-      if (closed) return;
+      if (closed || (captureConfig && captureState !== "running")) return;
+      if (captureConfig && !captureSourceIsCurrent()) {
+        onTimelineDiscontinuity();
+        return;
+      }
       let captureTimestampMs: number;
       if (options.mode === "reference") {
         if (!Number.isFinite(metadata.mediaTime) || metadata.mediaTime < 0) {
@@ -452,22 +878,41 @@ export async function startFormCoachProcessing(
         return;
       }
       preparingFrame = true;
-      void createImageBitmap(video)
+      const bitmapPromise = createImageBitmap(video)
         .then((bitmap) => {
-          if (closed || !frameSender) {
+          if (closed || (captureConfig && captureState !== "running") || !frameSender) {
             bitmap.close();
             return;
+          }
+          if (captureConfig) {
+            if (!captureSourceIsCurrent()) {
+              bitmap.close();
+              onTimelineDiscontinuity();
+              return;
+            }
+            if (captureDimensions && (captureDimensions.width !== bitmap.width || captureDimensions.height !== bitmap.height)) {
+              bitmap.close();
+              onTimelineDiscontinuity();
+              return;
+            }
+            captureDimensions ??= { width: bitmap.width, height: bitmap.height };
           }
           const offered = frameSender.offer(bitmap, captureTimestampMs);
           if (offered.status === "rejected" && offered.code !== "stopped") notifyError("worker-failed");
         })
-        .catch(() => notifyError("frame-capture-failed"))
-        .finally(() => { preparingFrame = false; });
+        .catch(() => { if (!closed) notifyError("frame-capture-failed"); })
+        .finally(() => {
+          preparingFrame = false;
+          if (pendingBitmap === bitmapPromise) pendingBitmap = null;
+          resolveFrameDrain();
+        });
+      pendingBitmap = bitmapPromise;
       scheduleCapture();
     });
   }
 
   function onControllerEvent(event: WorkerControllerEvent): void {
+    if (captureConfig && captureSessionIsClosed() && event.type !== "processed" && event.type !== "stopped") return;
     if (event.type === "ready") {
       activeModelDelegate = event.delegate;
       frameSender = createFrameSender<ImageBitmap>({
@@ -479,6 +924,12 @@ export async function startFormCoachProcessing(
       options.onReady?.({ model: event.model, delegate: event.delegate });
       video.addEventListener("seeking", onTimelineDiscontinuity);
       video.addEventListener("ended", onVideoEnded);
+      if (captureConfig) {
+        video.addEventListener("resize", onGeometryDiscontinuity);
+        video.addEventListener("emptied", onCaptureSourceReset);
+        video.addEventListener("loadstart", onCaptureSourceReset);
+        video.addEventListener("loadedmetadata", onGeometryDiscontinuity);
+      }
       performanceTimer = setInterval(() => publishPerformance(receiverNow()), 250);
       scheduleCapture();
       if (!readySettled) {
@@ -489,6 +940,8 @@ export async function startFormCoachProcessing(
     }
     if (event.type === "processed") {
       const completion = frameSender?.complete(event.sequence, event.captureTimestampMs, event.completionTimestampMs);
+      lastProcessedSequence = event.sequence;
+      resolveFrameDrain();
       if (!completion || completion.status === "processed") {
         if (completion?.status === "processed") {
           frameRate.recordFrame(completion.completionTimestampMs, completion.droppedFramesSincePrevious);
@@ -515,6 +968,11 @@ export async function startFormCoachProcessing(
     const data = event.data;
     if (!isFormCoachWorkerMessage(data) || data.version !== 1 || data.sessionEpoch !== epoch || typeof data.type !== "string") return;
     if (CONTROLLER_MESSAGE_TYPES.has(data.type)) return;
+    if (captureConfig && captureSessionIsClosed()) return;
+    if (captureConfig && (data.type === "reference-candidate" || data.type === "reference-capture-pause-required" || data.type === "reference-capture-paused" || data.type === "reference-built" || data.type === "reference-build-rejected")) {
+      onReferenceCaptureMessage(data);
+      return;
+    }
     if (data.type === "setup") {
       if (SETUP_STEPS.has(data.step as SetupStep)) options.onSetup?.(data.step as SetupStep);
       else notifyError("worker-failed");
@@ -570,7 +1028,9 @@ export async function startFormCoachProcessing(
   function attachWorker(targetWorker: Worker, forceCpu: boolean): boolean {
     worker = targetWorker;
     forceCpuWorker = forceCpu;
-    const port = new ControllerWorkerPort(worker, options.mode, arm, cameraView, referenceRepTarget, options.template, gpuCanvas, forceCpu);
+    const port = captureConfig
+      ? new ReferenceCaptureWorkerPort(worker, captureConfig.baseTemplate.arm, captureConfig.baseTemplate.cameraView, captureConfig.baseTemplate, gpuCanvas, forceCpu)
+      : new ControllerWorkerPort(worker, options.mode, arm, cameraView, referenceRepTarget, options.template, gpuCanvas, forceCpu);
     controller = createWorkerController({ port, sessionEpoch: epoch, now: receiverNow, onEvent: onControllerEvent });
     const onWorkerError = () => notifyError("worker-failed");
     const onWorkerMessageError = () => notifyError("worker-failed");
@@ -615,6 +1075,21 @@ export async function startFormCoachProcessing(
       return;
     }
     closed = true;
+    if (captureConfig) {
+      captureState = "closed";
+      candidateIds = [];
+      requestedPauseReason = null;
+      workerRequiredPauseReason = null;
+      pauseReasonForAck = null;
+      pendingPauseReject?.(createRuntimeError("cancelled"));
+      pendingPauseResolve = null;
+      pendingPauseReject = null;
+      if (pendingBuild) {
+        pendingBuild.resolve({ ok: false, code: "worker-failed", requestId: pendingBuild.requestId, candidateGeneration: pendingBuild.candidateGeneration, selectedCandidateIds: pendingBuild.selectedCandidateIds });
+        pendingBuild = null;
+      }
+      resolveFrameDrain();
+    }
     cancelCapture();
     removeVideoListeners();
     frameSender?.stop();
@@ -630,12 +1105,19 @@ export async function startFormCoachProcessing(
     stoppedResolve();
   }
 
-  const session: FormCoachProcessingSession = {
+  const processingSession: FormCoachProcessingSession = {
     model,
     get delegate() { return activeModelDelegate; },
     mode: options.mode,
     stop,
   };
+  const session: FormCoachProcessingSession | FormCoachReferenceCaptureSession = captureConfig
+    ? {
+      ...processingSession,
+      pauseCapture: () => pauseCaptureInternal("user_pause"),
+      buildReference: buildReferenceInternal,
+    }
+    : processingSession;
 
   try {
     if (!attachWorker(worker, forceCpuInitial)) throw createRuntimeError("worker-start-failed");

@@ -55,6 +55,12 @@ export interface PoseSessionAdapterOptions {
   readonly cameraView?: CameraView;
   readonly referenceRepTarget?: number;
   readonly template?: CurlScoringTemplate;
+  /** Worker-local capture hook. The segment is never added to a public frame/result DTO. */
+  readonly onReferenceCandidate?: (candidate: Readonly<{
+    rep: SegmentedCurlRep;
+    pairing: "single_arm" | "matched_bilateral";
+    arm: ArmSide | null;
+  }>) => void;
 }
 
 interface PoseFrameDetails {
@@ -350,8 +356,10 @@ function createSinglePoseSessionAdapter(options: InternalPoseSessionAdapterOptio
 
     let scoredRep: ScoredCurlRep | undefined;
     if (mode === "reference") {
-      if (isCleanReferenceRep(rep)) cleanReferenceReps.push(rep);
-      if (!options.deferReferenceAggregation && cleanReferenceReps.length >= referenceRepTarget && !completedReference) {
+      if (options.onReferenceCandidate) {
+        if (selectedArm) options.onReferenceCandidate({ rep, pairing: "single_arm", arm: selectedArm });
+      } else if (!options.deferReferenceAggregation && isCleanReferenceRep(rep)) cleanReferenceReps.push(rep);
+      if (!options.onReferenceCandidate && !options.deferReferenceAggregation && cleanReferenceReps.length >= referenceRepTarget && !completedReference) {
         completedReference = buildMedianReference(cleanReferenceReps.slice(0, referenceRepTarget));
         reference = completedReference;
       }
@@ -539,6 +547,7 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
 
   const singleOptions: InternalPoseSessionAdapterOptions = {
     ...options,
+    onReferenceCandidate: undefined,
     suppressCues: true,
     deferReferenceAggregation: true,
   };
@@ -619,8 +628,10 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
             repCount += 1;
             const mergedSegment = mergePairedSegments(paired.pair.left, paired.pair.right);
             if (mode === "reference") {
-              if (isCleanReferenceRep(mergedSegment)) pairedReferenceReps.push(mergedSegment);
-              if (pairedReferenceReps.length >= referenceRepTarget && !completedReference) {
+              if (options.onReferenceCandidate) {
+                options.onReferenceCandidate({ rep: mergedSegment, pairing: "matched_bilateral", arm: null });
+              } else if (isCleanReferenceRep(mergedSegment)) pairedReferenceReps.push(mergedSegment);
+              if (!options.onReferenceCandidate && pairedReferenceReps.length >= referenceRepTarget && !completedReference) {
                 completedReference = buildMedianReference(pairedReferenceReps.slice(0, referenceRepTarget));
                 reference = completedReference;
               }

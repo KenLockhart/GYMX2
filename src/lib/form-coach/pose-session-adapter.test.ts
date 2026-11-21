@@ -293,6 +293,53 @@ describe("pose session adapter", () => {
     expect(outputs.filter((output) => output.reference)).toHaveLength(1);
   });
 
+  it("emits selection candidates only for completed singles or an accepted bilateral merge", () => {
+    const singleCandidates: Array<{ pairing: string; arm: string | null; startMs: number }> = [];
+    const single = createPoseSessionAdapter({
+      mode: "reference",
+      arm: "right",
+      onReferenceCandidate: (candidate) => singleCandidates.push({ pairing: candidate.pairing, arm: candidate.arm, startMs: candidate.rep.startMs }),
+    });
+    let timestampMs = warmBaseline(single);
+    const cycle = [170, 170, 130, 100, 70, 50, 50, 50, 50, 50, 50, 70, 90, 120, 150, 170, 170, 170];
+    for (const angle of cycle) {
+      frame(single, timestampMs, { exerciseAngleDeg: angle });
+      timestampMs += 100;
+    }
+    expect(singleCandidates).toHaveLength(1);
+    expect(singleCandidates[0]).toMatchObject({ pairing: "single_arm", arm: "right" });
+    expect(single.getCleanReferenceCount()).toBe(0);
+
+    const bilateralCandidates: Array<{ pairing: string; arm: string | null; rep: SegmentedCurlRep }> = [];
+    const bilateral = createPoseSessionAdapter({
+      mode: "reference",
+      arm: "both",
+      onReferenceCandidate: (candidate) => bilateralCandidates.push(candidate),
+    });
+    timestampMs = 0;
+    for (; timestampMs <= 2_000; timestampMs += 100) frame(bilateral, timestampMs, { bothArms: true, exerciseAngleDeg: 170 });
+    for (const angle of cycle) {
+      frame(bilateral, timestampMs, { bothArms: true, exerciseAngleDeg: angle, leftExerciseAngleDeg: angle });
+      timestampMs += 100;
+    }
+    expect(bilateralCandidates).toHaveLength(1);
+    expect(bilateralCandidates[0]).toMatchObject({ pairing: "matched_bilateral", arm: null });
+
+    const unmatchedCandidates: SegmentedCurlRep[] = [];
+    const unmatched = createPoseSessionAdapter({ mode: "reference", arm: "both", onReferenceCandidate: ({ rep }) => unmatchedCandidates.push(rep) });
+    timestampMs = 0;
+    for (; timestampMs <= 2_000; timestampMs += 100) frame(unmatched, timestampMs, { bothArms: true, exerciseAngleDeg: 170 });
+    for (const angle of cycle) {
+      frame(unmatched, timestampMs, { bothArms: true, exerciseAngleDeg: angle, leftExerciseAngleDeg: 170 });
+      timestampMs += 100;
+    }
+    for (const angle of cycle) {
+      frame(unmatched, timestampMs, { bothArms: true, exerciseAngleDeg: 170, leftExerciseAngleDeg: angle });
+      timestampMs += 100;
+    }
+    expect(unmatchedCandidates).toHaveLength(0);
+  });
+
   it("drops a bilateral partial cycle on mid-rep occlusion and counts only the next complete pair", () => {
     const adapter = createPoseSessionAdapter({ mode: "live", arm: "both", template: LIVE_TEMPLATE });
     let timestampMs = 0;

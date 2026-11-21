@@ -5,14 +5,17 @@ import type { PoseLandmarker, PoseLandmarkerResult } from "@mediapipe/tasks-visi
 import { installMediaPipeRequestGuard } from "@/lib/form-coach/mediapipe-request-guard";
 import { loadMediaPipeSdk } from "@/lib/form-coach/mediapipe-loader";
 import { createPoseSessionAdapter } from "@/lib/form-coach/pose-session-adapter";
+import { STANDING_DUMBBELL_CURL } from "@/lib/form-coach/engine/registry";
+import { ReferenceCaptureStore } from "@/lib/form-coach/reference-capture-store";
 import { validateFormCoachAssetRequest } from "@/lib/form-coach/session-network-policy";
-import { isCurlScoringTemplate, isFormCoachWorkerMessage, type FormCoachWorkerEvent, type FormCoachWorkerFrame, type FormCoachWorkerInit, type SetupStep } from "@/lib/form-coach/worker-protocol";
+import { hasExactKeys, isCurlScoringTemplate, isFormCoachWorkerMessage, isReferenceCapturePauseReason, type FormCoachWorkerEvent, type FormCoachWorkerFrame, type FormCoachWorkerInit, type ReferenceCapturePauseReason, type SetupStep } from "@/lib/form-coach/worker-protocol";
+import { safeParseExerciseTemplate, type ExerciseTemplate } from "@/lib/form-coach/template-schema";
 import type { DetectorLoader, FormCoachModel, PoseDetectorHandle } from "@/lib/form-coach/detector-loader";
 import type { WorkerErrorCode } from "@/lib/form-coach/worker-controller";
 
 type Detector = PoseDetectorHandle & Pick<PoseLandmarker, "detectForVideo">;
 
-const scope = self as DedicatedWorkerGlobalScope;
+let scope = (typeof self === "undefined" ? null : self) as unknown as DedicatedWorkerGlobalScope;
 let epoch = 0;
 let loader: DetectorLoader | null = null;
 let detector: Detector | null = null;
@@ -29,6 +32,25 @@ let lastSetupStep: SetupStep | null = null;
 let boundarySent = false;
 let resourceObserver: PerformanceObserver | null = null;
 const observedRequests = new Map<string, { method: string; host: string; path: string; count: number }>();
+let captureStore: ReferenceCaptureStore | null = null;
+let captureState: "none" | "running" | "pausing" | "paused" | "closed" = "none";
+let capturePauseReason: ReferenceCapturePauseReason = "user_pause";
+let lastProcessedSequence = 0;
+let lastPauseRequestId = 0;
+let lastBuildRequestId = 0;
+let captureBuilt = false;
+let captureTemplate: ExerciseTemplate | null = null;
+let captureGeometry: Readonly<{ width: number; height: number }> | null = null;
+let activeFrameSequence = 0;
+let capturePauseRequiredSequence = 0;
+
+export type PoseWorkerDependencies = Readonly<{
+  createDetectorLoader?: typeof createDetectorLoader;
+  installMediaPipeRequestGuard?: typeof installMediaPipeRequestGuard;
+  loadMediaPipeSdk?: typeof loadMediaPipeSdk;
+  createPoseSessionAdapter?: typeof createPoseSessionAdapter;
+}>;
+let dependencies: PoseWorkerDependencies = {};
 
 function recordObservedResource(name: string): void {
   try {
@@ -80,12 +102,30 @@ function isModel(value: unknown): value is FormCoachModel {
   return value === "lite" || value === "full";
 }
 
+function deepFreezeTemplate(template: ExerciseTemplate): ExerciseTemplate {
+  const freeze = (value: unknown): void => {
+    if (!value || typeof value !== "object" || Object.isFrozen(value)) return;
+    for (const child of Object.values(value as Record<string, unknown>)) freeze(child);
+    Object.freeze(value);
+  };
+  freeze(template);
+  return template;
+}
+
 function send(message: FormCoachWorkerEvent) {
   try {
     scope.postMessage(message);
   } catch {
     // Worker messages contain only bounded numeric/status output; delivery failures stay local.
   }
+}
+
+function clearCapture(): void {
+  captureStore?.clear();
+  captureStore = null;
+  captureTemplate = null;
+  captureGeometry = null;
+  captureState = "closed";
 }
 
 function sendAudit() {
@@ -98,6 +138,21 @@ function sendAudit() {
     allowed: summary.allowed.slice(0, 16),
     blocked: summary.blocked.slice(0, 16),
     observed: finishResourceAudit(),
+  });
+}
+
+function requestAutomaticCapturePause(reason: ReferenceCapturePauseReason, sequence: number): void {
+  if (captureState !== "running") return;
+  captureState = "pausing";
+  capturePauseReason = reason;
+  capturePauseRequiredSequence = sequence;
+  send({
+    version: 1,
+    type: "reference-capture-pause-required",
+    sessionEpoch: epoch,
+    reason,
+    lastProcessedSequence: sequence,
+    candidateGeneration: captureStore?.candidateGeneration ?? 0,
   });
 }
 
@@ -164,6 +219,8 @@ async function stopDetector(): Promise<void> {
 async function failWorker(code: WorkerErrorCode): Promise<void> {
   if (stopCompleted) return;
   stopRequested = true;
+  clearCapture();
+  adapter = null;
   const activeLoader = loader;
   if (activeLoader) {
     try {
@@ -186,7 +243,7 @@ async function failWorker(code: WorkerErrorCode): Promise<void> {
 }
 
 function validateInit(value: Record<string, unknown>): value is FormCoachWorkerInit {
-    const expected = ["version", "type", "sessionEpoch", "model", "mode", "arm", "cameraView", "referenceRepTarget", "forceCpu", "gpuCanvas"];
+  const expected = ["version", "type", "sessionEpoch", "model", "mode", "arm", "cameraView", "referenceRepTarget", "forceCpu", "gpuCanvas"];
   const isExact = (keys: readonly string[]) => {
     const actual = Object.keys(value).sort();
     const wanted = [...keys].sort();
@@ -205,11 +262,36 @@ function validateInit(value: Record<string, unknown>): value is FormCoachWorkerI
   if (value.mode === "live") {
     return isExact([...expected, "template"]) && isCurlScoringTemplate(value.template);
   }
+  if ("referenceSelection" in value) {
+    const parsed = safeParseExerciseTemplate(value.referenceSelection);
+    return isExact([...expected, "referenceSelection"]) && parsed.success &&
+      parsed.data.exerciseKey === STANDING_DUMBBELL_CURL.exerciseKey &&
+      parsed.data.arm === value.arm && parsed.data.cameraView === value.cameraView;
+  }
   return isExact(expected) && value.template === undefined;
 }
 
 async function initialize(message: FormCoachWorkerInit): Promise<void> {
   epoch = message.sessionEpoch;
+  const parsedCaptureTemplate = message.referenceSelection === undefined ? null : safeParseExerciseTemplate(message.referenceSelection);
+  if (message.referenceSelection !== undefined && (!parsedCaptureTemplate || !parsedCaptureTemplate.success)) {
+    await failWorker("internal");
+    return;
+  }
+  if (parsedCaptureTemplate?.success) {
+    captureTemplate = deepFreezeTemplate(parsedCaptureTemplate.data);
+    captureState = "running";
+    captureStore = null;
+    captureGeometry = null;
+    lastProcessedSequence = 0;
+    lastPauseRequestId = 0;
+    lastBuildRequestId = 0;
+    captureBuilt = false;
+    capturePauseRequiredSequence = 0;
+  } else {
+    captureTemplate = null;
+    captureState = "none";
+  }
   if (!isModel(message.model) || typeof OffscreenCanvas === "undefined") {
     await failWorker("unsupported-platform");
     return;
@@ -219,9 +301,9 @@ async function initialize(message: FormCoachWorkerInit): Promise<void> {
     return;
   }
 
-  loader = createDetectorLoader({
+  loader = (dependencies.createDetectorLoader ?? createDetectorLoader)({
     installRequestGuard() {
-      requestGuard = installMediaPipeRequestGuard(scope as unknown as Parameters<typeof installMediaPipeRequestGuard>[0]);
+      requestGuard = (dependencies.installMediaPipeRequestGuard ?? installMediaPipeRequestGuard)(scope as unknown as Parameters<typeof installMediaPipeRequestGuard>[0]);
     },
     isAssetAllowed(path) {
       return validateFormCoachAssetRequest(
@@ -244,7 +326,7 @@ async function initialize(message: FormCoachWorkerInit): Promise<void> {
         },
       ).allowed;
     },
-    loadSdk: loadMediaPipeSdk,
+    loadSdk: dependencies.loadMediaPipeSdk ?? loadMediaPipeSdk,
     createGpuCanvas() {
       const canvas = message.gpuCanvas ?? new OffscreenCanvas(1, 1);
       const context = canvas.getContext("webgl2", {
@@ -285,12 +367,29 @@ async function initialize(message: FormCoachWorkerInit): Promise<void> {
     return;
   }
   detector = loaded.detector as Detector;
-  adapter = createPoseSessionAdapter({
+  const createAdapter = dependencies.createPoseSessionAdapter ?? createPoseSessionAdapter;
+  adapter = createAdapter({
     mode: message.mode,
     arm: message.arm,
     cameraView: message.cameraView,
     referenceRepTarget: message.referenceRepTarget,
     ...(message.mode === "live" ? { template: message.template } : {}),
+    ...(parsedCaptureTemplate?.success ? {
+      onReferenceCandidate(candidate) {
+        if (!captureStore || captureState !== "running") return;
+        const added = captureStore.add(candidate.rep, candidate.pairing, candidate.arm);
+        if (!added.ok) {
+          if (added.pauseReason === "candidate_cap" || added.pauseReason === "curve_point_cap") {
+            requestAutomaticCapturePause(added.pauseReason, activeFrameSequence);
+          } else {
+            void failWorker("processing-failed");
+          }
+          return;
+        }
+        send({ version: 1, type: "reference-candidate", sessionEpoch: epoch, candidateGeneration: added.generation, candidate: added.candidate });
+        if (added.pauseReason) requestAutomaticCapturePause(added.pauseReason, activeFrameSequence);
+      },
+    } : {}),
   });
   lastSetupStep = adapter.getSetupStep();
   send({ version: 1, type: "ready", sessionEpoch: epoch, model: message.model, delegate: loaded.delegate });
@@ -312,6 +411,12 @@ function mapLandmarks(result: PoseLandmarkerResult): Array<{ x: number; y: numbe
 
 async function processFrame(message: FormCoachWorkerFrame): Promise<void> {
   const frame = message.frame;
+  const referenceTemplate = captureTemplate;
+  const frameWasReferenceCapture = referenceTemplate !== null;
+  if (stopRequested || stopCompleted || captureState === "closed") {
+    closeTransferableFrame(frame);
+    return;
+  }
   const activeDetector = detector;
   const activeAdapter = adapter;
   let result: PoseLandmarkerResult | null = null;
@@ -334,9 +439,33 @@ async function processFrame(message: FormCoachWorkerFrame): Promise<void> {
     return;
   }
 
+  if (referenceTemplate) {
+    if (captureState !== "running") {
+      closeTransferableFrame(frame);
+      await failWorker("invalid-frame");
+      return;
+    }
+    if (captureGeometry && (captureGeometry.width !== message.width || captureGeometry.height !== message.height)) {
+      closeTransferableFrame(frame);
+      await failWorker("invalid-frame");
+      return;
+    }
+    captureGeometry ??= { width: message.width, height: message.height };
+    captureStore ??= new ReferenceCaptureStore({
+      sessionEpoch: epoch,
+      exerciseKey: referenceTemplate.exerciseKey,
+      arm: referenceTemplate.arm,
+      cameraView: referenceTemplate.cameraView,
+      width: message.width,
+      height: message.height,
+    }, referenceTemplate);
+  }
+
   processing = true;
+  activeFrameSequence = message.sequence;
   lastCaptureTimestampMs = message.captureTimestampMs;
   let errorCode: WorkerErrorCode | null = null;
+  let didProcess = false;
   try {
     result = activeDetector.detectForVideo(frame, message.captureTimestampMs);
     if (!stopRequested) {
@@ -346,7 +475,8 @@ async function processFrame(message: FormCoachWorkerFrame): Promise<void> {
         width: message.width,
         height: message.height,
       });
-      send({ version: 1, type: "overlay", sessionEpoch: epoch, landmarks: output.overlay });
+      if (stopRequested || stopCompleted) return;
+      if (!frameWasReferenceCapture) send({ version: 1, type: "overlay", sessionEpoch: epoch, landmarks: output.overlay });
       if (output.setupStep !== lastSetupStep) {
         lastSetupStep = output.setupStep;
         send({ version: 1, type: "setup", sessionEpoch: epoch, step: output.setupStep });
@@ -372,11 +502,10 @@ async function processFrame(message: FormCoachWorkerFrame): Promise<void> {
       for (const cue of output.cues) send({ version: 1, type: "cue", sessionEpoch: epoch, cue });
       if (output.setBoundary && !boundarySent) {
         boundarySent = true;
-        send({ version: 1, type: "set-boundary", sessionEpoch: epoch, reason: "session_sample_limit" });
+        if (captureTemplate) requestAutomaticCapturePause("session_sample_limit", message.sequence);
+        else send({ version: 1, type: "set-boundary", sessionEpoch: epoch, reason: "session_sample_limit" });
       }
-      if (!stopRequested) {
-        send({ version: 1, type: "processed", sessionEpoch: epoch, sequence: message.sequence, captureTimestampMs: message.captureTimestampMs });
-      }
+      if (!stopRequested) didProcess = true;
     }
   } catch {
     errorCode = "processing-failed";
@@ -385,19 +514,107 @@ async function processFrame(message: FormCoachWorkerFrame): Promise<void> {
     closeTransferableFrame(frame);
     processing = false;
   }
-  if (errorCode) await failWorker(errorCode);
+  if (errorCode) {
+    await failWorker(errorCode);
+    return;
+  }
+  if (didProcess && !stopRequested) {
+    lastProcessedSequence = message.sequence;
+    send({ version: 1, type: "processed", sessionEpoch: epoch, sequence: message.sequence, captureTimestampMs: message.captureTimestampMs });
+  }
+}
+
+function handleCapturePause(value: Record<string, unknown>): void {
+  if (!captureTemplate || captureState === "none" || captureState === "closed") return;
+  if (!hasExactKeys(value, ["version", "type", "sessionEpoch", "requestId", "lastProcessedSequence", "reason"]) ||
+      value.version !== 1 || value.type !== "reference-capture-pause" || value.sessionEpoch !== epoch ||
+      !Number.isSafeInteger(value.requestId) || (value.requestId as number) <= lastPauseRequestId ||
+      !Number.isSafeInteger(value.lastProcessedSequence) || value.lastProcessedSequence !== lastProcessedSequence ||
+      !isReferenceCapturePauseReason(value.reason) || processing ||
+      (captureState !== "running" && captureState !== "pausing") ||
+      (captureState === "pausing" && (value.reason !== capturePauseReason || value.lastProcessedSequence !== capturePauseRequiredSequence))) {
+    return;
+  }
+  lastPauseRequestId = value.requestId as number;
+  capturePauseReason = value.reason;
+  captureState = "paused";
+  adapter = null;
+  send({
+    version: 1,
+    type: "reference-capture-paused",
+    sessionEpoch: epoch,
+    requestId: lastPauseRequestId,
+    lastProcessedSequence,
+    candidateGeneration: captureStore?.candidateGeneration ?? 0,
+    reason: capturePauseReason,
+  });
+}
+
+function handleReferenceBuild(value: Record<string, unknown>): void {
+  if (!captureTemplate || captureState === "none" || captureState === "closed") return;
+  const exact = hasExactKeys(value, ["version", "type", "sessionEpoch", "requestId", "candidateGeneration", "selectedCandidateIds"]);
+  const requestId = Number.isSafeInteger(value.requestId) && (value.requestId as number) > 0 ? value.requestId as number : 0;
+  const candidateGeneration = Number.isSafeInteger(value.candidateGeneration) && (value.candidateGeneration as number) >= 0 ? value.candidateGeneration as number : 0;
+  const selectedCandidateIds = Array.isArray(value.selectedCandidateIds) && value.selectedCandidateIds.length <= 5 &&
+    value.selectedCandidateIds.every((id) => typeof id === "string" && /^candidate-[1-9][0-9]{0,2}$/.test(id))
+    ? [...value.selectedCandidateIds] as string[] : [];
+  const reject = (code: "not-paused" | "stale-generation" | "invalid-selection" | "already-built" | "invalid-request") => {
+    send({ version: 1, type: "reference-build-rejected", sessionEpoch: epoch, requestId, candidateGeneration, selectedCandidateIds, code });
+  };
+  if (!exact || value.version !== 1 || value.type !== "reference-build" || value.sessionEpoch !== epoch || requestId === 0 || requestId <= lastBuildRequestId) {
+    reject("invalid-request");
+    return;
+  }
+  lastBuildRequestId = requestId;
+  if (captureState !== "paused") {
+    reject("not-paused");
+    return;
+  }
+  if (captureBuilt) {
+    reject("already-built");
+    return;
+  }
+  if (candidateGeneration !== (captureStore?.candidateGeneration ?? 0)) {
+    reject("stale-generation");
+    return;
+  }
+  if (selectedCandidateIds.length < 3 || selectedCandidateIds.length > 5 || new Set(selectedCandidateIds).size !== selectedCandidateIds.length) {
+    reject("invalid-selection");
+    return;
+  }
+  const result = captureStore?.build(candidateGeneration, selectedCandidateIds);
+  if (!result || !result.ok) {
+    reject("invalid-selection");
+    return;
+  }
+  captureBuilt = true;
+  send({
+    version: 1,
+    type: "reference-built",
+    sessionEpoch: epoch,
+    requestId,
+    candidateGeneration,
+    selectedCandidateIds,
+    template: result.template,
+  });
 }
 
 async function handleStop(message: Record<string, unknown>): Promise<void> {
   if (message.version !== 1 || message.type !== "stop" || message.sessionEpoch !== epoch) return;
   stopRequested = true;
+  clearCapture();
+  adapter = null;
   await stopDetector();
   if (initialization) await initialization;
 }
 
-scope.addEventListener("message", (event: MessageEvent<unknown>) => {
+function handleMessage(event: MessageEvent<unknown>): void {
   if (!isFormCoachWorkerMessage(event.data)) return;
   const message = event.data;
+  if ((stopRequested || stopCompleted) && message.type !== "stop") {
+    if (message.type === "frame" && "frame" in message) closeTransferableFrame(message.frame);
+    return;
+  }
   if (message.type === "init") {
     if (!validateInit(message)) {
       epoch = Number.isSafeInteger(message.sessionEpoch) && (message.sessionEpoch as number) > 0 ? (message.sessionEpoch as number) : 1;
@@ -417,8 +634,63 @@ scope.addEventListener("message", (event: MessageEvent<unknown>) => {
     void handleStop(message);
     return;
   }
+  if (message.type === "reference-capture-pause") {
+    handleCapturePause(message);
+    return;
+  }
+  if (message.type === "reference-build") {
+    handleReferenceBuild(message);
+    return;
+  }
   if (message.type === "frame") {
     if (!isFormCoachWorkerMessage(message) || !("frame" in message)) return;
     void processFrame(message as unknown as FormCoachWorkerFrame);
   }
-});
+}
+
+/** Installs the same message handler on a supplied scope, allowing handler tests without a real detector. */
+export function installFormCoachPoseWorker(target: DedicatedWorkerGlobalScope, injected: PoseWorkerDependencies = {}): () => void {
+  if (resourceObserver) resourceObserver.disconnect();
+  scope = target;
+  dependencies = injected;
+  epoch = 0;
+  loader = null;
+  detector = null;
+  gpuContext = null;
+  requestGuard = null;
+  adapter = null;
+  initialization = null;
+  stopPromise = null;
+  stopRequested = false;
+  stopCompleted = false;
+  processing = false;
+  lastCaptureTimestampMs = -1;
+  lastSetupStep = null;
+  boundarySent = false;
+  resourceObserver = null;
+  observedRequests.clear();
+  captureStore = null;
+  captureState = "none";
+  capturePauseReason = "user_pause";
+  lastProcessedSequence = 0;
+  lastPauseRequestId = 0;
+  lastBuildRequestId = 0;
+  captureTemplate = null;
+  captureGeometry = null;
+  activeFrameSequence = 0;
+  capturePauseRequiredSequence = 0;
+  captureBuilt = false;
+  target.addEventListener("message", handleMessage);
+  return () => {
+    target.removeEventListener("message", handleMessage);
+    clearCapture();
+    adapter = null;
+    resourceObserver?.disconnect();
+    resourceObserver = null;
+    dependencies = {};
+  };
+}
+
+if (typeof WorkerGlobalScope !== "undefined" && typeof self !== "undefined" && self instanceof WorkerGlobalScope) {
+  installFormCoachPoseWorker(self as DedicatedWorkerGlobalScope);
+}

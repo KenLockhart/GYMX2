@@ -1,4 +1,5 @@
 import type { CameraView, CurlScoringTemplate, PoseLandmark, TrackedArm } from "./engine/types";
+import type { ExerciseTemplate } from "./template-schema";
 import type { CueCode, RepFaultCode, WorkerDelegate, WorkerErrorCode, WorkerModel } from "./worker-controller";
 
 export type FormCoachRunMode = "reference" | "live";
@@ -14,6 +15,8 @@ export type FormCoachWorkerInit = Readonly<{
   referenceRepTarget: number;
   forceCpu: boolean;
   template?: CurlScoringTemplate;
+  /** Present only for the opt-in local reference-candidate capture flow. */
+  referenceSelection?: ExerciseTemplate;
   gpuCanvas: OffscreenCanvas | null;
 }>;
 
@@ -32,7 +35,47 @@ export type FormCoachWorkerFrame = Readonly<{
 export type FormCoachWorkerCommand =
   | FormCoachWorkerInit
   | FormCoachWorkerFrame
+  | ReferenceCapturePauseCommand
+  | ReferenceCaptureBuildCommand
   | Readonly<{ version: 1; type: "stop"; sessionEpoch: number }>;
+
+export type ReferenceCapturePauseReason = "user_pause" | "video_end" | "candidate_cap" | "curve_point_cap" | "session_sample_limit";
+export type ReferenceCaptureCandidateReason = "form_faults" | "outside_clean_reference";
+
+export type ReferenceCaptureCandidateSummary = Readonly<{
+  id: string;
+  ordinal: number;
+  pairing: "single_arm" | "matched_bilateral";
+  arm: "left" | "right" | null;
+  selectable: boolean;
+  reason: ReferenceCaptureCandidateReason | null;
+  romMinAngle: number;
+  romMaxAngle: number;
+  concentricMs: number;
+  topPauseMs: number;
+  eccentricMs: number;
+  maxUpperArmDrift: number;
+  maxTorsoSwing: number;
+  maxShrug: number;
+}>;
+
+export type ReferenceCapturePauseCommand = Readonly<{
+  version: 1;
+  type: "reference-capture-pause";
+  sessionEpoch: number;
+  requestId: number;
+  lastProcessedSequence: number;
+  reason: ReferenceCapturePauseReason;
+}>;
+
+export type ReferenceCaptureBuildCommand = Readonly<{
+  version: 1;
+  type: "reference-build";
+  sessionEpoch: number;
+  requestId: number;
+  candidateGeneration: number;
+  selectedCandidateIds: readonly string[];
+}>;
 
 export type SetupStep =
   | "show-side-view"
@@ -79,6 +122,11 @@ export type FormCoachWorkerEvent =
   | Readonly<{ version: 1; type: "rep-result"; sessionEpoch: number; summary: FormCoachRepSummary }>
   | Readonly<{ version: 1; type: "pair-rejected"; sessionEpoch: number; reason: "missing-partner" | "out-of-phase" | "phase-mismatch" | "asymmetric" }>
   | Readonly<{ version: 1; type: "reference-ready"; sessionEpoch: number; template: CurlScoringTemplate; cleanRepCount: number }>
+  | Readonly<{ version: 1; type: "reference-candidate"; sessionEpoch: number; candidateGeneration: number; candidate: ReferenceCaptureCandidateSummary }>
+  | Readonly<{ version: 1; type: "reference-capture-pause-required"; sessionEpoch: number; reason: ReferenceCapturePauseReason; lastProcessedSequence: number; candidateGeneration: number }>
+  | Readonly<{ version: 1; type: "reference-capture-paused"; sessionEpoch: number; requestId: number; lastProcessedSequence: number; candidateGeneration: number; reason: ReferenceCapturePauseReason }>
+  | Readonly<{ version: 1; type: "reference-build-rejected"; sessionEpoch: number; requestId: number; candidateGeneration: number; selectedCandidateIds: readonly string[]; code: "not-paused" | "stale-generation" | "invalid-selection" | "already-built" | "invalid-request" }>
+  | Readonly<{ version: 1; type: "reference-built"; sessionEpoch: number; requestId: number; candidateGeneration: number; selectedCandidateIds: readonly string[]; template: ExerciseTemplate }>
   | Readonly<{ version: 1; type: "set-boundary"; sessionEpoch: number; reason: "session_sample_limit" }>
   | Readonly<{ version: 1; type: "network-audit"; sessionEpoch: number; allowedAssetGets: number; allowed: readonly NetworkAuditEntry[]; blocked: readonly NetworkAuditEntry[]; observed: readonly NetworkAuditEntry[] }>;
 
@@ -161,4 +209,37 @@ export function isCurlScoringTemplate(value: unknown): value is CurlScoringTempl
     finiteInRange(toleranceRecord.tempoPct, 0.1, 200) &&
     ["rom", "elbow", "torso", "tempo", "shoulders"].every((key) => finiteInRange(weightRecord[key], 0, 100))
   );
+}
+
+export function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+export function isReferenceCapturePauseReason(value: unknown): value is ReferenceCapturePauseReason {
+  return value === "user_pause" || value === "video_end" || value === "candidate_cap" || value === "curve_point_cap" || value === "session_sample_limit";
+}
+
+export function isReferenceCaptureCandidateSummary(value: unknown): value is ReferenceCaptureCandidateSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  const keys = ["id", "ordinal", "pairing", "arm", "selectable", "reason", "romMinAngle", "romMaxAngle", "concentricMs", "topPauseMs", "eccentricMs", "maxUpperArmDrift", "maxTorsoSwing", "maxShrug"];
+  const numberIn = (key: string, min: number, max: number) => Number.isFinite(candidate[key]) && (candidate[key] as number) >= min && (candidate[key] as number) <= max;
+  const reasonValid = candidate.reason === null || candidate.reason === "form_faults" || candidate.reason === "outside_clean_reference";
+  return hasExactKeys(candidate, keys) &&
+    typeof candidate.id === "string" && /^candidate-[1-9][0-9]{0,2}$/.test(candidate.id) &&
+    Number.isSafeInteger(candidate.ordinal) && (candidate.ordinal as number) >= 1 && (candidate.ordinal as number) <= 100 &&
+    candidate.id === `candidate-${candidate.ordinal}` &&
+    (candidate.pairing === "single_arm" || candidate.pairing === "matched_bilateral") &&
+    (candidate.arm === null || candidate.arm === "left" || candidate.arm === "right") &&
+    (candidate.pairing !== "matched_bilateral" || candidate.arm === null) &&
+    (candidate.pairing !== "single_arm" || candidate.arm === "left" || candidate.arm === "right") &&
+    typeof candidate.selectable === "boolean" && reasonValid &&
+    (candidate.selectable ? candidate.reason === null : candidate.reason !== null) &&
+    numberIn("romMinAngle", 0, 180) && numberIn("romMaxAngle", 0, 180) && (candidate.romMinAngle as number) < (candidate.romMaxAngle as number) &&
+    numberIn("concentricMs", 1, 15_000) && numberIn("topPauseMs", 0, 15_000) && numberIn("eccentricMs", 1, 15_000) &&
+    (candidate.concentricMs as number) + (candidate.topPauseMs as number) + (candidate.eccentricMs as number) >= 600 &&
+    (candidate.concentricMs as number) + (candidate.topPauseMs as number) + (candidate.eccentricMs as number) <= 15_000 &&
+    numberIn("maxUpperArmDrift", 0, 180) && numberIn("maxTorsoSwing", 0, 180) && numberIn("maxShrug", 0, 10);
 }
