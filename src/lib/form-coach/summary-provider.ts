@@ -155,9 +155,9 @@ function normalizeNumericSummary(value: unknown): NumericAttemptSummary | null {
     if (ANGLE_FIELDS.some((field) => !within(field, 0, 180))) return null;
     if (!within("max_shrug", 0, 1)) return null;
     if (
-      !within("concentric_ms_average", 100, 15_000) ||
+      !within("concentric_ms_average", 1, 15_000) ||
       !within("top_pause_ms_average", 0, 15_000) ||
-      !within("eccentric_ms_average", 100, 15_000)
+      !within("eccentric_ms_average", 1, 15_000)
     ) {
       return null;
     }

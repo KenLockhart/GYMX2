@@ -6,10 +6,12 @@ import { ActiveArmSelector, armVisibilityIsUsable } from "./engine/side-selectio
 import { LandmarkEmaSmoother } from "./engine/smoothing";
 import { CurlRepSegmenter } from "./engine/rep-segmentation";
 import { scoreCurlRep } from "./engine/scoring";
+import { BilateralRepPairer, type PairRejectionReason } from "./engine/bilateral-pairing";
 import { STANDING_DUMBBELL_CURL } from "./engine/registry";
 import type {
   ArmSelectionSample,
   ArmSide,
+  CameraView,
   CurlScoringTemplate,
   FrameMetrics,
   LandmarkSet,
@@ -23,7 +25,6 @@ import type { FormCoachRepSummary, FormCoachRunMode, SetupStep } from "./worker-
 
 const MIN_SETUP_VISIBILITY = 0.5;
 const MIN_TORSO_HEIGHT_RATIO = 0.25;
-const MAX_SIDE_VIEW_RATIO = 0.35;
 const MAX_FRAME_GAP_MS = 500;
 const BASELINE_HOLD_MS = 2_000;
 const BASELINE_MAX_LEAN_DRIFT_DEG = 2.5;
@@ -45,13 +46,29 @@ export interface PoseFrameOutput {
   readonly reference?: CurlScoringTemplate;
   readonly cues: readonly CueCode[];
   readonly setBoundary: boolean;
+  readonly pairRejected?: PairRejectionReason;
 }
 
 export interface PoseSessionAdapterOptions {
   readonly mode: FormCoachRunMode;
   readonly arm?: TrackedArm;
+  readonly cameraView?: CameraView;
   readonly referenceRepTarget?: number;
   readonly template?: CurlScoringTemplate;
+}
+
+interface PoseFrameDetails {
+  readonly segment: SegmentedCurlRep;
+  readonly scored?: ScoredCurlRep;
+}
+
+interface InternalPoseFrameOutput extends PoseFrameOutput {
+  readonly details?: PoseFrameDetails;
+}
+
+interface InternalPoseSessionAdapterOptions extends PoseSessionAdapterOptions {
+  readonly deferReferenceAggregation?: boolean;
+  readonly suppressCues?: boolean;
 }
 
 interface BaselineCandidate {
@@ -96,6 +113,13 @@ function sideViewRatio(landmarks: LandmarkSet, width: number, height: number): n
   return Math.max(shoulderWidth, hipWidth) / torsoLength;
 }
 
+function configuredViewIsUsable(ratio: number | null, cameraView: CameraView): boolean {
+  if (ratio === null) return false;
+  if (cameraView === "side") return ratio < 0.35;
+  if (cameraView === "front") return ratio >= 0.75;
+  return ratio >= 0.35 && ratio < 0.75;
+}
+
 function median(values: readonly number[]): number {
   const ordered = [...values].sort((left, right) => left - right);
   const middle = Math.floor(ordered.length / 2);
@@ -136,6 +160,11 @@ function toRepSummary(repNumber: number, scored: ScoredCurlRep): FormCoachRepSum
   return {
     repNumber,
     score: scored.score,
+    romScore: scored.romScore,
+    maxUpperArmDrift: scored.maxUpperArmDrift,
+    maxTorsoSwing: scored.maxTorsoSwing,
+    maxShrug: scored.maxShrug,
+    curveSimilarity: scored.curveSimilarity,
     faults: scored.faults as RepFaultCode[],
     componentScores: scored.componentScores,
     romMinAngle: scored.romMinAngle,
@@ -155,7 +184,55 @@ function faultsAtFrame(metrics: FrameMetrics, template: CurlScoringTemplate): Re
   return faults;
 }
 
-export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
+function mergePairedSegments(left: SegmentedCurlRep, right: SegmentedCurlRep): SegmentedCurlRep {
+  const startMs = Math.min(left.startMs, right.startMs);
+  const endMs = Math.max(left.endMs, right.endMs);
+  const leftCurve = resampleTimedCurve(left.elbowCurve, REFERENCE_CURVE_SAMPLES);
+  const rightCurve = resampleTimedCurve(right.elbowCurve, REFERENCE_CURVE_SAMPLES);
+  const elbowCurve = leftCurve.map((angle, index) => ({
+    timestampMs: startMs + ((endMs - startMs) * index) / (REFERENCE_CURVE_SAMPLES - 1),
+    angleDeg: (angle + rightCurve[index]) / 2,
+  }));
+  return {
+    startMs,
+    endMs,
+    concentricMs: (left.concentricMs + right.concentricMs) / 2,
+    topPauseMs: (left.topPauseMs + right.topPauseMs) / 2,
+    eccentricMs: (left.eccentricMs + right.eccentricMs) / 2,
+    romMinAngle: Math.max(left.romMinAngle, right.romMinAngle),
+    romMaxAngle: Math.min(left.romMaxAngle, right.romMaxAngle),
+    maxUpperArmDrift: Math.max(left.maxUpperArmDrift, right.maxUpperArmDrift),
+    maxTorsoSwing: Math.max(left.maxTorsoSwing, right.maxTorsoSwing),
+    maxShrug: Math.max(left.maxShrug, right.maxShrug),
+    elbowCurve,
+  };
+}
+
+function conservativePairedScore(
+  left: ScoredCurlRep,
+  right: ScoredCurlRep,
+  template: CurlScoringTemplate,
+): ScoredCurlRep {
+  const merged = mergePairedSegments(left, right);
+  const scoredAggregate = scoreCurlRep(merged, template);
+  const faults = [...new Set([...left.faults, ...right.faults])];
+  return {
+    ...scoredAggregate,
+    romScore: Math.min(left.romScore, right.romScore),
+    curveSimilarity: Math.min(left.curveSimilarity, right.curveSimilarity),
+    componentScores: {
+      rom: Math.min(left.componentScores.rom, right.componentScores.rom),
+      elbow: Math.min(left.componentScores.elbow, right.componentScores.elbow),
+      torso: Math.min(left.componentScores.torso, right.componentScores.torso),
+      tempo: Math.min(left.componentScores.tempo, right.componentScores.tempo),
+      shoulders: Math.min(left.componentScores.shoulders, right.componentScores.shoulders),
+    },
+    score: Math.min(left.score, right.score),
+    faults,
+  };
+}
+
+function createSinglePoseSessionAdapter(options: InternalPoseSessionAdapterOptions) {
   const mode = options.mode;
   const referenceRepTarget = options.referenceRepTarget ?? 3;
   if (mode !== "reference" && mode !== "live") throw new RangeError("Unsupported Form Coach mode.");
@@ -164,7 +241,8 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
   }
   if (mode === "live" && !options.template) throw new RangeError("Live scoring requires a reference template.");
   const requestedArm = options.arm ?? STANDING_DUMBBELL_CURL.arm;
-  if (requestedArm === "both") throw new RangeError("Both-arm scoring is not supported by this Form Coach runtime.");
+  if (requestedArm === "both") throw new RangeError("A single-arm adapter requires one arm or auto selection.");
+  const cameraView = options.cameraView ?? STANDING_DUMBBELL_CURL.cameraView;
 
   const smoother = new LandmarkEmaSmoother(0.4, MIN_SETUP_VISIBILITY);
   const selector = new ActiveArmSelector(requestedArm, 1_000);
@@ -173,7 +251,7 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
     flexedThreshold: STANDING_DUMBBELL_CURL.segmentation.flexedThreshold,
     maxSessionSamples: MAX_SET_SAMPLES,
   });
-  const cues = new CurlCueScheduler({ enabled: mode === "live", cues: DEFAULT_CURL_CUES });
+  const cues = new CurlCueScheduler({ enabled: mode === "live" && options.suppressCues !== true, cues: DEFAULT_CURL_CUES });
   const cleanReferenceReps: SegmentedCurlRep[] = [];
   let selectedArm: ArmSide | null = null;
   let lastSetupStep: SetupStep = "show-side-view";
@@ -188,7 +266,7 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
 
   function chooseSetupStep(landmarks: LandmarkSet, width: number, height: number, timestampMs: number): SetupStep {
     const ratio = sideViewRatio(landmarks, width, height);
-    if (ratio === null || ratio >= MAX_SIDE_VIEW_RATIO) return "show-side-view";
+    if (!configuredViewIsUsable(ratio, cameraView)) return cameraView === "side" ? "show-side-view" : "show-required-view";
     if (!selectedArm) return "low-confidence";
     if (!armVisibilityIsUsable({ timestampMs, landmarks }, selectedArm)) return "low-confidence";
 
@@ -264,34 +342,40 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
     }
   }
 
-  function processCompletedRep(rep: SegmentedCurlRep, timestampMs: number): { rep?: FormCoachRepSummary; reference?: CurlScoringTemplate; cues: CueCode[] } {
+  function processCompletedRep(rep: SegmentedCurlRep, timestampMs: number): { rep?: FormCoachRepSummary; reference?: CurlScoringTemplate; cues: CueCode[]; details: PoseFrameDetails } {
     repCount += 1;
     let repSummary: FormCoachRepSummary | undefined;
     let reference: CurlScoringTemplate | undefined;
     const emittedCues: CueCode[] = [];
 
+    let scoredRep: ScoredCurlRep | undefined;
     if (mode === "reference") {
       if (isCleanReferenceRep(rep)) cleanReferenceReps.push(rep);
-      if (cleanReferenceReps.length >= referenceRepTarget && !completedReference) {
+      if (!options.deferReferenceAggregation && cleanReferenceReps.length >= referenceRepTarget && !completedReference) {
         completedReference = buildMedianReference(cleanReferenceReps.slice(0, referenceRepTarget));
         reference = completedReference;
       }
     } else if (options.template) {
-      const scored = scoreCurlRep(rep, options.template);
-      repSummary = toRepSummary(repCount, scored);
+      scoredRep = scoreCurlRep(rep, options.template);
+      repSummary = toRepSummary(repCount, scoredRep);
       const announcements = cues.handle({
         type: "rep_completed",
         atMs: timestampMs,
         repNumber: repCount,
-        faults: scored.faults as RepFaultCode[],
+        faults: scoredRep.faults as RepFaultCode[],
       });
       emittedCues.push(...announcements.map((announcement) => announcement.key as CueCode));
       if (announcements.length > 0) cues.handle({ type: "cue_finished", atMs: timestampMs });
     }
-    return { ...(repSummary ? { rep: repSummary } : {}), ...(reference ? { reference } : {}), cues: emittedCues };
+    return {
+      ...(repSummary ? { rep: repSummary } : {}),
+      ...(reference ? { reference } : {}),
+      cues: emittedCues,
+      details: { segment: rep, ...(scoredRep ? { scored: scoredRep } : {}) },
+    };
   }
 
-  function pushFrameMetrics(metrics: FrameMetrics): { rep?: FormCoachRepSummary; reference?: CurlScoringTemplate; cues: CueCode[] } {
+  function pushFrameMetrics(metrics: FrameMetrics): { rep?: FormCoachRepSummary; reference?: CurlScoringTemplate; cues: CueCode[]; details?: PoseFrameDetails } {
     const sample = {
       timestampMs: metrics.timestampMs,
       elbowAngleDeg: metrics.elbowAngleDeg,
@@ -319,14 +403,24 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
     }
     if (nextPhase) currentPhase = nextPhase;
     const completed = update.completed[0];
-    const result = completed ? processCompletedRep(completed, completed.endMs) : { cues: [] as CueCode[] };
+    const result: {
+      rep?: FormCoachRepSummary;
+      reference?: CurlScoringTemplate;
+      cues: CueCode[];
+      details?: PoseFrameDetails;
+    } = completed ? processCompletedRep(completed, completed.endMs) : { cues: [] };
     cuesOut.push(...result.cues);
     setBoundary ||= update.stopReason === "session_sample_limit";
-    return { ...(result.rep ? { rep: result.rep } : {}), ...(result.reference ? { reference: result.reference } : {}), cues: cuesOut };
+    return {
+      ...(result.rep ? { rep: result.rep } : {}),
+      ...(result.reference ? { reference: result.reference } : {}),
+      ...(completed ? { details: result.details } : {}),
+      cues: cuesOut,
+    };
   }
 
   return {
-    process(input: PoseFrameInput): PoseFrameOutput {
+    process(input: PoseFrameInput): InternalPoseFrameOutput {
       if (!Number.isFinite(input.timestampMs) || input.timestampMs < 0) {
         invalidateCurrentFrame(lastObservedTimestampMs ?? undefined, "invalid_metrics");
         lastSetupStep = "low-confidence";
@@ -365,7 +459,13 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
 
       const setupStep = chooseSetupStep(landmarks, input.width, input.height, input.timestampMs);
       if (setupStep !== lastSetupStep) lastSetupStep = setupStep;
-      if (!selectedArm || setupStep === "show-side-view" || setupStep === "move-back" || setupStep === "low-confidence") {
+      if (
+        !selectedArm ||
+        setupStep === "show-side-view" ||
+        setupStep === "show-required-view" ||
+        setupStep === "move-back" ||
+        setupStep === "low-confidence"
+      ) {
         invalidateCurrentFrame(input.timestampMs, "low_confidence");
         return { overlay: normalizedOverlay(landmarks), setupStep, cues: [], setBoundary };
       }
@@ -411,12 +511,153 @@ export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
         setupStep: "ready",
         ...(result.rep ? { rep: result.rep } : {}),
         ...(result.reference ? { reference: result.reference } : {}),
+        ...(result.details ? { details: result.details } : {}),
         cues: result.cues,
         setBoundary: false,
       };
     },
+    invalidateCurrentCandidate(timestampMs: number | undefined): void {
+      invalidateCurrentFrame(timestampMs, "low_confidence");
+    },
     getSetupStep: () => lastSetupStep,
     getCleanReferenceCount: () => cleanReferenceReps.length,
     getSetSampleLimit: () => MAX_SET_SAMPLES,
+  };
+}
+
+export function createPoseSessionAdapter(options: PoseSessionAdapterOptions) {
+  const requestedArm = options.arm ?? STANDING_DUMBBELL_CURL.arm;
+  if (requestedArm !== "both") return createSinglePoseSessionAdapter(options);
+
+  const mode = options.mode;
+  const referenceRepTarget = options.referenceRepTarget ?? 3;
+  if (mode !== "reference" && mode !== "live") throw new RangeError("Unsupported Form Coach mode.");
+  if (!Number.isInteger(referenceRepTarget) || referenceRepTarget < 3 || referenceRepTarget > 5) {
+    throw new RangeError("Reference rep target must be between 3 and 5.");
+  }
+  if (mode === "live" && !options.template) throw new RangeError("Live scoring requires a reference template.");
+
+  const singleOptions: InternalPoseSessionAdapterOptions = {
+    ...options,
+    suppressCues: true,
+    deferReferenceAggregation: true,
+  };
+  const left = createSinglePoseSessionAdapter({ ...singleOptions, arm: "left" });
+  const right = createSinglePoseSessionAdapter({ ...singleOptions, arm: "right" });
+  const pairer = new BilateralRepPairer();
+  const pairedReferenceReps: SegmentedCurlRep[] = [];
+  const cues = new CurlCueScheduler({ enabled: mode === "live", cues: DEFAULT_CURL_CUES });
+  const cameraView = options.cameraView ?? STANDING_DUMBBELL_CURL.cameraView;
+  let lastObservedTimestampMs: number | null = null;
+  let lastSetupStep: SetupStep = cameraView === "side" ? "show-side-view" : "show-required-view";
+  let repCount = 0;
+  let setBoundary = false;
+  let completedReference: CurlScoringTemplate | null = null;
+
+  function chooseCombinedSetupStep(input: PoseFrameInput, leftOutput: InternalPoseFrameOutput, rightOutput: InternalPoseFrameOutput): SetupStep {
+    const leftSample: ArmSelectionSample = { timestampMs: input.timestampMs, landmarks: input.landmarks };
+    if (!configuredViewIsUsable(sideViewRatio(input.landmarks, input.width, input.height), cameraView)) {
+      return cameraView === "side" ? "show-side-view" : "show-required-view";
+    }
+    if (!armVisibilityIsUsable(leftSample, "left") || !armVisibilityIsUsable(leftSample, "right")) return "show-both-arms";
+    const steps = [leftOutput.setupStep, rightOutput.setupStep];
+    if (steps.includes("move-back")) return "move-back";
+    if (steps.includes("low-confidence")) return "low-confidence";
+    if (steps.includes("extend-arm-hold")) return "extend-arm-hold";
+    return "ready";
+  }
+
+  return {
+    process(input: PoseFrameInput): InternalPoseFrameOutput {
+      const rejections: PairRejectionReason[] = [];
+      if (!Number.isFinite(input.timestampMs) || input.timestampMs < 0) {
+        rejections.push(...pairer.reset());
+      } else if (lastObservedTimestampMs !== null) {
+        const gapMs = input.timestampMs - lastObservedTimestampMs;
+        if (gapMs <= 0 || gapMs > MAX_FRAME_GAP_MS) rejections.push(...pairer.reset());
+      }
+      if (Number.isFinite(input.timestampMs) && input.timestampMs >= 0) lastObservedTimestampMs = input.timestampMs;
+
+      const leftOutput = left.process(input);
+      const rightOutput = right.process(input);
+      const setupStep = chooseCombinedSetupStep(input, leftOutput, rightOutput);
+      if (setupStep !== lastSetupStep) lastSetupStep = setupStep;
+
+      const ready = setupStep === "ready";
+      if (!ready) {
+        rejections.push(...pairer.reset());
+      }
+      const observationUnusable =
+        setupStep === "show-side-view" ||
+        setupStep === "show-required-view" ||
+        setupStep === "show-both-arms" ||
+        setupStep === "move-back" ||
+        setupStep === "low-confidence";
+      if (observationUnusable) {
+        left.invalidateCurrentCandidate(input.timestampMs);
+        right.invalidateCurrentCandidate(input.timestampMs);
+      }
+      if (Number.isFinite(input.timestampMs)) rejections.push(...pairer.expire(input.timestampMs));
+
+      let summary: FormCoachRepSummary | undefined;
+      let reference: CurlScoringTemplate | undefined;
+      const emittedCues: CueCode[] = [];
+      if (ready && Number.isFinite(input.timestampMs)) {
+        let paired: ReturnType<typeof pairer.push> | null = null;
+        if (leftOutput.details) {
+          paired = pairer.push("left", leftOutput.details.segment, input.timestampMs);
+          rejections.push(...paired.rejected);
+        }
+        if (rightOutput.details) {
+          const rightUpdate = pairer.push("right", rightOutput.details.segment, input.timestampMs);
+          if (rightUpdate.pair) paired = rightUpdate;
+          rejections.push(...rightUpdate.rejected);
+        }
+        if (paired) {
+          rejections.push(...paired.rejected);
+          if (paired.pair) {
+            repCount += 1;
+            const mergedSegment = mergePairedSegments(paired.pair.left, paired.pair.right);
+            if (mode === "reference") {
+              if (isCleanReferenceRep(mergedSegment)) pairedReferenceReps.push(mergedSegment);
+              if (pairedReferenceReps.length >= referenceRepTarget && !completedReference) {
+                completedReference = buildMedianReference(pairedReferenceReps.slice(0, referenceRepTarget));
+                reference = completedReference;
+              }
+            } else if (options.template) {
+              const leftScored = scoreCurlRep(paired.pair.left, options.template);
+              const rightScored = scoreCurlRep(paired.pair.right, options.template);
+              const pairedScore = conservativePairedScore(leftScored, rightScored, options.template);
+              summary = toRepSummary(repCount, pairedScore);
+              const announcements = cues.handle({
+                type: "rep_completed",
+                atMs: Math.max(paired.pair.left.endMs, paired.pair.right.endMs),
+                repNumber: repCount,
+                faults: pairedScore.faults as RepFaultCode[],
+              });
+              emittedCues.push(...announcements.map((announcement) => announcement.key as CueCode));
+              if (announcements.length > 0) cues.handle({ type: "cue_finished", atMs: Math.max(paired.pair.left.endMs, paired.pair.right.endMs) });
+            }
+          }
+        }
+      }
+
+      if (leftOutput.setBoundary || rightOutput.setBoundary) {
+        setBoundary = true;
+        rejections.push(...pairer.reset());
+      }
+      return {
+        overlay: leftOutput.overlay,
+        setupStep,
+        ...(summary ? { rep: summary } : {}),
+        ...(reference ? { reference } : {}),
+        ...(rejections.length > 0 ? { pairRejected: rejections[0] } : {}),
+        cues: emittedCues,
+        setBoundary,
+      };
+    },
+    getSetupStep: () => lastSetupStep,
+    getCleanReferenceCount: () => pairedReferenceReps.length,
+    getSetSampleLimit: () => Math.min(left.getSetSampleLimit(), right.getSetSampleLimit()),
   };
 }

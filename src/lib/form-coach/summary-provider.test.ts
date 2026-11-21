@@ -240,6 +240,17 @@ describe("Form Coach summary provider", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("accepts a measured fast phase and rejects zero or negative phase averages", async () => {
+    const { fetchImpl } = createFetchMock();
+    const provider = createProvider(fetchImpl);
+    const fastPhase: NumericAttemptSummary = { ...summary, concentric_ms_average: 80 };
+
+    await expect(provider.summarize(fastPhase)).resolves.toMatchObject({ status: "ready" });
+    await expect(provider.summarize({ ...fastPhase, eccentric_ms_average: 0 })).resolves.toEqual({ status: "invalid_input" });
+    await expect(provider.summarize({ ...fastPhase, concentric_ms_average: -1 })).resolves.toEqual({ status: "invalid_input" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects enumerable getters without invoking them", async () => {
     const { fetchImpl } = createFetchMock();
     const provider = createProvider(fetchImpl);

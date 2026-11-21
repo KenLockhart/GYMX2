@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   CoachFormCoachAssessmentPageSchema,
   FormCoachWorkflowDetailSchema,
+  FormCoachRepSubmissionSchema,
   FORM_COACH_REFERENCE_SIGNED_URL_MAX_TTL_SECONDS,
   FORM_COACH_REFERENCE_SIGNING_RESERVE_SECONDS,
   PinnedFormCoachReferenceAssetSchema,
+  RepResultSchema,
   formCoachReferenceUrlTtlSeconds,
   parsePinnedFormCoachReferenceAsset,
 } from "./workflow-contracts";
@@ -40,6 +42,37 @@ function referenceAsset(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Form Coach app workflow contracts", () => {
+  it("keeps legacy detail reads compatible while validating new measured submissions", () => {
+    const fastRep = {
+      rep_number: 1,
+      score: 70,
+      rom_min_angle: 45,
+      rom_max_angle: 160,
+      rom_score: 72,
+      max_upper_arm_drift: 20,
+      max_torso_swing: 4,
+      max_shrug: 0.1,
+      concentric_ms: 80,
+      top_pause_ms: 0,
+      eccentric_ms: 520,
+      curve_similarity: 90,
+      elbow_score: 50,
+      torso_score: 90,
+      tempo_score: 55,
+      shoulders_score: 88,
+      faults: ["eccentric_too_fast"],
+    } as const;
+    expect(RepResultSchema.parse(fastRep)).toEqual(fastRep);
+    expect(FormCoachRepSubmissionSchema.parse(fastRep)).toEqual(fastRep);
+    const legacyShortTotal = { ...fastRep, concentric_ms: 100, eccentric_ms: 100 };
+    expect(RepResultSchema.parse(legacyShortTotal)).toEqual(legacyShortTotal);
+    expect(FormCoachRepSubmissionSchema.safeParse(legacyShortTotal).success).toBe(false);
+    expect(FormCoachRepSubmissionSchema.safeParse({ ...fastRep, concentric_ms: 0 }).success).toBe(false);
+    expect(FormCoachRepSubmissionSchema.safeParse({ ...fastRep, eccentric_ms: 519 }).success).toBe(false);
+    expect(FormCoachRepSubmissionSchema.safeParse({ ...fastRep, eccentric_ms: 14_921 }).success).toBe(false);
+    expect(RepResultSchema.safeParse({ ...fastRep, rawFrame: "forbidden" }).success).toBe(false);
+  });
+
   it("accepts the bounded coach queue DTO and rejects stale or malformed fields", () => {
     const page = {
       rows: [{

@@ -1,18 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CurlScoringTemplate, PoseLandmark, TrackedArm } from "@/lib/form-coach/engine/types";
+import type { CameraView, CurlScoringTemplate, PoseLandmark, TrackedArm } from "@/lib/form-coach/engine/types";
 import type { FormCoachProcessingSession, FormCoachRuntimeFailure, FormCoachPerformanceSummary } from "@/lib/form-coach/browser-runtime";
 import type { FormCoachRepSummary, FormCoachRunMode, SetupStep } from "@/lib/form-coach/worker-protocol";
+import type { PersistableFormCoachRepResult } from "@/lib/form-coach/runtime-results";
 
 export interface FormCoachProcessorProps {
   readonly mode: FormCoachRunMode;
   readonly arm?: TrackedArm;
+  readonly cameraView?: CameraView;
   /** Caller-owned stream. This component never requests camera/microphone permission or stops its tracks. */
   readonly liveStream?: MediaStream | null;
   readonly referenceRepTarget?: number;
   readonly template?: CurlScoringTemplate;
   readonly onRepSummary?: (summary: FormCoachRepSummary) => void;
+  readonly onRepResult?: (result: PersistableFormCoachRepResult) => void;
+  readonly onRepResultRejected?: (reason: "outside-persisted-result-domain") => void;
   readonly onReferenceReady?: (template: CurlScoringTemplate, cleanRepCount: number) => void;
 }
 
@@ -23,6 +27,8 @@ const MAX_VISIBLE_SUMMARIES = 20;
 
 const SETUP_TEXT: Record<SetupStep, string> = {
   "show-side-view": "Turn sideways so the camera sees one shoulder and hip in profile.",
+  "show-required-view": "Adjust the camera to the view required by this exercise.",
+  "show-both-arms": "Keep both shoulders, elbows, and wrists visible throughout the repetition.",
   "move-back": "Move closer until your torso occupies at least one quarter of the frame.",
   "extend-arm-hold": "Keep your arm extended and your torso still for two seconds.",
   ready: "Ready. Move through a controlled repetition.",
@@ -82,10 +88,13 @@ function drawOverlay(canvas: HTMLCanvasElement | null, video: HTMLVideoElement |
 export function FormCoachProcessor({
   mode,
   arm = "auto",
+  cameraView,
   liveStream = null,
   referenceRepTarget = 3,
   template,
   onRepSummary,
+  onRepResult,
+  onRepResultRejected,
   onReferenceReady,
 }: FormCoachProcessorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -205,6 +214,7 @@ export function FormCoachProcessor({
       const session = await startFormCoachProcessing(video, {
         mode,
         arm,
+        cameraView,
         signal: abortController.signal,
         referenceRepTarget,
         ...(mode === "live" && template ? { template } : {}),
@@ -215,6 +225,20 @@ export function FormCoachProcessor({
         },
         onOverlay: handleOverlay,
         onRep: handleRep,
+        onRepResult,
+        onRepResultRejected: (reason) => {
+          onRepResultRejected?.(reason);
+          setStatus("A measured rep fell outside the saved numeric result limits and was not added to the saved result set.");
+        },
+        onPairRejected: (reason) => {
+          const messages = {
+            "missing-partner": "The two arms did not both complete the same repetition. No rep was counted.",
+            "out-of-phase": "The two arms moved out of phase. No rep was counted.",
+            "phase-mismatch": "The arm timing differed too much to pair. No rep was counted.",
+            asymmetric: "The arm range or movement shape differed too much to pair. No rep was counted.",
+          } as const;
+          setStatus(messages[reason]);
+        },
         onReferenceReady: handleReference,
         onCue: (key) => setCue(CUE_TEXT[key] ?? null),
         onPerformance: setPerformance,

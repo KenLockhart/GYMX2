@@ -59,7 +59,7 @@ const ExerciseFaultSchema = z.enum([
   "clean_rep",
 ]);
 
-const RepResultSchema = z
+export const RepResultSchema = z
   .object({
     rep_number: z.number().int().min(1).max(20),
     score: z.number().finite().min(0).max(100),
@@ -69,9 +69,9 @@ const RepResultSchema = z
     max_upper_arm_drift: z.number().finite().min(0).max(180),
     max_torso_swing: z.number().finite().min(0).max(180),
     max_shrug: z.number().finite().min(0).max(1),
-    concentric_ms: z.number().int().min(100).max(15_000),
+    concentric_ms: z.number().int().min(1).max(15_000),
     top_pause_ms: z.number().int().min(0).max(15_000),
-    eccentric_ms: z.number().int().min(100).max(15_000),
+    eccentric_ms: z.number().int().min(1).max(15_000),
     curve_similarity: z.number().finite().min(0).max(100),
     elbow_score: z.number().finite().min(0).max(100),
     torso_score: z.number().finite().min(0).max(100),
@@ -83,6 +83,15 @@ const RepResultSchema = z
   .refine((rep) => rep.rom_min_angle < rep.rom_max_angle, {
     message: "Rep range minimum must be below its maximum.",
     path: ["rom_min_angle"],
+  });
+
+/** New finish payloads enforce the measured segmenter duration; detail reads keep 400 compatibility. */
+export const FormCoachRepSubmissionSchema = RepResultSchema.refine((rep) => {
+    const totalDurationMs = rep.concentric_ms + rep.top_pause_ms + rep.eccentric_ms;
+    return totalDurationMs >= 600 && totalDurationMs <= 15_000;
+  }, {
+    message: "Rep duration must be between 600 and 15000 milliseconds.",
+    path: ["concentric_ms"],
   });
 
 const NumericSummaryKeys = [

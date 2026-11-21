@@ -7,7 +7,11 @@ interface LandmarkOptions {
   readonly torsoBottom?: number;
   readonly frontView?: boolean;
   readonly rightWristVisibility?: number;
+  readonly leftWristVisibility?: number;
+  readonly bothArms?: boolean;
+  readonly leftArmOffset?: number;
   readonly exerciseAngleDeg?: number;
+  readonly leftExerciseAngleDeg?: number;
 }
 
 function landmarks(options: LandmarkOptions = {}): PoseLandmark[] {
@@ -23,10 +27,13 @@ function landmarks(options: LandmarkOptions = {}): PoseLandmark[] {
   set(8, rightShoulderX, 0.2, 0.9);
   set(11, leftShoulderX, 0.33, 0.6);
   set(12, rightShoulderX, 0.33, 0.95);
-  set(13, leftShoulderX + 0.01, 0.48, 0.15);
+  const showLeft = options.bothArms === true;
+  const leftElbowX = leftShoulderX + (options.leftArmOffset ?? 0);
+  set(13, showLeft ? leftElbowX : leftShoulderX + 0.01, 0.48, showLeft ? 0.95 : 0.15);
   const rightElbowX = options.exerciseAngleDeg === undefined ? rightShoulderX + 0.01 : rightShoulderX;
   set(14, rightElbowX, 0.48, 0.95);
-  set(15, leftShoulderX + 0.01, 0.63, 0.15);
+  const leftExerciseAngleDeg = options.leftExerciseAngleDeg ?? options.exerciseAngleDeg;
+  set(15, leftShoulderX + 0.01, 0.63, showLeft ? options.leftWristVisibility ?? 0.95 : 0.15);
   if (options.exerciseAngleDeg === undefined) {
     set(16, rightShoulderX + 0.01, 0.63, options.rightWristVisibility ?? 0.95);
   } else {
@@ -38,6 +45,22 @@ function landmarks(options: LandmarkOptions = {}): PoseLandmark[] {
       0.48 - (Math.cos(radians) * wristLengthPx) / 480,
       options.rightWristVisibility ?? 0.95,
     );
+    if (showLeft && leftExerciseAngleDeg !== undefined) {
+      const shoulderDxPx = (leftShoulderX - leftElbowX) * 640;
+      const shoulderDyPx = (0.33 - 0.48) * 480;
+      const shoulderDirection = Math.atan2(shoulderDyPx, shoulderDxPx);
+      const leftRadians = (leftExerciseAngleDeg * Math.PI) / 180;
+      const wristDirection = shoulderDirection + leftRadians;
+      set(
+        15,
+        leftElbowX + (Math.cos(wristDirection) * wristLengthPx) / 640,
+        0.48 + (Math.sin(wristDirection) * wristLengthPx) / 480,
+        options.leftWristVisibility ?? 0.95,
+      );
+    }
+  }
+  if (showLeft && leftExerciseAngleDeg === undefined) {
+    set(15, leftElbowX, 0.63, options.leftWristVisibility ?? 0.95);
   }
   set(23, leftHipX, options.torsoBottom ?? 0.65, 0.9);
   set(24, rightHipX, options.torsoBottom ?? 0.65, 0.95);
@@ -101,6 +124,29 @@ describe("pose session adapter", () => {
       const result = tooFar.process({ landmarks: landmarks({ torsoBottom: 0.5 }), timestampMs, width: 640, height: 480 });
       if (timestampMs === 1_000) expect(result.setupStep).toBe("move-back");
     }
+  });
+
+  it("does not baseline or score side-view poses when the configured view is front", () => {
+    const adapter = createPoseSessionAdapter({ mode: "live", arm: "right", cameraView: "front", template: LIVE_TEMPLATE });
+    const outputs: ReturnType<typeof frame>[] = [];
+    let timestampMs = 0;
+    const send = (angleDeg: number) => {
+      const output = frame(adapter, timestampMs, { exerciseAngleDeg: angleDeg });
+      timestampMs += 100;
+      outputs.push(output);
+      return output;
+    };
+
+    for (let index = 0; index <= 20; index += 1) send(170);
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      for (const angle of [170, 170, 130, 100, 70, 50, 50, 50, 50, 50, 50, 70, 90, 120, 150, 170, 170, 170]) {
+        send(angle);
+      }
+    }
+
+    expect(outputs.every((output) => output.setupStep === "show-required-view")).toBe(true);
+    expect(outputs.some((output) => output.setupStep === "ready")).toBe(false);
+    expect(outputs.some((output) => output.rep || output.reference)).toBe(false);
   });
 
   it("holds a stable extended-arm baseline for two seconds after arm selection", () => {
@@ -194,6 +240,158 @@ describe("pose session adapter", () => {
   it("rejects reference targets outside the supported clean-rep range and live sessions without a template", () => {
     expect(() => createPoseSessionAdapter({ mode: "reference", referenceRepTarget: 2 })).toThrow(RangeError);
     expect(() => createPoseSessionAdapter({ mode: "live" })).toThrow(RangeError);
-    expect(() => createPoseSessionAdapter({ mode: "reference", arm: "both" })).toThrow("Both-arm scoring is not supported");
+    expect(() => createPoseSessionAdapter({ mode: "reference", arm: "both" })).not.toThrow();
+  });
+
+  it("requires both visible arms and the configured camera view", () => {
+    const both = createPoseSessionAdapter({ mode: "reference", arm: "both", cameraView: "side" });
+    expect(frame(both, 0).setupStep).toBe("show-both-arms");
+    const front = createPoseSessionAdapter({ mode: "reference", arm: "both", cameraView: "front" });
+    expect(front.process({ landmarks: landmarks({ frontView: true, bothArms: true, exerciseAngleDeg: 170 }), timestampMs: 0, width: 640, height: 480 }).setupStep).toBe("extend-arm-hold");
+    const wrongView = createPoseSessionAdapter({ mode: "reference", arm: "both", cameraView: "front" });
+    expect(frame(wrongView, 0, { bothArms: true, exerciseAngleDeg: 170 }).setupStep).toBe("show-required-view");
+    const left = createPoseSessionAdapter({ mode: "reference", arm: "left" });
+    let output;
+    for (let timestampMs = 0; timestampMs <= 2_000; timestampMs += 100) {
+      output = frame(left, timestampMs, { bothArms: true, exerciseAngleDeg: 170 });
+    }
+    expect(output?.setupStep).toBe("ready");
+  });
+
+  it("counts a synchronized bilateral rep once and preserves a fault from either arm", () => {
+    const adapter = createPoseSessionAdapter({ mode: "live", arm: "both", template: LIVE_TEMPLATE });
+    let timestampMs = 0;
+    for (; timestampMs <= 2_000; timestampMs += 100) {
+      frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: 170 });
+    }
+    const outputs: ReturnType<typeof frame>[] = [];
+    const angles = [170, 170, 130, 100, 70, 50, 50, 50, 50, 50, 50, 70, 90, 120, 150, 170, 170, 170];
+    for (const angle of angles) {
+      outputs.push(frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: angle, leftArmOffset: 0.12 }));
+      timestampMs += 100;
+    }
+    const completed = outputs.filter((output) => output.rep);
+    expect(completed).toHaveLength(1);
+    expect(completed[0]?.rep?.repNumber).toBe(1);
+    expect(completed[0]?.rep?.faults).toContain("elbow_drift");
+    expect(completed[0]?.rep?.score).toBeLessThan(100);
+  });
+
+  it("uses only complete bilateral clean cycles in a three-to-five-rep reference", () => {
+    const adapter = createPoseSessionAdapter({ mode: "reference", arm: "both", referenceRepTarget: 3 });
+    let timestampMs = 0;
+    for (; timestampMs <= 2_000; timestampMs += 100) frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: 170 });
+    const angles = [170, 170, 130, 100, 70, 50, 50, 50, 50, 50, 50, 70, 90, 120, 150, 170, 170, 170];
+    const outputs: ReturnType<typeof frame>[] = [];
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      for (const angle of angles) {
+        outputs.push(frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: angle }));
+        timestampMs += 100;
+      }
+    }
+    expect(adapter.getCleanReferenceCount()).toBe(3);
+    expect(outputs.filter((output) => output.reference)).toHaveLength(1);
+  });
+
+  it("drops a bilateral partial cycle on mid-rep occlusion and counts only the next complete pair", () => {
+    const adapter = createPoseSessionAdapter({ mode: "live", arm: "both", template: LIVE_TEMPLATE });
+    let timestampMs = 0;
+    for (; timestampMs <= 2_000; timestampMs += 100) frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: 170 });
+    const interrupted = [170, 170, 130, 100, 70, 50];
+    for (const angle of interrupted) {
+      frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: angle });
+      timestampMs += 100;
+    }
+    expect(frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: 50, leftWristVisibility: 0.49 }).setupStep).toBe("show-both-arms");
+    timestampMs += 100;
+    const resumed = [100, 140, 170, 170, 170];
+    const afterInterruption = resumed.map((angle) => {
+      const output = frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: angle });
+      timestampMs += 100;
+      return output;
+    });
+    expect(afterInterruption.some((output) => output.rep)).toBe(false);
+
+    const complete = [170, 170, 130, 100, 70, 50, 50, 50, 50, 50, 50, 70, 90, 120, 150, 170, 170, 170];
+    const outputs = complete.map((angle) => {
+      const output = frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: angle });
+      timestampMs += 100;
+      return output;
+    });
+    expect(outputs.filter((output) => output.rep)).toHaveLength(1);
+  });
+
+  it("drops both bilateral partial candidates after early one-wrist occlusion", () => {
+    const adapter = createPoseSessionAdapter({ mode: "live", arm: "both", template: LIVE_TEMPLATE });
+    let timestampMs = 0;
+    for (; timestampMs <= 2_000; timestampMs += 100) {
+      frame(adapter, timestampMs, { bothArms: true, exerciseAngleDeg: 170, leftExerciseAngleDeg: 170 });
+    }
+
+    const interrupted: Array<{ left: number; right: number; leftVisibility?: number }> = [
+      { left: 170, right: 170 },
+      { left: 170, right: 170 },
+      { left: 130, right: 130 },
+      { left: 100, right: 100, leftVisibility: 0.49 },
+      { left: 170, right: 70 },
+      { left: 130, right: 50 },
+      { left: 100, right: 50 },
+      { left: 70, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 50, right: 50 },
+      { left: 70, right: 50 },
+      { left: 90, right: 50 },
+      { left: 120, right: 70 },
+      { left: 150, right: 90 },
+      { left: 170, right: 120 },
+      { left: 170, right: 150 },
+      { left: 170, right: 170 },
+    ];
+    const interruptedOutputs = interrupted.map(({ left, right, leftVisibility }) => {
+      const output = frame(adapter, timestampMs, {
+        bothArms: true,
+        leftExerciseAngleDeg: left,
+        exerciseAngleDeg: right,
+        ...(leftVisibility === undefined ? {} : { leftWristVisibility: leftVisibility }),
+      });
+      timestampMs += 100;
+      return output;
+    });
+    expect(interruptedOutputs[3]?.setupStep).toBe("show-both-arms");
+    expect(interruptedOutputs.some((output) => output.rep)).toBe(false);
+
+    const completeCycle = [170, 170, 130, 100, 70, 50, 50, 50, 50, 50, 50, 70, 90, 120, 150, 170, 170, 170];
+    const leftOnlyCycle = completeCycle.map((angle) => {
+      const output = frame(adapter, timestampMs, {
+        bothArms: true,
+        exerciseAngleDeg: 170,
+        leftExerciseAngleDeg: angle,
+      });
+      timestampMs += 100;
+      return output;
+    });
+    expect(leftOnlyCycle.some((output) => output.rep)).toBe(false);
+
+    const completedOutputs = completeCycle.map((angle) => {
+      const output = frame(adapter, timestampMs, {
+        bothArms: true,
+        exerciseAngleDeg: angle,
+        leftExerciseAngleDeg: angle,
+      });
+      timestampMs += 100;
+      return output;
+    });
+    expect(completedOutputs.filter((output) => output.rep)).toHaveLength(1);
   });
 });

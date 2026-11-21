@@ -14,12 +14,15 @@ import {
   type NetworkAuditEntry,
   type SetupStep,
 } from "./worker-protocol";
+import { STANDING_DUMBBELL_CURL } from "./engine/registry";
+import type { CameraView } from "./engine/types";
+import { serializeFormCoachRepResult, type PersistableFormCoachRepResult } from "./runtime-results";
 import type { CurlScoringTemplate, PoseLandmark, TrackedArm } from "./engine/types";
 
 const MANIFEST_PATH = "/form-coach-assets/form-coach-worker/manifest.json";
 const WORKER_PATH_PATTERN = /^\/form-coach-worker\/([a-f0-9]{64})\/worker\.js$/;
 const CONTROLLER_MESSAGE_TYPES = new Set(["ready", "processed", "rep-summary", "cue", "stopped", "error"]);
-const SETUP_STEPS = new Set<SetupStep>(["show-side-view", "move-back", "extend-arm-hold", "ready", "low-confidence"]);
+const SETUP_STEPS = new Set<SetupStep>(["show-side-view", "show-required-view", "show-both-arms", "move-back", "extend-arm-hold", "ready", "low-confidence"]);
 
 export type FormCoachRuntimeFailure =
   | "unsupported-browser"
@@ -54,6 +57,7 @@ export interface FormCoachPerformanceSummary {
 export interface FormCoachRuntimeOptions {
   readonly mode: FormCoachRunMode;
   readonly arm?: TrackedArm;
+  readonly cameraView?: CameraView;
   readonly signal?: AbortSignal;
   /** Starts a dedicated CPU Worker without first making a GPU context, for constrained devices. */
   readonly forceCpu?: boolean;
@@ -63,6 +67,9 @@ export interface FormCoachRuntimeOptions {
   readonly onSetup?: (step: SetupStep) => void;
   readonly onOverlay?: (landmarks: readonly (PoseLandmark | null)[]) => void;
   readonly onRep?: (summary: FormCoachRepSummary) => void;
+  readonly onRepResult?: (result: PersistableFormCoachRepResult) => void;
+  readonly onRepResultRejected?: (reason: "outside-persisted-result-domain") => void;
+  readonly onPairRejected?: (reason: "missing-partner" | "out-of-phase" | "phase-mismatch" | "asymmetric") => void;
   readonly onReferenceReady?: (template: CurlScoringTemplate, cleanRepCount: number) => void;
   readonly onCue?: (cue: string) => void;
   readonly onPerformance?: (summary: FormCoachPerformanceSummary) => void;
@@ -179,6 +186,7 @@ class ControllerWorkerPort implements WorkerPortLike {
     private readonly worker: Worker,
     private readonly mode: FormCoachRunMode,
     private readonly arm: TrackedArm,
+    private readonly cameraView: CameraView,
     private readonly referenceRepTarget: number,
     private readonly template: CurlScoringTemplate | undefined,
     private readonly gpuCanvas: OffscreenCanvas | null,
@@ -191,6 +199,7 @@ class ControllerWorkerPort implements WorkerPortLike {
         ...message,
         mode: this.mode,
         arm: this.arm,
+        cameraView: this.cameraView,
         referenceRepTarget: this.referenceRepTarget,
         forceCpu: this.forceCpu,
         gpuCanvas: this.forceCpu ? null : this.gpuCanvas,
@@ -270,8 +279,9 @@ export async function startFormCoachProcessing(
   if (options.mode === "live" && !isCurlScoringTemplate(options.template)) throw createRuntimeError("worker-start-failed");
   if (options.mode !== "reference" && options.mode !== "live") throw createRuntimeError("worker-start-failed");
   const arm = options.arm ?? "auto";
-  if (arm === "both") throw createRuntimeError("unsupported-arm-mode");
-  if (arm !== "auto" && arm !== "left" && arm !== "right") throw createRuntimeError("worker-start-failed");
+  if (arm !== "auto" && arm !== "left" && arm !== "right" && arm !== "both") throw createRuntimeError("worker-start-failed");
+  const cameraView = options.cameraView ?? STANDING_DUMBBELL_CURL.cameraView;
+  if (cameraView !== "side" && cameraView !== "front" && cameraView !== "three_quarter") throw createRuntimeError("worker-start-failed");
   if (options.signal?.aborted) throw createRuntimeError("cancelled");
   const referenceRepTarget = options.referenceRepTarget ?? 3;
   if (!Number.isInteger(referenceRepTarget) || referenceRepTarget < 3 || referenceRepTarget > 5) {
@@ -516,8 +526,18 @@ export async function startFormCoachProcessing(
       return;
     }
     if (data.type === "rep-result") {
-      if (isFormCoachRepSummary(data.summary)) options.onRep?.(data.summary);
-      else notifyError("worker-failed");
+      if (isFormCoachRepSummary(data.summary)) {
+        options.onRep?.(data.summary);
+        const serialized = serializeFormCoachRepResult(data.summary);
+        if (serialized.ok) options.onRepResult?.(serialized.value);
+        else if (serialized.reason === "outside-persisted-result-domain") options.onRepResultRejected?.(serialized.reason);
+      } else notifyError("worker-failed");
+      return;
+    }
+    if (data.type === "pair-rejected") {
+      if (data.reason === "missing-partner" || data.reason === "out-of-phase" || data.reason === "phase-mismatch" || data.reason === "asymmetric") {
+        options.onPairRejected?.(data.reason);
+      } else notifyError("worker-failed");
       return;
     }
     if (data.type === "reference-ready") {
@@ -550,7 +570,7 @@ export async function startFormCoachProcessing(
   function attachWorker(targetWorker: Worker, forceCpu: boolean): boolean {
     worker = targetWorker;
     forceCpuWorker = forceCpu;
-    const port = new ControllerWorkerPort(worker, options.mode, arm, referenceRepTarget, options.template, gpuCanvas, forceCpu);
+    const port = new ControllerWorkerPort(worker, options.mode, arm, cameraView, referenceRepTarget, options.template, gpuCanvas, forceCpu);
     controller = createWorkerController({ port, sessionEpoch: epoch, now: receiverNow, onEvent: onControllerEvent });
     const onWorkerError = () => notifyError("worker-failed");
     const onWorkerMessageError = () => notifyError("worker-failed");

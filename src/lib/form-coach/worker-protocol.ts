@@ -1,4 +1,4 @@
-import type { CurlScoringTemplate, PoseLandmark, TrackedArm } from "./engine/types";
+import type { CameraView, CurlScoringTemplate, PoseLandmark, TrackedArm } from "./engine/types";
 import type { CueCode, RepFaultCode, WorkerDelegate, WorkerErrorCode, WorkerModel } from "./worker-controller";
 
 export type FormCoachRunMode = "reference" | "live";
@@ -10,6 +10,7 @@ export type FormCoachWorkerInit = Readonly<{
   model: WorkerModel;
   mode: FormCoachRunMode;
   arm: TrackedArm;
+  cameraView: CameraView;
   referenceRepTarget: number;
   forceCpu: boolean;
   template?: CurlScoringTemplate;
@@ -35,6 +36,8 @@ export type FormCoachWorkerCommand =
 
 export type SetupStep =
   | "show-side-view"
+  | "show-required-view"
+  | "show-both-arms"
   | "move-back"
   | "extend-arm-hold"
   | "ready"
@@ -43,6 +46,11 @@ export type SetupStep =
 export type FormCoachRepSummary = Readonly<{
   repNumber: number;
   score: number;
+  romScore: number;
+  maxUpperArmDrift: number;
+  maxTorsoSwing: number;
+  maxShrug: number;
+  curveSimilarity: number;
   faults: readonly RepFaultCode[];
   componentScores: Readonly<{ rom: number; elbow: number; torso: number; tempo: number; shoulders: number }>;
   romMinAngle: number;
@@ -69,6 +77,7 @@ export type FormCoachWorkerEvent =
   | Readonly<{ version: 1; type: "setup"; sessionEpoch: number; step: SetupStep }>
   | Readonly<{ version: 1; type: "overlay"; sessionEpoch: number; landmarks: readonly (PoseLandmark | null)[] }>
   | Readonly<{ version: 1; type: "rep-result"; sessionEpoch: number; summary: FormCoachRepSummary }>
+  | Readonly<{ version: 1; type: "pair-rejected"; sessionEpoch: number; reason: "missing-partner" | "out-of-phase" | "phase-mismatch" | "asymmetric" }>
   | Readonly<{ version: 1; type: "reference-ready"; sessionEpoch: number; template: CurlScoringTemplate; cleanRepCount: number }>
   | Readonly<{ version: 1; type: "set-boundary"; sessionEpoch: number; reason: "session_sample_limit" }>
   | Readonly<{ version: 1; type: "network-audit"; sessionEpoch: number; allowedAssetGets: number; allowed: readonly NetworkAuditEntry[]; blocked: readonly NetworkAuditEntry[]; observed: readonly NetworkAuditEntry[] }>;
@@ -98,14 +107,26 @@ export function isFormCoachRepSummary(value: unknown): value is FormCoachRepSumm
   const scores = summary.componentScores;
   const faults = new Set(["elbow_drift", "torso_swing", "short_rom_bottom", "short_rom_top", "eccentric_too_fast", "shoulder_shrug"]);
   const scoreKeys = ["rom", "elbow", "torso", "tempo", "shoulders"];
+  const summaryKeys = [
+    "repNumber", "score", "romScore", "maxUpperArmDrift", "maxTorsoSwing", "maxShrug", "curveSimilarity",
+    "faults", "componentScores", "romMinAngle", "romMaxAngle", "concentricMs", "topPauseMs", "eccentricMs",
+  ];
   return (
+    Object.keys(summary).sort().join("\0") === [...summaryKeys].sort().join("\0") &&
     Number.isSafeInteger(summary.repNumber) && (summary.repNumber as number) >= 1 && (summary.repNumber as number) <= 1_000_000 &&
     Number.isFinite(summary.score) && (summary.score as number) >= 0 && (summary.score as number) <= 100 &&
+    Number.isFinite(summary.romScore) && (summary.romScore as number) >= 0 && (summary.romScore as number) <= 100 &&
+    Number.isFinite(summary.maxUpperArmDrift) && (summary.maxUpperArmDrift as number) >= 0 && (summary.maxUpperArmDrift as number) <= 180 &&
+    Number.isFinite(summary.maxTorsoSwing) && (summary.maxTorsoSwing as number) >= 0 && (summary.maxTorsoSwing as number) <= 180 &&
+    Number.isFinite(summary.maxShrug) && (summary.maxShrug as number) >= 0 && (summary.maxShrug as number) <= 1 &&
+    Number.isFinite(summary.curveSimilarity) && (summary.curveSimilarity as number) >= 0 && (summary.curveSimilarity as number) <= 100 &&
     Number.isFinite(summary.romMinAngle) && (summary.romMinAngle as number) >= 0 && (summary.romMinAngle as number) <= 180 &&
     Number.isFinite(summary.romMaxAngle) && (summary.romMaxAngle as number) >= 0 && (summary.romMaxAngle as number) <= 180 &&
-    Number.isFinite(summary.concentricMs) && (summary.concentricMs as number) >= 0 && (summary.concentricMs as number) <= 60_000 &&
-    Number.isFinite(summary.topPauseMs) && (summary.topPauseMs as number) >= 0 && (summary.topPauseMs as number) <= 60_000 &&
-    Number.isFinite(summary.eccentricMs) && (summary.eccentricMs as number) >= 0 && (summary.eccentricMs as number) <= 60_000 &&
+    Number.isFinite(summary.concentricMs) && (summary.concentricMs as number) >= 1 && (summary.concentricMs as number) <= 15_000 &&
+    Number.isFinite(summary.topPauseMs) && (summary.topPauseMs as number) >= 0 && (summary.topPauseMs as number) <= 15_000 &&
+    Number.isFinite(summary.eccentricMs) && (summary.eccentricMs as number) >= 1 && (summary.eccentricMs as number) <= 15_000 &&
+    (summary.concentricMs as number) + (summary.topPauseMs as number) + (summary.eccentricMs as number) >= 600 &&
+    (summary.concentricMs as number) + (summary.topPauseMs as number) + (summary.eccentricMs as number) <= 15_000 &&
     Array.isArray(summary.faults) && summary.faults.length <= 6 && summary.faults.every((fault) => typeof fault === "string" && faults.has(fault)) &&
     !!scores && typeof scores === "object" && Object.keys(scores).sort().join("\0") === [...scoreKeys].sort().join("\0") &&
     Object.values(scores).every((score) => Number.isFinite(score) && (score as number) >= 0 && (score as number) <= 100)

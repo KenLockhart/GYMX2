@@ -186,7 +186,7 @@ async function failWorker(code: WorkerErrorCode): Promise<void> {
 }
 
 function validateInit(value: Record<string, unknown>): value is FormCoachWorkerInit {
-  const expected = ["version", "type", "sessionEpoch", "model", "mode", "arm", "referenceRepTarget", "forceCpu", "gpuCanvas"];
+    const expected = ["version", "type", "sessionEpoch", "model", "mode", "arm", "cameraView", "referenceRepTarget", "forceCpu", "gpuCanvas"];
   const isExact = (keys: readonly string[]) => {
     const actual = Object.keys(value).sort();
     const wanted = [...keys].sort();
@@ -196,7 +196,8 @@ function validateInit(value: Record<string, unknown>): value is FormCoachWorkerI
     Number.isSafeInteger(value.sessionEpoch) && (value.sessionEpoch as number) > 0 &&
     value.version === 1 && value.type === "init" && isModel(value.model) &&
     (value.mode === "reference" || value.mode === "live") &&
-    (value.arm === "left" || value.arm === "right" || value.arm === "auto") &&
+    (value.arm === "left" || value.arm === "right" || value.arm === "both" || value.arm === "auto") &&
+    (value.cameraView === "side" || value.cameraView === "front" || value.cameraView === "three_quarter") &&
     Number.isInteger(value.referenceRepTarget) && (value.referenceRepTarget as number) >= 3 && (value.referenceRepTarget as number) <= 5 &&
     typeof value.forceCpu === "boolean" &&
     (value.gpuCanvas === null || (typeof OffscreenCanvas !== "undefined" && value.gpuCanvas instanceof OffscreenCanvas));
@@ -287,6 +288,7 @@ async function initialize(message: FormCoachWorkerInit): Promise<void> {
   adapter = createPoseSessionAdapter({
     mode: message.mode,
     arm: message.arm,
+    cameraView: message.cameraView,
     referenceRepTarget: message.referenceRepTarget,
     ...(message.mode === "live" ? { template: message.template } : {}),
   });
@@ -348,6 +350,9 @@ async function processFrame(message: FormCoachWorkerFrame): Promise<void> {
       if (output.setupStep !== lastSetupStep) {
         lastSetupStep = output.setupStep;
         send({ version: 1, type: "setup", sessionEpoch: epoch, step: output.setupStep });
+      }
+      if (output.pairRejected) {
+        send({ version: 1, type: "pair-rejected", sessionEpoch: epoch, reason: output.pairRejected });
       }
       if (output.rep) {
         send({ version: 1, type: "rep-result", sessionEpoch: epoch, summary: output.rep });
