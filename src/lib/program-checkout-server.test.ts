@@ -165,9 +165,16 @@ describe("Program Checkout app contracts", () => {
 
   it("builds same-origin order returns and accepts only Stripe Checkout redirects", () => {
     expect(buildProgramCheckoutReturnUrls({ siteUrl: "https://gymx2.com", programId, orderId })).toEqual({
-      successUrl: `https://gymx2.com/programs/${programId}?checkout=success&order_id=${orderId}`,
-      cancelUrl: `https://gymx2.com/programs/${programId}?checkout=cancel&order_id=${orderId}`,
+      successUrl: `https://gymx2.com/program-purchases/${encodeURIComponent(orderId)}?checkout=success`,
+      cancelUrl: `https://gymx2.com/program-purchases/${encodeURIComponent(orderId)}?checkout=cancel`,
     });
+    const encodedOrderReturn = buildProgramCheckoutReturnUrls({
+      siteUrl: "https://gymx2.com",
+      programId,
+      orderId: "order/segment",
+    });
+    expect(encodedOrderReturn.successUrl).toBe("https://gymx2.com/program-purchases/order%2Fsegment?checkout=success");
+    expect(encodedOrderReturn.cancelUrl).toBe("https://gymx2.com/program-purchases/order%2Fsegment?checkout=cancel");
     expect(() => buildProgramCheckoutReturnUrls({ siteUrl: "https://user@attacker.test", programId, orderId })).toThrow();
     expect(() => buildProgramCheckoutReturnUrls({ siteUrl: "http://localhost:3000", programId, orderId })).toThrow();
     expect(isStrictStripeCheckoutUrl("https://checkout.stripe.com/c/pay/cs_test_123" )).toBe(true);
@@ -468,6 +475,53 @@ describe("Program Checkout app contracts", () => {
     expect(service.rpc).toHaveBeenCalledWith("bind_program_billing_checkout_session", expect.objectContaining({
       p_order_id: orderId, p_expected_revision: 5, p_attempt_number: 2, p_checkout_session_id: newSession.id,
     }));
+  });
+
+  it("rejects an already-requested retry bound to attempt 1 after the owner snapshot advances to attempt 2", async () => {
+    const service = rpcClient((name) => name === "get_program_checkout_snapshot" ? retrySnapshot() : null);
+    const buyer = rpcClient((name) => name === "request_program_checkout_retry"
+      ? { status: "already_requested", attempt_number: 1 }
+      : null);
+    const store = createProgramCheckoutServerStore({
+      serviceClient: service,
+      buyerClient: buyer,
+      buyerId,
+      initialRevision: 5,
+    });
+    const providerCalls: string[] = [];
+    const provider = new Proxy({}, {
+      get(_target, property) {
+        return vi.fn(() => {
+          providerCalls.push(String(property));
+          throw new Error("Provider must not be consulted for a stale retry request");
+        });
+      },
+    }) as unknown as ProgramCheckoutProvider;
+
+    await expect(retryProgramCheckout({
+      store,
+      provider,
+      orderId,
+      expectedRevision: 5,
+      explicitRequestId: retryRequestId,
+      requestedAt: at,
+      today: "2026-11-20",
+      now: at,
+    })).resolves.toEqual({ status: "blocked", reason: "retry_attempt_changed" });
+
+    expect(buyer.rpc).toHaveBeenCalledOnce();
+    expect(buyer.rpc).toHaveBeenCalledWith("request_program_checkout_retry", {
+      p_order_id: orderId,
+      p_request_id: retryRequestId,
+    });
+    expect(service.rpc).toHaveBeenCalledTimes(1);
+    expect(service.rpc).toHaveBeenCalledWith("get_program_checkout_snapshot", {
+      p_order_id: orderId,
+      p_expected_billing_revision: 5,
+      p_expected_buyer_id: buyerId,
+    });
+    expect(service.rpc).not.toHaveBeenCalledWith("advance_program_checkout_attempt", expect.anything());
+    expect(providerCalls).toEqual([]);
   });
 
   it("fails closed on missing snapshot retry proof and RPC provenance disagreement", async () => {

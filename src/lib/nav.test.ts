@@ -78,6 +78,20 @@ describe("menus", () => {
     }
   });
 
+  it("keeps Program purchase history reachable for every role and preserves Armory Purchases visibility", () => {
+    for (const role of roles) {
+      const accountItems = menuGroups(role).find((group) => group.title === "Account")?.items ?? [];
+      expect(accountItems.map((entry) => entry.href)).toContain("/program-purchases");
+      expect(allDestinations(role).some((entry) => entry.href === "/program-purchases")).toBe(true);
+    }
+    for (const role of ["member", "coach", "moderator"] as const) {
+      expect(menuGroups(role).find((group) => group.title === "Account")?.items.map((entry) => entry.href))
+        .toContain("/armory/purchases");
+    }
+    expect(menuGroups("admin").find((group) => group.title === "Account")?.items.map((entry) => entry.href))
+      .not.toContain("/armory/purchases");
+  });
+
   it("shows assessment navigation only to coaches and member Form Checks only to members", () => {
     expect(allDestinations("coach").some((item) => item.href === "/form-coach/assessments")).toBe(true);
     expect(allDestinations("member").some((item) => item.href === "/form-checks")).toBe(true);

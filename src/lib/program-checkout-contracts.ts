@@ -63,13 +63,11 @@ export function buildProgramCheckoutReturnUrls(input: { siteUrl: string; program
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
     throw new Error("Program Checkout site origin is invalid");
   }
-  const route = `/programs/${encodeURIComponent(input.programId)}`;
+  const route = `/program-purchases/${encodeURIComponent(input.orderId)}`;
   const success = new URL(route, base.origin);
   success.searchParams.set("checkout", "success");
-  success.searchParams.set("order_id", input.orderId);
   const cancel = new URL(route, base.origin);
   cancel.searchParams.set("checkout", "cancel");
-  cancel.searchParams.set("order_id", input.orderId);
   return { successUrl: success.toString(), cancelUrl: cancel.toString() };
 }
 
