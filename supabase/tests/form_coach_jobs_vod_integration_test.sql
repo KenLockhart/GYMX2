@@ -1,8 +1,10 @@
 -- DEPENDENCY: run only after 20261119031500_stream_media_app_contracts.sql is accepted and applied.
 -- This companion exercises the real 315 VOD-upload-abort proof with the 420 Form Coach grant.
 -- The standalone form_coach_jobs_test.sql intentionally has no dependency on 315.
+-- Assessment/template/receipt rows below are synthetic owner fixtures for the 420 job/Auth contract;
+-- they do not exercise the normal Form Coach template or funding producer.
 begin;
-select plan(17);
+select plan(18);
 
 insert into auth.users(id,email,raw_user_meta_data) values
   ('f4210000-0000-4000-8000-000000000001','jobs-vod-coach@example.test','{"display_name":"Jobs VOD Coach"}'),
@@ -11,7 +13,7 @@ update public.profiles set role='coach' where id='f4210000-0000-4000-8000-000000
 insert into public.coach_members(coach_id,member_id)
 values('f4210000-0000-4000-8000-000000000001','f4210000-0000-4000-8000-000000000002');
 insert into public.form_coach_terms_versions(version,document_path,document_sha256,created_by)
-values(1,'/legal/form-coach/jobs-vod/1',repeat('a',64),'f4210000-0000-4000-8000-000000000001');
+values(1,'/legal/form-coach/terms/1',repeat('a',64),'f4210000-0000-4000-8000-000000000001');
 insert into public.form_coach_templates(id,owner_subject_id,owner_id,owner_kind,name)
 values('f4210000-0000-4000-8000-000000000010','f4210000-0000-4000-8000-000000000001',
   'f4210000-0000-4000-8000-000000000001','coach','Synthetic VOD Jobs Curl');
@@ -103,6 +105,18 @@ select is((select count(*)::integer from public.service_claim_form_coach_summary
 select is(public.record_stream_vod_upload_abort_component_proof(
   'f4210000-0000-4000-8000-000000000102',1,'f4210000-0000-4000-8000-000000000103')->>'outcome',
   'recorded','the 315 VOD upload-abort inventory is recorded through its real service API');
+set local role service_role;
+set local request.jwt.claim.role='service_role';
+set local request.jwt.claims='{"role":"service_role"}';
+select set_config('test.jobs_vod_billing_cleanup',public.service_record_form_coach_billing_cleanup(
+  'f4210000-0000-4000-8000-000000000102',1::bigint,'f4210000-0000-4000-8000-000000000112'
+)::text,true);
+reset role;
+select is((select proof.proof_state::text from public.stream_media_auth_component_proof_events proof
+  where proof.tombstone_id='f4210000-0000-4000-8000-000000000102'
+    and proof.component_key='form_coach_billing'
+  order by proof.proof_sequence desc limit 1),'ready',
+  'the actual 330 billing cleanup RPC records the required empty-ledger component proof');
 select set_config('test.jobs_vod_incomplete',public.service_record_form_coach_auth_cleanup_proof(
   'f4210000-0000-4000-8000-000000000102',1,'f4210000-0000-4000-8000-000000000104')::text,true);
 select is((current_setting('test.jobs_vod_incomplete')::jsonb->>'ready')::boolean,false,
