@@ -120,23 +120,66 @@ function topCorrections(
     });
 }
 
-function SummaryState({ result }: { result: AttemptResult }) {
-  const stateLabel = result.summary_state === "pending"
-    ? "Summary pending"
-    : result.summary_state === "unavailable"
-      ? "Summary unavailable"
-      : "Coach summary";
+type SummaryPresentation = Readonly<{
+  heading: string;
+  description: string;
+  compactStatus: string;
+}>;
+
+function summaryPresentation(
+  result: AttemptResult,
+  summaryProviderConfigured: boolean,
+): SummaryPresentation {
+  if (result.coach_summary) {
+    return {
+      heading: "Coach summary",
+      description: result.coach_summary,
+      compactStatus: "written summary available",
+    };
+  }
+
+  if (result.summary_state === "pending") {
+    return summaryProviderConfigured
+      ? {
+          heading: "Summary pending",
+          description: "A numeric result is available while the written summary is pending.",
+          compactStatus: "written summary pending",
+        }
+      : {
+          heading: "Written summary unavailable",
+          description: "Written summaries are unavailable right now. Your numeric result is still available.",
+          compactStatus: "written summary unavailable",
+        };
+  }
+
+  if (result.summary_state === "unavailable") {
+    return {
+      heading: "Summary unavailable",
+      description: "The numeric result is available; no written summary was returned.",
+      compactStatus: "written summary unavailable",
+    };
+  }
+
+  return {
+    heading: "Coach summary",
+    description: "No written summary is available for this attempt.",
+    compactStatus: "numeric result recorded",
+  };
+}
+
+function SummaryState({
+  result,
+  summaryProviderConfigured,
+}: {
+  result: AttemptResult;
+  summaryProviderConfigured: boolean;
+}) {
+  const presentation = summaryPresentation(result, summaryProviderConfigured);
 
   return (
-    <section className="rounded-lg border border-border bg-surface-raised p-3" aria-label={stateLabel}>
-      <h4 className="text-sm font-semibold">{stateLabel}</h4>
-      <p className="mt-1 text-sm text-muted">
-        {result.coach_summary ?? (result.summary_state === "pending"
-          ? "A numeric result is available while the written summary is pending."
-          : result.summary_state === "unavailable"
-            ? "The numeric result is available; no written summary was returned."
-            : "No written summary is available for this attempt.")}
-      </p>
+    <section className="rounded-lg border border-border bg-surface-raised p-3" aria-label={presentation.heading}>
+      <h4 className="text-sm font-semibold">{presentation.heading}</h4>
+      <p className="mt-1 text-sm text-muted">{presentation.description}</p>
     </section>
   );
 }
@@ -200,17 +243,22 @@ function ItemHistory({
   item,
   reviewItem,
   reviewAction,
+  summaryProviderConfigured,
 }: {
   assessmentId: string;
   item: AssessmentItem;
   reviewItem: ReviewItem | null;
   reviewAction?: FormCoachReviewAction;
+  summaryProviderConfigured: boolean;
 }) {
   const attempts = resultAttempts(item);
   const best = bestAttempt(attempts);
   const faultSummary = faultCounts(attempts);
   const fixes = topCorrections(item, faultSummary.entries);
   const cueList = item.cues_enabled ? item.template?.cues ?? [] : [];
+  const bestSummary = best?.result
+    ? summaryPresentation(best.result, summaryProviderConfigured)
+    : null;
 
   return (
     <article className="space-y-5 rounded-2xl border border-border bg-surface p-4 sm:p-6" aria-labelledby={`exercise-${item.ordinal}`}>
@@ -315,11 +363,7 @@ function ItemHistory({
             <p className="text-3xl font-bold tabular-nums">{formatScore(best.result.average_score)}</p>
           </div>
           <p className="mt-2 text-sm text-muted">
-            {plural(best.result.rep_count, "rep")} · {best.result.summary_state === "pending"
-              ? "written summary pending"
-              : best.result.summary_state === "unavailable"
-                ? "written summary unavailable"
-                : "numeric score recorded"}
+            {plural(best.result.rep_count, "rep")} · {bestSummary?.compactStatus}
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
             <p className="rounded-lg bg-surface p-3">Range <strong className="block tabular-nums">{formatScore(best.result.numeric_summary.rom_average)}</strong></p>
@@ -327,7 +371,9 @@ function ItemHistory({
             <p className="rounded-lg bg-surface p-3">Tempo <strong className="block tabular-nums">{formatScore(best.result.numeric_summary.tempo_average)}</strong></p>
             <p className="rounded-lg bg-surface p-3">Shoulders <strong className="block tabular-nums">{formatScore(best.result.numeric_summary.shoulders_average)}</strong></p>
           </div>
-          <div className="mt-3"><SummaryState result={best.result} /></div>
+          <div className="mt-3">
+            <SummaryState result={best.result} summaryProviderConfigured={summaryProviderConfigured} />
+          </div>
         </section>
       )}
 
@@ -393,7 +439,11 @@ function ItemHistory({
                     <td className="px-3 py-2 tabular-nums">{attempt.finished_at ? <time dateTime={attempt.finished_at}>{formatUtcDate(attempt.finished_at)}</time> : "—"}</td>
                     <td className="px-3 py-2 tabular-nums">{attempt.result ? formatScore(attempt.result.average_score) : "—"}</td>
                     <td className="px-3 py-2 tabular-nums">{attempt.result?.rep_count ?? "—"}</td>
-                    <td className="px-3 py-2">{attempt.result?.summary_state ?? "result unavailable"}</td>
+                    <td className="px-3 py-2">
+                      {attempt.result
+                        ? summaryPresentation(attempt.result, summaryProviderConfigured).compactStatus
+                        : "result unavailable"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -406,7 +456,9 @@ function ItemHistory({
                 Attempt {attempt.attempt_number}: rep scores and form metrics
               </summary>
               <div className="mt-3 space-y-3">
-                {attempt.result && <SummaryState result={attempt.result} />}
+                {attempt.result && (
+                  <SummaryState result={attempt.result} summaryProviderConfigured={summaryProviderConfigured} />
+                )}
                 <RepScoreTable reps={attempt.result?.rep_results ?? []} />
               </div>
             </details>
@@ -421,10 +473,12 @@ export function AssessmentDetail({
   role,
   detail,
   reviewAction,
+  summaryProviderConfigured = false,
 }: {
   role: ViewerRole;
   detail: FormCoachWorkflowDetail | FormCoachReviewDetail;
   reviewAction?: FormCoachReviewAction;
+  summaryProviderConfigured?: boolean;
 }) {
   const backHref = role === "coach" ? "/form-coach/assessments" : "/form-checks";
   const title = detail.source_kind === "manual" ? "Manual Form Check" : detail.program_title ?? "Program assessment";
@@ -490,6 +544,7 @@ export function AssessmentDetail({
             item={item}
             reviewItem={role === "coach" && "expected_review_sequence" in item ? item : null}
             reviewAction={reviewAction}
+            summaryProviderConfigured={summaryProviderConfigured}
           />
         ))}
       </section>

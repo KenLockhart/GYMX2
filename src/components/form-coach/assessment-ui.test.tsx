@@ -14,6 +14,9 @@ const now = "2026-11-20T12:00:00.000Z";
 type RepFaults = NonNullable<
   NonNullable<FormCoachWorkflowDetail["items"][number]["attempts"][number]["result"]>["rep_results"][number]
 >["faults"];
+type AttemptResult = NonNullable<
+  FormCoachWorkflowDetail["items"][number]["attempts"][number]["result"]
+>;
 
 const detail: FormCoachWorkflowDetail = {
   assessment_id: assessmentId,
@@ -131,6 +134,27 @@ function detailWithRepFaults(repFaults: readonly RepFaults[]): FormCoachWorkflow
   };
 }
 
+function detailWithSummaryState(
+  summaryState: AttemptResult["summary_state"],
+  coachSummary: string | null,
+): FormCoachWorkflowDetail {
+  const item = detail.items[0];
+  const attempt = item?.attempts[0];
+  const result = attempt?.result;
+  if (!item || !attempt || !result) throw new Error("The UI fixture requires one finished result.");
+
+  return {
+    ...detail,
+    items: [{
+      ...item,
+      attempts: [{
+        ...attempt,
+        result: { ...result, summary_state: summaryState, coach_summary: coachSummary },
+      }],
+    }],
+  };
+}
+
 describe("Form Coach assessment views", () => {
   it("renders the member inbox without a fabricated member name or raw member ID", () => {
     const markup = renderToStaticMarkup(createElement(AssessmentList, {
@@ -192,19 +216,48 @@ describe("Form Coach assessment views", () => {
   });
 
   it("renders best and all finished numeric history, fault counts, pending summary and latest feedback read-only", () => {
-    const markup = renderToStaticMarkup(createElement(AssessmentDetail, { role: "member", detail }));
+    const markup = renderToStaticMarkup(createElement(AssessmentDetail, {
+      role: "member",
+      detail,
+      summaryProviderConfigured: true,
+    }));
 
     expect(markup).toContain("Best finished attempt");
     expect(markup).toContain("Finished attempt history");
     expect(markup).toContain("Elbow drift");
     expect(markup).toContain("Top corrections");
     expect(markup).toContain("Summary pending");
+    expect(markup).toContain("A numeric result is available while the written summary is pending.");
     expect(markup).toContain("November 27, 2026 at 12:30:00 AM UTC");
     expect(markup).toContain("Latest coach feedback");
     expect(markup).toContain("Keep your elbow steady on the next practice.");
     expect(markup).not.toContain("Start attempt");
     expect(markup).not.toContain("Submit review");
     expect(markup).not.toContain("storage_path");
+  });
+
+  it("fails closed to unavailable copy when the summary capability is missing", () => {
+    const markup = renderToStaticMarkup(createElement(AssessmentDetail, { role: "member", detail }));
+
+    expect(markup).toContain("Written summary unavailable");
+    expect(markup).toContain("Written summaries are unavailable right now. Your numeric result is still available.");
+    expect(markup).not.toContain("Summary pending");
+    expect(markup).not.toContain("written summary pending");
+    expect(markup).toContain("82%");
+    expect(markup).toContain("1 rep");
+  });
+
+  it("keeps a saved coach summary visible when the provider is no longer configured", () => {
+    const markup = renderToStaticMarkup(createElement(AssessmentDetail, {
+      role: "member",
+      detail: detailWithSummaryState("complete", "Keep your elbow steady through the next set."),
+      summaryProviderConfigured: false,
+    }));
+
+    expect(markup).toContain("Coach summary");
+    expect(markup).toContain("Keep your elbow steady through the next set.");
+    expect(markup).not.toContain("Written summary unavailable");
+    expect(markup).toContain("82%");
   });
 
   it("counts empty and legacy clean flags as clean and deduplicates faults once per rep", () => {
