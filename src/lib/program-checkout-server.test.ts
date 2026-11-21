@@ -171,9 +171,12 @@ describe("Program Checkout app contracts", () => {
     expect(() => buildProgramCheckoutReturnUrls({ siteUrl: "https://user@attacker.test", programId, orderId })).toThrow();
     expect(() => buildProgramCheckoutReturnUrls({ siteUrl: "http://localhost:3000", programId, orderId })).toThrow();
     expect(isStrictStripeCheckoutUrl("https://checkout.stripe.com/c/pay/cs_test_123" )).toBe(true);
+    expect(isStrictStripeCheckoutUrl("https://checkout.stripe.com/c/pay/cs_test_123#fidkdWxOYHwnPyd1blpxYHZxWjA0SDdPUW5JbmFMck1wMmx9N2B%2F" )).toBe(true);
     expect(isStrictStripeCheckoutUrl("https://checkout.stripe.com.attacker.test/c/pay" )).toBe(false);
     expect(isStrictStripeCheckoutUrl("https://user@checkout.stripe.com/c/pay" )).toBe(false);
-    expect(isStrictStripeCheckoutUrl("https://checkout.stripe.com/c/pay#fragment" )).toBe(false);
+    expect(isStrictStripeCheckoutUrl("http://checkout.stripe.com/c/pay#fidkdWxOYHwnPyd1" )).toBe(false);
+    expect(isStrictStripeCheckoutUrl("https://checkout.stripe.com:8443/c/pay#fidkdWxOYHwnPyd1" )).toBe(false);
+    expect(isStrictStripeCheckoutUrl("https://checkout.stripe.com:444/c/pay#fidkdWxOYHwnPyd1" )).toBe(false);
   });
 
   it("keeps the feature disabled by default without creating auth, service, or provider clients", async () => {
@@ -419,7 +422,8 @@ describe("Program Checkout app contracts", () => {
       livemode: false, providerScope: scope,
     };
     const newSession = {
-      id: "cs_program_retry", url: "https://checkout.stripe.com/c/pay/cs_program_retry",
+      id: "cs_program_retry",
+      url: "https://checkout.stripe.com/c/pay/cs_program_retry#fidkdWxOYHwnPyd1blpxYHZxWjA0SDdPUW5JbmFMck1wMmx9N2B%2F",
       customerId: "cus_program", clientReferenceId: secondAttemptId,
       mode: "payment", status: "open", paymentStatus: "unpaid", amountTotal: 12000, currency: "usd",
       paymentIntentId: null,

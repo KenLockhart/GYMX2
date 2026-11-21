@@ -52,7 +52,7 @@ export function isStrictStripeCheckoutUrl(value: unknown): value is string {
   try {
     const url = new URL(value);
     return url.protocol === "https:" && url.hostname === "checkout.stripe.com" &&
-      url.port === "" && !url.username && !url.password && !url.hash;
+      url.port === "" && !url.username && !url.password;
   } catch {
     return false;
   }
