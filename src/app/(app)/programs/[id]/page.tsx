@@ -14,6 +14,7 @@ import { LOCALE_TAG, type Locale } from "@/i18n/config";
 import type { Messages } from "@/i18n/messages";
 import { getLocale, getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
+import { isProgramPaidAuthoringEnabled } from "@/lib/program-authoring-server";
 import { loadProgramProgressSummariesForProgram } from "@/lib/program-progress-data";
 import { parseProgramVersionedProgress } from "@/lib/program-versioned-progress";
 import {
@@ -358,6 +359,11 @@ export default async function ProgramPage({
         <Link href="/programs" className="text-link text-sm">
           {t.back}
         </Link>
+        {isProgramPaidAuthoringEnabled() ? (
+          <Link href={`/programs/${program.id}/manage`} className="text-link text-sm">
+            Paid content and pricing
+          </Link>
+        ) : null}
         <ActionForm action={updateProgram} className="max-w-2xl space-y-3">
           <input type="hidden" name="program_id" value={program.id} />
           <Field

@@ -9,9 +9,13 @@ const mocks = vi.hoisted(() => ({
   getT: vi.fn(),
   getLocale: vi.fn(),
   notFound: vi.fn(),
+  paidAuthoringEnabled: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ requireAccount: mocks.requireAccount }));
+vi.mock("@/lib/program-authoring-server", () => ({
+  isProgramPaidAuthoringEnabled: mocks.paidAuthoringEnabled,
+}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: mocks.createAdminClient,
@@ -52,6 +56,7 @@ import ProgramPage from "./page";
 
 const PROGRAM_ID = "10000000-0000-4000-8000-000000000001";
 const MEMBER_ID = "20000000-0000-4000-8000-000000000002";
+const OWNER_ID = "70000000-0000-4000-8000-000000000007";
 const OPEN_LESSON_ID = "30000000-0000-4000-8000-000000000003";
 const LOCKED_LESSON_ID = "40000000-0000-4000-8000-000000000004";
 
@@ -162,6 +167,7 @@ describe("Program member detail progress", () => {
     mocks.requireAccount.mockResolvedValue({
       profile: { id: MEMBER_ID, role: "member" },
     });
+    mocks.paidAuthoringEnabled.mockReturnValue(false);
     mocks.createClient.mockResolvedValue(makeClient());
     mocks.createAdminClient.mockReturnValue({
       from(table: string) {
@@ -200,6 +206,37 @@ describe("Program member detail progress", () => {
         watch: (title: string) => `Watch ${title}`,
         theVideo: "the video",
         unlocks: (date: string) => `Unlocks ${date}`,
+        program: "Program",
+        programTitle: "Program title",
+        description: "Description",
+        introVideoOptional: "Intro video",
+        noIntroVideo: "No intro video",
+        introVideoHint: "Intro video hint",
+        published: "Published",
+        publishedPlatformHint: "Published platform hint",
+        publishedHint: "Published hint",
+        saveProgram: "Save Program",
+        confirmRemoveDay: (day: number) => `Remove day ${day}?`,
+        removing: "Removing",
+        remove: "Remove",
+        edit: "Edit",
+        addDayN: (day: number) => `Add day ${day}`,
+        membersOn: "Members",
+        nobody: "Nobody",
+        aMember: "A member",
+        currentProgress: (done: number, total: number) => `${done} of ${total}`,
+        confirmDelete: (title: string) => `Delete ${title}?`,
+        deleting: "Deleting",
+        delete: "Delete",
+        day: "Day",
+        dayTitlePlaceholder: "Day title",
+        pillar: "Pillar",
+        choose: "Choose",
+        instructions: "Instructions",
+        videoOptional: "Video (optional)",
+        noVideo: "No video",
+        saveDay: "Save day",
+        addDay: "Add day",
       },
       options: { pillars: { body: "Body", mind: "Mind", spirit: "Spirit" } },
     });
@@ -302,5 +339,24 @@ describe("Program member detail progress", () => {
 
     await expect(renderPage()).rejects.toThrow("NEXT_NOT_FOUND");
     expect(adminQueries).toHaveLength(0);
+  });
+
+  it("shows the authoring link only to the exact owner when the feature is enabled", async () => {
+    mocks.requireAccount.mockResolvedValue({ profile: { id: OWNER_ID, role: "coach" } });
+    mocks.paidAuthoringEnabled.mockReturnValue(true);
+
+    const html = await renderPage();
+
+    expect(html).toContain(`href="/programs/${PROGRAM_ID}/manage"`);
+    expect(html).toContain("Paid content and pricing");
+  });
+
+  it("keeps the authoring link hidden when the feature is disabled", async () => {
+    mocks.requireAccount.mockResolvedValue({ profile: { id: OWNER_ID, role: "coach" } });
+
+    const html = await renderPage();
+
+    expect(html).not.toContain(`/programs/${PROGRAM_ID}/manage`);
+    expect(html).not.toContain("Paid content and pricing");
   });
 });

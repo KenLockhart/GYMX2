@@ -4,6 +4,8 @@ import { requireCoachOrAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createProgramPromotionCommandSchema,
+  discardProgramAuthoringDraftCommandSchema,
+  parseProgramAuthoringDiscarded,
   parseProgramAuthoringPromotion,
   parseProgramAuthoringPublished,
   parseProgramAuthoringSavedDraft,
@@ -13,6 +15,7 @@ import {
   programAuthoringSnapshotCommandSchema,
   saveProgramAuthoringDraftCommandSchema,
   type ProgramAuthoringPromotion,
+  type ProgramAuthoringDiscarded,
   type ProgramAuthoringPublished,
   type ProgramAuthoringResult,
   type ProgramAuthoringSavedDraft,
@@ -93,6 +96,35 @@ export async function saveProgramAuthoringDraft(
       video_id: lesson.videoId,
     })),
   }, parseProgramAuthoringSavedDraft);
+}
+
+export async function discardProgramAuthoringDraft(
+  input: unknown,
+): Promise<ProgramAuthoringResult<ProgramAuthoringDiscarded>> {
+  if (!isProgramPaidAuthoringEnabled()) return { ok: false, reason: "feature_disabled" };
+  const command = discardProgramAuthoringDraftCommandSchema.safeParse(input);
+  if (!command.success) return { ok: false, reason: "invalid_request" };
+  const actor = await getVerifiedActor();
+  if (!actor) return { ok: false, reason: "unavailable" };
+  const result = await callAuthoringRpc("discard_program_authoring_draft", {
+    target_program_id: command.data.programId,
+    target_actor_id: actor.id,
+    target_draft_id: command.data.draftId,
+    target_expected_draft_revision: command.data.expectedDraftRevision,
+    target_expected_content_version_id: command.data.expectedContentVersionId,
+    target_expected_offer_version_id: command.data.expectedOfferVersionId,
+  }, parseProgramAuthoringDiscarded);
+  if (!result.ok) return result;
+  if (result.value.status === "conflict") return { ok: false, reason: "conflict" };
+  return {
+    ok: true,
+    value: {
+      status: result.value.status,
+      programId: result.value.programId,
+      draftId: result.value.draftId,
+      draftRevision: result.value.draftRevision,
+    },
+  };
 }
 
 export async function publishProgramAuthoringDraft(

@@ -12,6 +12,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdminCli
 
 import {
   createProgramPromotion,
+  discardProgramAuthoringDraft,
   isProgramPaidAuthoringEnabled,
   loadProgramAuthoringSnapshot,
   publishProgramAuthoringDraft,
@@ -104,6 +105,10 @@ describe("Program authoring server adapter", () => {
       reason: "feature_disabled",
     });
     await expect(publishProgramOfferPrice({})).resolves.toEqual({
+      ok: false,
+      reason: "feature_disabled",
+    });
+    await expect(discardProgramAuthoringDraft({})).resolves.toEqual({
       ok: false,
       reason: "feature_disabled",
     });
@@ -208,6 +213,45 @@ describe("Program authoring server adapter", () => {
         video_id: videoId,
       }],
     });
+  });
+
+  it("discards only the exact authenticated owner draft and fails closed on a replacement conflict", async () => {
+    process.env.PROGRAM_PAID_AUTHORING_ENABLED = "true";
+    mocks.rpc.mockResolvedValue({
+      data: {
+        status: "discarded",
+        program_id: programId,
+        draft_id: draftId,
+        draft_revision: 3,
+      },
+      error: null,
+    });
+    mocks.createAdminClient.mockReturnValue({ rpc: mocks.rpc });
+    const command = {
+      programId,
+      draftId,
+      expectedDraftRevision: 3,
+      expectedContentVersionId: contentId,
+      expectedOfferVersionId: offerId,
+    };
+    await expect(discardProgramAuthoringDraft(command)).resolves.toEqual({
+      ok: true,
+      value: { status: "discarded", programId, draftId, draftRevision: 3 },
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith("discard_program_authoring_draft", {
+      target_program_id: programId,
+      target_actor_id: actorId,
+      target_draft_id: draftId,
+      target_expected_draft_revision: 3,
+      target_expected_content_version_id: contentId,
+      target_expected_offer_version_id: offerId,
+    });
+
+    mocks.rpc.mockResolvedValue({
+      data: { status: "conflict", program_id: programId, draft_id: draftId },
+      error: null,
+    });
+    await expect(discardProgramAuthoringDraft(command)).resolves.toEqual({ ok: false, reason: "conflict" });
   });
 
   it("maps a content publication to the reviewed CAS and never accepts posted seller facts", async () => {

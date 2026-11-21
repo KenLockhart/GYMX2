@@ -44,6 +44,14 @@ export const saveProgramAuthoringDraftCommandSchema = z.object({
   lessons: lessonsSchema,
 }).strict();
 
+export const discardProgramAuthoringDraftCommandSchema = z.object({
+  programId: uuidSchema,
+  draftId: uuidSchema,
+  expectedDraftRevision: positiveIntegerSchema,
+  expectedContentVersionId: uuidSchema,
+  expectedOfferVersionId: uuidSchema,
+}).strict();
+
 export const publishProgramAuthoringDraftCommandSchema = z.object({
   programId: uuidSchema,
   draftId: uuidSchema,
@@ -197,6 +205,13 @@ export type ProgramAuthoringSavedDraft = {
   lessonCount: number;
 };
 
+export type ProgramAuthoringDiscarded = {
+  status: "discarded" | "already_absent";
+  programId: string;
+  draftId: string;
+  draftRevision: number;
+};
+
 export type ProgramAuthoringPublished = {
   status: "published";
   programId: string;
@@ -230,7 +245,7 @@ export type ProgramAuthoringPromotion = {
 
 export type ProgramAuthoringResult<T> =
   | { ok: true; value: T }
-  | { ok: false; reason: "feature_disabled" | "invalid_request" | "unavailable" };
+  | { ok: false; reason: "feature_disabled" | "invalid_request" | "unavailable" | "conflict" };
 
 export function parseProgramAuthoringSavedDraft(value: unknown): ProgramAuthoringSavedDraft | null {
   const parsed = z.object({
@@ -252,6 +267,35 @@ export function parseProgramAuthoringSavedDraft(value: unknown): ProgramAuthorin
     baseOfferVersionId: parsed.data.base_offer_version_id,
     lessonCount: parsed.data.lesson_count,
   };
+}
+
+export function parseProgramAuthoringDiscarded(value: unknown): ProgramAuthoringDiscarded | {
+  status: "conflict";
+  programId: string;
+  draftId: string;
+} | null {
+  const success = z.object({
+    status: z.enum(["discarded", "already_absent"]),
+    program_id: uuidSchema,
+    draft_id: uuidSchema,
+    draft_revision: positiveIntegerSchema,
+  }).strict().safeParse(value);
+  if (success.success) {
+    return {
+      status: success.data.status,
+      programId: success.data.program_id,
+      draftId: success.data.draft_id,
+      draftRevision: success.data.draft_revision,
+    };
+  }
+  const conflict = z.object({
+    status: z.literal("conflict"),
+    program_id: uuidSchema,
+    draft_id: uuidSchema,
+  }).strict().safeParse(value);
+  return conflict.success
+    ? { status: "conflict", programId: conflict.data.program_id, draftId: conflict.data.draft_id }
+    : null;
 }
 
 export function parseProgramAuthoringPublished(value: unknown): ProgramAuthoringPublished | null {
