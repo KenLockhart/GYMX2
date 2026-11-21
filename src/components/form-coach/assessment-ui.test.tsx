@@ -1,9 +1,12 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AssessmentDetail } from "./assessment-detail";
 import { AssessmentList } from "./assessment-list";
+import type { FormCoachReviewAction } from "./assessment-review-form";
 import type { FormCoachWorkflowDetail } from "@/lib/form-coach/workflow-contracts";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const assessmentId = "f1000000-0000-4000-8000-000000000003";
 const memberId = "f1000000-0000-4000-8000-000000000002";
@@ -239,5 +242,73 @@ describe("Form Coach assessment views", () => {
 
     expect(markup).toContain(`/members/${memberId}`);
     expect(markup).toContain("Open member profile");
+  });
+
+  it("shows coach review controls only from the review projection and against finished attempts", () => {
+    const reviewAction: FormCoachReviewAction = async () => ({ outcome: "idle" });
+    const reviewDetail = {
+      ...detail,
+      items: detail.items.map((item) => ({
+        ...item,
+        expected_review_sequence: 3,
+        can_review: true,
+        can_open_retry: true,
+        max_extra_attempts: 2,
+      })),
+    };
+    const markup = renderToStaticMarkup(createElement(AssessmentDetail, {
+      role: "coach",
+      detail: reviewDetail,
+      reviewAction,
+    }));
+
+    expect(markup).toContain("Coach review controls");
+    expect(markup).toContain("Review finished attempt 1");
+    expect(markup).toContain('name="expected_review_sequence" value="3"');
+    expect(markup).toContain("Save review");
+  });
+
+  it("keeps authorized history visible when review controls are unavailable", () => {
+    const reviewDetail = {
+      ...detail,
+      items: detail.items.map((item) => ({
+        ...item,
+        expected_review_sequence: 1,
+        can_review: false,
+        can_open_retry: false,
+        max_extra_attempts: 0,
+      })),
+    };
+    const markup = renderToStaticMarkup(createElement(AssessmentDetail, {
+      role: "coach",
+      detail: reviewDetail,
+      reviewAction: async () => ({ outcome: "idle" as const }),
+    }));
+
+    expect(markup).toContain("Best finished attempt");
+    expect(markup).toContain("Review controls are currently unavailable");
+    expect(markup).not.toContain('name="verdict"');
+  });
+
+  it("never renders coach review forms to the member route even if given a review projection", () => {
+    const reviewDetail = {
+      ...detail,
+      items: detail.items.map((item) => ({
+        ...item,
+        expected_review_sequence: 1,
+        can_review: true,
+        can_open_retry: true,
+        max_extra_attempts: 2,
+      })),
+    };
+    const markup = renderToStaticMarkup(createElement(AssessmentDetail, {
+      role: "member",
+      detail: reviewDetail,
+      reviewAction: async () => ({ outcome: "idle" as const }),
+    }));
+
+    expect(markup).toContain("Latest coach feedback");
+    expect(markup).not.toContain('name="verdict"');
+    expect(markup).not.toContain("Coach review controls");
   });
 });

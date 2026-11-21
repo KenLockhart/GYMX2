@@ -1,6 +1,6 @@
 # Form Coach assessment pages
 
-The assessment pages provide read-only queue and history views over the authenticated Form Coach RPCs.
+The assessment pages provide a coach queue, member inbox, numeric results, and current coach review controls over the authenticated Form Coach RPCs.
 
 ## Pages
 
@@ -13,8 +13,16 @@ Both lists request at most 20 rows per page. Due timestamps display their stored
 
 ## Read boundaries
 
-`workflow-server.ts` uses the authenticated Supabase client for queue and detail reads. The server validates the RPC output against strict DTO schemas before rendering it. Each detail page pins the expected account role before calling the shared detail reader; the detail RPC also enforces current coach membership or member ownership. Only a coach detail response that includes an authorized `member_id` can produce a member-profile link. Admin and moderator roles have no alternate assessment view.
+`workflow-server.ts` and `review-server.ts` use the authenticated Supabase client for queue and detail reads. The server validates each RPC output against a strict DTO before rendering it. The member detail reader pins the expected member role; the coach review reader requires the current coach role, and its RPC reuses the current coach-link and ownership checks from the shared detail contract. Only a coach detail response that includes an authorized `member_id` can produce a member-profile link. Admin and moderator roles have no alternate assessment view.
 
-The pages render only fields returned in the narrow workflow DTOs: assessment status and dates, exercise setup, finished numeric scores and form flags, summary state, and latest coach feedback. They do not render member identifiers, storage paths, clip URLs, or media. Reference assets are not signed by these pages.
+The member pages render only fields returned in the narrow workflow DTOs: assessment status and dates, exercise setup, finished numeric scores and form flags, summary state, and latest coach feedback. Coach detail uses a separate typed review projection that adds the current per-item review sequence and bounded capability flags. It reuses the existing privacy-filtered detail RPC and returns no review sequence to members. Neither role receives storage paths or clip URLs, and reference assets are not signed by these pages.
 
-The current UI is read-only. It does not offer session setup, attempt start/resume, or coach review submission. Those actions require their own complete interaction and sequence checks. Missing or unauthorized details use the same generic unavailable-to-this-account copy so the page does not reveal another member's assessment.
+## Coach review
+
+For an eligible item, the coach can record Learned or Needs Work against a specific finished attempt, with up to 1000 characters of optional feedback. A Needs Work review can optionally open a bounded retry window on the existing assessment. The form posts its displayed review sequence and a per-form idempotency UUID; the server verifies the selected item and finished attempt through the authenticated coach projection, then calls the existing `record_form_coach_review` RPC without replacing that sequence. The database remains authoritative for current coach membership, deletion fences, funding, feature availability, retry limits, exact request replay, and compare-and-swap.
+
+After a recorded review or exact replay, the coach detail and member history paths are revalidated. The database queues an internal notification event, but this UI does not claim that a message was delivered. Starting or resuming attempts and assessment setup remain separate interactions. Feature-disabled and otherwise ineligible history stays readable while review controls are withheld. Missing or unauthorized details use the same generic unavailable-to-this-account copy so the page does not reveal another member's assessment.
+
+## Validation scope
+
+Local validation passed 33 rollback-only database assertions, 34 mocked UI and server tests, and an isolated ReactDOM fixture for saved, uncertain, retry, and rejected-action lifecycles. The browser fixture used synthetic actions only; it did not validate a live Next.js request, Supabase Auth session, notification delivery, or external provider execution.

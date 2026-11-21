@@ -1,8 +1,11 @@
 import Link from "next/link";
 import type { FormCoachWorkflowDetail } from "@/lib/form-coach/workflow-contracts";
+import type { FormCoachReviewDetail } from "@/lib/form-coach/review-contracts";
+import { AssessmentReviewForm, type FormCoachReviewAction } from "./assessment-review-form";
 
 type ViewerRole = "coach" | "member";
-type AssessmentItem = FormCoachWorkflowDetail["items"][number];
+type AssessmentItem = FormCoachWorkflowDetail["items"][number] | FormCoachReviewDetail["items"][number];
+type ReviewItem = FormCoachReviewDetail["items"][number];
 type Attempt = AssessmentItem["attempts"][number];
 type FinishedAttempt = Attempt & { state: "finished" };
 type AttemptResult = NonNullable<Attempt["result"]>;
@@ -192,7 +195,17 @@ function RepScoreTable({ reps }: { reps: readonly RepResult[] }) {
   );
 }
 
-function ItemHistory({ item }: { item: AssessmentItem }) {
+function ItemHistory({
+  assessmentId,
+  item,
+  reviewItem,
+  reviewAction,
+}: {
+  assessmentId: string;
+  item: AssessmentItem;
+  reviewItem: ReviewItem | null;
+  reviewAction?: FormCoachReviewAction;
+}) {
   const attempts = resultAttempts(item);
   const best = bestAttempt(attempts);
   const faultSummary = faultCounts(attempts);
@@ -262,6 +275,32 @@ function ItemHistory({ item }: { item: AssessmentItem }) {
           </div>
           {item.latest_review.feedback ? <p className="mt-2 whitespace-pre-wrap text-sm">{item.latest_review.feedback}</p> : (
             <p className="mt-2 text-sm text-muted">No written feedback was added.</p>
+          )}
+        </section>
+      )}
+
+      {reviewItem && reviewAction && (
+        <section className="space-y-3" aria-label="Coach review controls">
+          {reviewItem.can_review ? (
+            item.attempts.filter(isFinished).map((attempt) => (
+              <AssessmentReviewForm
+                key={attempt.attempt_id}
+                assessmentId={assessmentId}
+                itemId={item.item_id}
+                attemptId={attempt.attempt_id}
+                attemptNumber={attempt.attempt_number}
+                expectedReviewSequence={reviewItem.expected_review_sequence}
+                requestId={crypto.randomUUID()}
+                canReview={reviewItem.can_review}
+                canOpenRetry={reviewItem.can_open_retry}
+                maxExtraAttempts={reviewItem.max_extra_attempts}
+                action={reviewAction}
+              />
+            ))
+          ) : (
+            <p className="rounded-lg border border-border bg-surface-raised p-3 text-sm text-muted">
+              Review controls are currently unavailable for this exercise.
+            </p>
           )}
         </section>
       )}
@@ -381,9 +420,11 @@ function ItemHistory({ item }: { item: AssessmentItem }) {
 export function AssessmentDetail({
   role,
   detail,
+  reviewAction,
 }: {
   role: ViewerRole;
-  detail: FormCoachWorkflowDetail;
+  detail: FormCoachWorkflowDetail | FormCoachReviewDetail;
+  reviewAction?: FormCoachReviewAction;
 }) {
   const backHref = role === "coach" ? "/form-coach/assessments" : "/form-checks";
   const title = detail.source_kind === "manual" ? "Manual Form Check" : detail.program_title ?? "Program assessment";
@@ -430,9 +471,11 @@ export function AssessmentDetail({
           )}
         </dl>
 
-        <p className="rounded-lg border border-border bg-surface p-3 text-sm text-muted">
-          This page shows assessment details, results and feedback. Starting attempts and submitting reviews are not available here.
-        </p>
+        {role === "member" && (
+          <p className="rounded-lg border border-border bg-surface p-3 text-sm text-muted">
+            This page shows assessment details, results and feedback. Starting attempts and submitting reviews are not available here.
+          </p>
+        )}
       </header>
 
       <section className="space-y-4" aria-labelledby="exercise-history-heading">
@@ -440,7 +483,15 @@ export function AssessmentDetail({
           <h2 id="exercise-history-heading" className="text-3xl">Exercise results and history</h2>
           <p className="mt-1 text-sm text-muted">Scores and form metrics come from finished attempts recorded for this assessment.</p>
         </div>
-        {detail.items.map((item) => <ItemHistory key={item.ordinal} item={item} />)}
+        {detail.items.map((item) => (
+          <ItemHistory
+            key={item.ordinal}
+            assessmentId={detail.assessment_id}
+            item={item}
+            reviewItem={role === "coach" && "expected_review_sequence" in item ? item : null}
+            reviewAction={reviewAction}
+          />
+        ))}
       </section>
     </div>
   );
