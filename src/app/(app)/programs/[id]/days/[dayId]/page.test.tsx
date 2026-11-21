@@ -60,6 +60,53 @@ const VIDEO = {
   cloudflare_uid: "cloudflare-uid",
   status: "ready",
 };
+const LEGACY_PROGRESS = {
+  program_id: PROGRAM_ID,
+  member_id: MEMBER_ID,
+  program_title: "Foundation",
+  program_uses_versions: false,
+  mode: "legacy_free",
+  access_authorized: true,
+  enrollment_id: ENROLLMENT.id,
+  content_version_id: null,
+  started_on: ENROLLMENT.started_on,
+  access_started_on: null,
+  eastern_today: "2026-11-18",
+  timeline_ceiling: 1,
+  paid_ceiling: 1,
+  lesson_ceiling: 1,
+  cleared_installments: 0,
+  installment_count: 0,
+  fully_funded: false,
+  required_count: 1,
+  current_completed_count: 0,
+  lifetime_completed_count: 0,
+  required_lessons: [
+    {
+      id: DAY_ID,
+      source_day_id: DAY_ID,
+      lesson_ordinal: 1,
+      timeline_day_number: 1,
+      title: "Day One",
+      pillar: "body",
+    },
+  ],
+  accessible_lessons: [
+    {
+      id: DAY_ID,
+      source_day_id: DAY_ID,
+      lesson_ordinal: 1,
+      timeline_day_number: 1,
+      title: "Day One",
+      pillar: "body",
+      instructions: "Start slowly.",
+    },
+  ],
+  accessible_lesson_ids: [DAY_ID],
+  current_completed_lesson_ids: [],
+  completed_once: [],
+  history: [],
+};
 
 type QueryRecord = { table: string; filters: [string, unknown][] };
 
@@ -71,6 +118,10 @@ let viewer: { id: string; role: "member" | "coach" | "admin" | "moderator" };
 
 function clientFor(rows: Map<string, unknown>, queries: QueryRecord[]) {
   return {
+    rpc: vi.fn(async (name: string) => ({
+      data: name === "get_program_versioned_progress" ? rows.get("progress") ?? null : null,
+      error: null,
+    })),
     from(table: string) {
       const record: QueryRecord = { table, filters: [] };
       queries.push(record);
@@ -104,6 +155,8 @@ describe("program day playback route", () => {
     userRows.set("programs", PROGRAM);
     userRows.set("program_days", DAY);
     userRows.set("program_enrollments", ENROLLMENT);
+    userRows.set("progress", LEGACY_PROGRESS);
+    adminRows.set("program_days", DAY);
     adminRows.set("videos", VIDEO);
     mocks.requireAccount.mockImplementation(async () => ({ profile: viewer }));
     mocks.createClient.mockImplementation(async () =>
@@ -145,13 +198,6 @@ describe("program day playback route", () => {
         ["program_id", PROGRAM_ID],
       ],
     });
-    expect(userQueries[2]).toMatchObject({
-      table: "program_enrollments",
-      filters: [
-        ["program_id", PROGRAM_ID],
-        ["member_id", MEMBER_ID],
-      ],
-    });
     expect(adminQueries[0]).toMatchObject({
       table: "videos",
       filters: [
@@ -162,8 +208,8 @@ describe("program day playback route", () => {
     });
   });
 
-  it("does not sign or load a video for an unenrolled member", async () => {
-    userRows.set("program_enrollments", null);
+  it("does not sign or load a video without a verified progress projection", async () => {
+    userRows.set("progress", null);
 
     await expect(callPage()).rejects.toThrow("NEXT_NOT_FOUND");
     expect(adminQueries).toHaveLength(0);
@@ -171,15 +217,27 @@ describe("program day playback route", () => {
   });
 
   it("rejects a locked day before loading its private video", async () => {
-    userRows.set("program_days", {
-      ...DAY,
-      day_number: 2,
+    userRows.set("progress", {
+      ...LEGACY_PROGRESS,
+      accessible_lesson_ids: [],
+      accessible_lessons: [],
     });
 
     await expect(callPage()).rejects.toThrow("NEXT_NOT_FOUND");
     expect(adminQueries).toHaveLength(0);
     expect(mocks.getPlayerUrl).not.toHaveBeenCalled();
   });
+
+  it.each(["free_snapshot", "paid_order"] as const)(
+    "does not expose versioned %s media through the legacy playback route",
+    async (mode) => {
+      userRows.set("progress", { ...LEGACY_PROGRESS, mode });
+
+      await expect(callPage()).rejects.toThrow("NEXT_NOT_FOUND");
+      expect(adminQueries).toHaveLength(0);
+      expect(mocks.getPlayerUrl).not.toHaveBeenCalled();
+    },
+  );
 
   it("rejects programs hidden from this signed-in viewer", async () => {
     userRows.set("programs", null);
@@ -199,11 +257,8 @@ describe("program day playback route", () => {
     expect(adminQueries).toHaveLength(0);
   });
 
-  it("rejects an enrollment that belongs to another member", async () => {
-    userRows.set("program_enrollments", {
-      ...ENROLLMENT,
-      member_id: OTHER_ID,
-    });
+  it("rejects a progress projection for another member", async () => {
+    userRows.set("progress", { ...LEGACY_PROGRESS, member_id: OTHER_ID });
 
     await expect(callPage()).rejects.toThrow("NEXT_NOT_FOUND");
     expect(adminQueries).toHaveLength(0);
@@ -241,12 +296,31 @@ describe("program day playback route", () => {
 
   it("lets admins preview a program without member enrollment", async () => {
     viewer = { id: OTHER_ID, role: "admin" };
+    userRows.delete("program_days");
 
     await callPage();
 
     expect(userQueries.some(({ table }) => table === "program_enrollments")).toBe(
       false,
     );
+    expect(userQueries.map(({ table }) => table)).toEqual(["programs"]);
+    expect(adminQueries.map(({ table }) => table)).toEqual([
+      "program_days",
+      "videos",
+    ]);
     expect(mocks.getPlayerUrl).toHaveBeenCalledWith("cloudflare-uid");
+  });
+
+  it("does not elevate another coach to an admin day lookup", async () => {
+    viewer = { id: OTHER_ID, role: "coach" };
+
+    await expect(callPage()).rejects.toThrow("NEXT_NOT_FOUND");
+
+    expect(userQueries.map(({ table }) => table)).toEqual([
+      "programs",
+      "program_days",
+    ]);
+    expect(adminQueries).toHaveLength(0);
+    expect(mocks.getPlayerUrl).not.toHaveBeenCalled();
   });
 });

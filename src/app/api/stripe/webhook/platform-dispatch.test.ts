@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   recordRefundFromCharge: vi.fn(),
   releasePlatformCheckout: vi.fn(),
   syncPlatformSubscriptionById: vi.fn(),
+  dispatchFormCoachStripeEvent: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -30,6 +31,9 @@ vi.mock("@/lib/refunds", () => ({
 vi.mock("@/lib/platform-membership-server", () => ({
   releasePlatformCheckout: mocks.releasePlatformCheckout,
   syncPlatformSubscriptionById: mocks.syncPlatformSubscriptionById,
+}));
+vi.mock("@/lib/form-coach/stripe-webhook-server", () => ({
+  dispatchFormCoachStripeEvent: mocks.dispatchFormCoachStripeEvent,
 }));
 
 const WEBHOOK_SECRET = "whsec_synthetic_test_only";
@@ -69,6 +73,7 @@ async function postSignedWebhook() {
 }
 
 function expectNoBusinessDispatch() {
+  expect(mocks.dispatchFormCoachStripeEvent).not.toHaveBeenCalled();
   expect(mocks.syncPlatformSubscriptionById).not.toHaveBeenCalled();
   expect(mocks.releasePlatformCheckout).not.toHaveBeenCalled();
   expect(mocks.syncSubscription).not.toHaveBeenCalled();
@@ -88,6 +93,7 @@ beforeEach(() => {
   mocks.recordRefundFromCharge.mockResolvedValue(undefined);
   mocks.releasePlatformCheckout.mockResolvedValue(undefined);
   mocks.syncPlatformSubscriptionById.mockResolvedValue(undefined);
+  mocks.dispatchFormCoachStripeEvent.mockResolvedValue(false);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
@@ -308,6 +314,60 @@ describe("platform membership dispatch", () => {
     expect(response.status).toBe(500);
     expect(mocks.syncPlatformSubscriptionById).toHaveBeenCalledTimes(1);
     expect(mocks.syncSubscription).not.toHaveBeenCalled();
+    expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
+    expect(mocks.recordPurchase).not.toHaveBeenCalled();
+  });
+});
+
+describe("Form Coach namespace dispatch", () => {
+  it("claims a connected-account Form Coach event before generic membership handlers", async () => {
+    const event = prepareEvent("checkout.session.completed", {
+      id: "cs_form_coach_synthetic",
+      mode: "subscription",
+      metadata: { feature_namespace: "form_coach", feature_key: "form_coach" },
+    });
+    (event as unknown as { account: string }).account = "acct_connected_synthetic";
+    mocks.dispatchFormCoachStripeEvent.mockResolvedValue(true);
+
+    const response = await postSignedWebhook();
+
+    expect(response.status).toBe(200);
+    expect(mocks.dispatchFormCoachStripeEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.dispatchFormCoachStripeEvent).toHaveBeenCalledWith(event);
+    expect(mocks.syncSubscriptionById).not.toHaveBeenCalled();
+    expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
+    expect(mocks.recordPurchase).not.toHaveBeenCalled();
+  });
+
+  it("preserves the existing handler for an unrelated connected-account subscription", async () => {
+    const subscription = {
+      id: "sub_unrelated_connect_synthetic",
+      metadata: { kind: "legacy_connect_subscription" },
+    };
+    const event = prepareEvent("customer.subscription.updated", subscription);
+    (event as unknown as { account: string }).account = "acct_connected_synthetic";
+    mocks.dispatchFormCoachStripeEvent.mockResolvedValue(false);
+
+    const response = await postSignedWebhook();
+
+    expect(response.status).toBe(200);
+    expect(mocks.dispatchFormCoachStripeEvent).toHaveBeenCalledWith(event);
+    expect(mocks.syncSubscription).toHaveBeenCalledWith(subscription);
+    expect(mocks.recordPurchase).not.toHaveBeenCalled();
+    expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
+  });
+
+  it("asks Stripe to retry without falling through when reconciliation fails", async () => {
+    prepareEvent("invoice.paid", {
+      id: "in_form_coach_synthetic",
+      metadata: { feature_namespace: "form_coach" },
+    });
+    mocks.dispatchFormCoachStripeEvent.mockRejectedValue(new Error("sanitized test error"));
+
+    const response = await postSignedWebhook();
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("Could not reconcile billing");
     expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
     expect(mocks.recordPurchase).not.toHaveBeenCalled();
   });

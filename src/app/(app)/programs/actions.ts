@@ -7,7 +7,6 @@ import { isPillar } from "@/lib/achievements";
 import { syncProgressQuietly } from "@/lib/achievements-data";
 import { requireAccount, requireCoachOrAdmin } from "@/lib/auth";
 import { canUseProgramIntroVideo } from "@/lib/programs";
-import { todayKey } from "@/lib/reminders";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 import { idSchema } from "@/lib/validation";
@@ -146,22 +145,12 @@ export async function deleteProgram(
   _: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { profile } = await requireCoachOrAdmin();
+  await requireCoachOrAdmin();
   const id = idSchema.safeParse(formData.get("program_id"));
   if (!id.success) return { error: "Choose a program." };
   const supabase = await createClient();
-  const { data: program } = await supabase
-    .from("programs")
-    .select("coach_id, platform_owned")
-    .eq("id", id.data)
-    .maybeSingle();
-  if (!ownsProgramForRole(profile, program))
-    return { error: "We couldn't delete the program. Please try again." };
   const { error } = await supabase
-    .from("programs")
-    .delete()
-    .eq("id", id.data)
-    .eq("coach_id", profile.id);
+    .rpc("delete_owned_program", { target_program_id: id.data });
   if (error)
     return { error: "We couldn't delete the program. Please try again." };
   revalidatePath("/programs");
@@ -205,15 +194,17 @@ export async function saveProgramDay(
   if (row.video_id && !(await ownedReadyProgramVideo(profile.id, row.video_id))) {
     return { error: "Choose one of your ready videos." };
   }
-  const { error } = dayId
-    ? await supabase
-        .from("program_days")
-        .update(row)
-        .eq("id", dayId)
-        .eq("program_id", programId.data)
-    : await supabase
-        .from("program_days")
-        .insert({ ...row, program_id: programId.data });
+  const parsedDayId = dayId ? idSchema.safeParse(dayId) : null;
+  if (dayId && !parsedDayId?.success) return { error: "Choose a day." };
+  const { error } = await supabase.rpc("save_owned_program_day", {
+    target_program_id: programId.data,
+    target_day_id: parsedDayId?.success ? parsedDayId.data : null,
+    target_day_number: row.day_number,
+    target_title: row.title,
+    target_instructions: row.instructions,
+    target_pillar: row.pillar,
+    target_video_id: row.video_id,
+  });
   if (error) {
     return {
       error:
@@ -242,11 +233,10 @@ export async function deleteProgramDay(
     .maybeSingle();
   if (!ownsProgramForRole(profile, program))
     return { error: "We couldn't remove that day." };
-  const { error } = await supabase
-    .from("program_days")
-    .delete()
-    .eq("id", dayId.data)
-    .eq("program_id", programId.data);
+  const { error } = await supabase.rpc("delete_owned_program_day", {
+    target_program_id: programId.data,
+    target_day_id: dayId.data,
+  });
   if (error) return { error: "We couldn't remove that day." };
   revalidatePath(`/programs/${programId.data}`);
   return {};
@@ -256,18 +246,14 @@ export async function startProgram(
   _: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { profile } = await requireAccount();
+  await requireAccount();
   const id = idSchema.safeParse(formData.get("program_id"));
   if (!id.success) return { error: "Choose a program." };
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("program_enrollments")
-    .insert({
-      program_id: id.data,
-      member_id: profile.id,
-      started_on: todayKey(),
-    });
-  if (error && error.code !== "23505")
+  const { error } = await supabase.rpc("start_my_program_enrollment", {
+    target_program_id: id.data,
+  });
+  if (error)
     return { error: "We couldn't start that program. Please try again." };
   revalidatePath("/programs");
   redirect(`/programs/${id.data}`);
@@ -277,15 +263,13 @@ export async function leaveProgram(
   _: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { profile } = await requireAccount();
+  await requireAccount();
   const id = idSchema.safeParse(formData.get("enrollment_id"));
   if (!id.success) return { error: "Choose a program." };
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("program_enrollments")
-    .delete()
-    .eq("id", id.data)
-    .eq("member_id", profile.id);
+  const { error } = await supabase.rpc("leave_my_program_enrollment", {
+    target_enrollment_id: id.data,
+  });
   if (error)
     return { error: "We couldn't leave that program. Please try again." };
   revalidatePath("/programs");
@@ -298,28 +282,22 @@ export async function setProgramDayDone(
   formData: FormData,
 ): Promise<ActionState> {
   const { profile } = await requireAccount();
-  const enrollmentId = idSchema.safeParse(formData.get("enrollment_id"));
   const dayId = idSchema.safeParse(formData.get("day_id"));
-  const programId = String(formData.get("program_id") ?? "");
-  if (!enrollmentId.success || !dayId.success)
+  const operationId = idSchema.safeParse(formData.get("operation_id"));
+  const programId = idSchema.safeParse(formData.get("program_id"));
+  const doneValue = formData.get("done");
+  if (!dayId.success || !operationId.success || !programId.success || (doneValue !== "true" && doneValue !== "false"))
     return { error: "Choose a day." };
-  const isDone = formData.get("done") === "true";
+  const isDone = doneValue === "true";
 
   const supabase = await createClient();
-  const { error } = isDone
-    ? await supabase
-        .from("program_day_completions")
-        .insert({
-          enrollment_id: enrollmentId.data,
-          day_id: dayId.data,
-          member_id: profile.id,
-        })
-    : await supabase
-        .from("program_day_completions")
-        .delete()
-        .eq("enrollment_id", enrollmentId.data)
-        .eq("day_id", dayId.data);
-  if (error && error.code !== "23505") {
+  const { data, error } = await supabase.rpc("set_my_program_lesson_state", {
+    target_program_id: programId.data,
+    target_lesson_id: dayId.data,
+    target_done: isDone,
+    target_operation_id: operationId.data,
+  });
+  if (error) {
     return {
       error:
         error.code === "42501"
@@ -327,7 +305,12 @@ export async function setProgramDayDone(
           : "We couldn't save that. Please try again.",
     };
   }
-  if (isDone) after(() => syncProgressQuietly(profile));
-  revalidatePath(`/programs/${programId}`);
-  return isDone ? { message: "Nice work! +3 points." } : {};
+  if (!data || typeof data !== "object" || !("accepted" in data) || data.accepted !== true) {
+    return { error: "We couldn't save that. Please try again." };
+  }
+  if (isDone && data.replayed !== true && data.current_completed === true) {
+    after(() => syncProgressQuietly(profile));
+  }
+  revalidatePath(`/programs/${programId.data}`);
+  return { message: "Saved." };
 }

@@ -62,6 +62,32 @@ describe("menus", () => {
     ].map((i) => i.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
+  it("lists Form Coach pricing under admin Commerce and never exposes it to other roles", () => {
+    const href = "/admin/monetization/feature-pricing";
+    expect(ADMIN_NAV.groups.find((group) => group.title === "Commerce")?.items.map((item) => item.href)).toContain(href);
+    expect(allDestinations("admin").some((item) => item.href === href)).toBe(true);
+    for (const role of ["member", "coach", "moderator"] as const) {
+      expect(allDestinations(role).some((item) => item.href === href)).toBe(false);
+    }
+  });
+
+  it("keeps Form Coach billing reachable from the account menu for every signed-in role", () => {
+    for (const role of roles) {
+      expect(menuGroups(role).find((group) => group.title === "Account")?.items.map((entry) => entry.href))
+        .toContain("/billing/form-coach");
+    }
+  });
+
+  it("shows assessment navigation only to coaches and member Form Checks only to members", () => {
+    expect(allDestinations("coach").some((item) => item.href === "/form-coach/assessments")).toBe(true);
+    expect(allDestinations("member").some((item) => item.href === "/form-checks")).toBe(true);
+    for (const role of ["member", "moderator", "admin"] as const) {
+      expect(allDestinations(role).some((item) => item.href === "/form-coach/assessments")).toBe(false);
+    }
+    for (const role of ["coach", "moderator", "admin"] as const) {
+      expect(allDestinations(role).some((item) => item.href === "/form-checks")).toBe(false);
+    }
+  });
 });
 
 describe("isActive", () => {

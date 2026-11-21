@@ -9,6 +9,7 @@ import { getCurrentAccount } from "@/lib/auth";
 import { goalLabel } from "@/lib/onboarding";
 import { weeksLabel } from "@/lib/programs";
 import { ratingSummary, reviewerName, stars } from "@/lib/public-pages";
+import { loadProgramCatalogLessonCounts } from "@/lib/program-progress-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 
@@ -133,6 +134,16 @@ export default async function PublicCoachPage({
     description: string;
     program_days: { count: number }[];
   }[];
+  const catalogCounts = await loadProgramCatalogLessonCounts(
+    programs.map((program) => ({
+      id: program.id,
+      dayCount: program.program_days[0]?.count ?? 0,
+    })),
+  );
+  const programsWithCounts = programs.map((program) => ({
+    ...program,
+    lessonCount: catalogCounts.get(program.id) ?? 0,
+  }));
   const plans = (planData ?? []) as {
     id: string;
     name: string;
@@ -213,14 +224,14 @@ export default async function PublicCoachPage({
         <section className="space-y-4">
           <h2 className="text-3xl">Programs</h2>
           <ul className="grid gap-4 md:grid-cols-2">
-            {programs.map((program) => (
+            {programsWithCounts.map((program) => (
               <li
                 key={program.id}
                 className="space-y-2 rounded-lg border border-border bg-surface p-5"
               >
                 <p className="text-xl font-semibold">{program.title}</p>
                 <p className="text-sm text-muted">
-                  {weeksLabel(program.program_days[0]?.count ?? 0)}
+                  {weeksLabel(program.lessonCount)}
                 </p>
                 {program.description && (
                   <p className="line-clamp-4 whitespace-pre-line text-sm">

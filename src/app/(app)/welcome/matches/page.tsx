@@ -6,8 +6,8 @@ import { formatMoney } from "@/lib/armory";
 import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { matchCoaches } from "@/lib/onboarding";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { loadProgramCatalogLessonCounts } from "@/lib/program-progress-data";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT()).welcome.matches.title };
@@ -21,6 +21,7 @@ type CoachRow = {
   join_mode: string;
 };
 type ProgramRow = {
+  id: string;
   coach_id: string;
   title: string;
   program_days: { count: number }[];
@@ -46,10 +47,10 @@ export default async function MatchesPage() {
         .select("coach_id, price_cents")
         .eq("active", true)
         .not("stripe_price_id", "is", null),
-      // Members only see programs of coaches they've joined, so the server shares just the published titles.
-      createAdminClient()
+      // Use the member's normal catalog visibility before consulting snapshot counts.
+      supabase
         .from("programs")
-        .select("coach_id, title, program_days(count)")
+        .select("id, coach_id, title, program_days(count)")
         .eq("published", true),
     ]);
   const coaches = (coachData ?? []) as CoachRow[];
@@ -61,11 +62,21 @@ export default async function MatchesPage() {
       lowestPlan.set(plan.coach_id as string, plan.price_cents as number);
     }
   }
-  const programs = new Map<string, ProgramRow[]>();
-  for (const program of (programData ?? []) as unknown as ProgramRow[]) {
+  const visiblePrograms = (programData ?? []) as unknown as ProgramRow[];
+  const catalogCounts = await loadProgramCatalogLessonCounts(
+    visiblePrograms.map((program) => ({
+      id: program.id,
+      dayCount: program.program_days[0]?.count ?? 0,
+    })),
+  );
+  const programs = new Map<string, (ProgramRow & { lessonCount: number })[]>();
+  for (const program of visiblePrograms) {
     programs.set(program.coach_id, [
       ...(programs.get(program.coach_id) ?? []),
-      program,
+      {
+        ...program,
+        lessonCount: catalogCounts.get(program.id) ?? 0,
+      },
     ]);
   }
 
@@ -132,7 +143,7 @@ export default async function MatchesPage() {
                   <p className="text-sm">
                     <span className="text-muted">{t.startWith}</span>
                     {first.title} (
-                    {all.programs.weeks(first.program_days[0]?.count ?? 0)})
+                    {all.programs.weeks(first.lessonCount)})
                   </p>
                 )}
                 {coach.join_mode !== "free" && plan !== undefined && (

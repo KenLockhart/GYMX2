@@ -86,6 +86,7 @@ export function menuGroups(role: Role): NavGroup[] {
       item("/profile", "Profile and settings", "profile"),
       item("/notifications", "Notifications", "notifications"),
       item("/membership", "Platform membership", "memberships"),
+      item("/billing/form-coach", "Form Coach billing", "sales"),
       ...(role === "admin"
         ? []
         : [item("/armory/purchases", "Purchases", "purchases")]),
@@ -121,6 +122,7 @@ export function menuGroups(role: Role): NavGroup[] {
           item("/plans", "Memberships", "memberships"),
           item("/insights", "Insights", "insights"),
           item("/checkins", "Check-ins", "checkin"),
+          item("/form-coach/assessments", "Form Coach Assessments", "tasks"),
           item("/library/daily-content", "Daily content", "dailyContent"),
           item("/groups", "My community", "groups"),
           item("/moderation", "Reports", "reports"),
@@ -141,6 +143,7 @@ export function menuGroups(role: Role): NavGroup[] {
       title: "Your training",
       items: [
         item("/checkin", "Weekly check-in", "checkin"),
+        ...(role === "member" ? [item("/form-checks", "Form Checks", "checkin")] : []),
         item("/track", "Track", "track"),
         item("/progress", "Progress", "progress"),
         item("/memos", "Memos", "memos"),
@@ -198,7 +201,10 @@ export const ADMIN_NAV: { overview: NavItem; groups: NavGroup[] } = {
     },
     {
       title: "Commerce",
-      items: [item("/armory/sales", "Armory sales", "sales")],
+      items: [
+        item("/armory/sales", "Armory sales", "sales"),
+        item("/admin/monetization/feature-pricing", "Form Coach pricing", "sales"),
+      ],
     },
   ],
 };

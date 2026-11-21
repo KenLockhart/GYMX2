@@ -1,6 +1,7 @@
 import "server-only";
 import type { ActivityRows, EngagementRows } from "@/lib/leaderboard";
 import { PHOTO_BUCKET } from "@/lib/coach-profile-server";
+import { loadProgramCompletedOnceActivity } from "@/lib/program-progress-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type Query = {
@@ -50,7 +51,6 @@ export async function loadActivity(
     joins,
     sales,
     habits,
-    programDays,
     attended,
   ] = await Promise.all([
     readAll<ActivityRows["people"][number]>(() =>
@@ -119,15 +119,6 @@ export async function loadActivity(
         "habit_id",
       ),
     ),
-    // Finished program days count like finished tasks.
-    readAll<ActivityRows["completions"][number]>(() =>
-      after(
-        db.from("program_day_completions").select("member_id"),
-        "completed_at",
-      )
-        .order("enrollment_id")
-        .order("day_id"),
-    ),
     // Showing up live counts as a session too.
     readAll<ActivityRows["going"][number]>(() =>
       after(db.from("session_attendance").select("member_id"), "joined_at")
@@ -136,9 +127,20 @@ export async function loadActivity(
     ),
   ]);
 
+  const programActivity = await loadProgramCompletedOnceActivity({
+    from: since,
+    to: new Date().toISOString(),
+    memberIds: people
+      .filter((person) => person.role === "member")
+      .map((person) => person.id),
+  });
+
   return {
     people,
-    completions: [...completions, ...programDays],
+    completions: [
+      ...completions,
+      ...programActivity.map((row) => ({ member_id: row.member_id })),
+    ],
     assigned: assignedRows.flatMap((row) =>
       row.task ? [{ coach_id: row.task.coach_id }] : [],
     ),

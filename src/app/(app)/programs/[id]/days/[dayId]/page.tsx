@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { canUseProgramDayVideo, canWatchProgramDay } from "@/lib/programs";
+import { parseProgramVersionedProgress } from "@/lib/program-versioned-progress";
 import { todayKey } from "@/lib/reminders";
 import { getPlayerUrl, isStreamConfigured } from "@/lib/stream";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -26,9 +27,33 @@ export default async function ProgramDayVideoPage({
     .select("id, coach_id, title, published")
     .eq("id", id)
     .maybeSingle();
-  if (!program) notFound();
+  if (!program || program.id !== id) notFound();
 
-  const { data: day } = await supabase
+  // Gate 2 keeps versioned paid and grandfathered lessons off the legacy media route.
+  // Until the signed-only media gate is wired, only a currently accessible unconverted free
+  // lesson can reach this signer.
+  let legacyFreeLessonAllowed = false;
+  if (profile.role === "member") {
+    const { data: rawProgress, error } = await supabase.rpc(
+      "get_program_versioned_progress",
+      { target_program_id: program.id, target_member_id: null },
+    );
+    const progress = error ? null : parseProgramVersionedProgress(rawProgress);
+    legacyFreeLessonAllowed = Boolean(
+      progress &&
+        progress.programId === program.id &&
+        progress.memberId === profile.id &&
+        progress.mode === "legacy_free" &&
+        progress.accessAuthorized &&
+        progress.accessibleLessonIds.includes(dayId),
+    );
+    if (!legacyFreeLessonAllowed) notFound();
+  }
+
+  // Only an admin who already passed the request-bound Program visibility check may
+  // use the server client to read that Program's current day row.
+  const dayReader = profile.role === "admin" ? createAdminClient() : supabase;
+  const { data: day } = await dayReader
     .from("program_days")
     .select("id, program_id, day_number, title, instructions, video_id")
     .eq("id", dayId)
@@ -36,30 +61,8 @@ export default async function ProgramDayVideoPage({
     .maybeSingle();
   if (!day || day.program_id !== program.id || !day.video_id) notFound();
 
-  let enrollment: {
-    id: string;
-    programId: string;
-    memberId: string;
-    startedOn: string;
-  } | null = null;
-  if (profile.role === "member") {
-    const { data } = await supabase
-      .from("program_enrollments")
-      .select("id, program_id, member_id, started_on")
-      .eq("program_id", program.id)
-      .eq("member_id", profile.id)
-      .maybeSingle();
-    enrollment = data
-      ? {
-          id: data.id,
-          programId: data.program_id,
-          memberId: data.member_id,
-          startedOn: data.started_on,
-        }
-      : null;
-  }
-
   if (
+    profile.role !== "member" &&
     !canWatchProgramDay({
       viewerId: profile.id,
       viewerRole: profile.role,
@@ -73,7 +76,7 @@ export default async function ProgramDayVideoPage({
         dayNumber: day.day_number,
         videoId: day.video_id,
       },
-      enrollment,
+      enrollment: null,
       today: todayKey(),
     })
   ) {
@@ -82,7 +85,9 @@ export default async function ProgramDayVideoPage({
 
   // Load only the exact video referenced by this visible, authorized day. Never use the
   // general Library permission to expose another private video.
-  const { data: video } = await createAdminClient()
+  const videoReader =
+    profile.role === "admin" ? dayReader : createAdminClient();
+  const { data: video } = await videoReader
     .from("videos")
     .select("id, coach_id, title, description, cloudflare_uid, status")
     .eq("id", day.video_id)

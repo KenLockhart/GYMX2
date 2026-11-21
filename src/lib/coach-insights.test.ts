@@ -165,12 +165,36 @@ describe("coach insights", () => {
         {
           id: "p",
           title: "6 weeks",
-          days: 4,
-          enrollments: [{ done: 4 }, { done: 2 }],
+          enrollments: [
+            { done: 4, required: 4 },
+            { done: 2, required: 4 },
+          ],
         },
       ]),
     ).toEqual([
       { id: "p", title: "6 weeks", started: 2, finished: 1, average: 75 },
+    ]);
+
+    expect(
+      programStats([
+        {
+          id: "versioned",
+          title: "Versioned program",
+          enrollments: [
+            { done: 4, required: 4 },
+            { done: 1, required: 8 },
+            { done: 3, required: 0 },
+          ],
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "versioned",
+        title: "Versioned program",
+        started: 3,
+        finished: 1,
+        average: 42,
+      },
     ]);
   });
 });

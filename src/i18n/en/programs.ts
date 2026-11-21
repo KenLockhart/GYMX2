@@ -76,6 +76,10 @@ export const programs = {
   byCoach: (coach: string) => `Program · ${coach}`,
   yourCoach: "your coach",
   daysDone: (done: number, total: number) => `${done} of ${total} days done`,
+  currentProgress: (done: number, total: number) =>
+    `Current version · ${done} of ${total} lessons done`,
+  historyProgress: (count: number) =>
+    `${count} lessons completed in saved history`,
   upNext: (n: number) => `Up next: day ${n}`,
   caughtUp: "You're caught up",
   watch: (title: string) => `Watch: ${title}`,

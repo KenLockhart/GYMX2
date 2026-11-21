@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  loadProgramProgressHistoryForMember,
+  loadProgramProgressSummariesForMember,
+} from "@/lib/program-progress-data";
 import { createClient } from "@/lib/supabase/server";
 
 // Everything GYMX2 keeps about one person, read with their own permissions and always filtered
@@ -246,13 +250,6 @@ const SECTIONS: {
     owner: "member_id",
   },
   {
-    name: "programs_started",
-    table: "program_enrollments",
-    columns:
-      "started_on, completed_at, program:programs(title), program_day_completions(completed_at, day:program_days(day_number, title))",
-    owner: "member_id",
-  },
-  {
     name: "purchases",
     table: "purchases",
     columns:
@@ -351,7 +348,7 @@ const SECTIONS: {
     name: "programs_created",
     table: "programs",
     columns:
-      "title, description, published, created_at, program_days(day_number, title, instructions, pillar)",
+      "title, description, published, created_at, program_days(day_number, title, pillar, instructions)",
     owner: "coach_id",
   },
   {
@@ -390,9 +387,60 @@ export async function buildDataExport(user: { id: string; email: string }) {
       return [section.name, error ? undefined : data] as const;
     }),
   );
-  const sections = Object.fromEntries(
+  const sections: Record<string, unknown> = Object.fromEntries(
     results.filter(([, rows]) => Array.isArray(rows) && rows.length > 0),
   );
+
+  if (profile) {
+    try {
+      const summaries = await loadProgramProgressSummariesForMember(user.id);
+      const programHistories: {
+        program_title: string;
+        mode: string;
+        started_on: string | null;
+        required_lessons: number;
+        current_completed_lessons: number;
+        completed_once_lessons: number;
+        history: {
+          lesson_ordinal: number;
+          timeline_day_number: number;
+          title: string;
+          pillar: string;
+          state: "completed" | "undone";
+          occurred_at: string;
+        }[];
+      }[] = [];
+      for (let start = 0; start < summaries.length; start += 8) {
+        const batch = summaries.slice(start, start + 8);
+        const histories = await Promise.all(
+          batch.map((row) =>
+            loadProgramProgressHistoryForMember(row.program_id, user.id),
+          ),
+        );
+        batch.forEach((row, index) => {
+          programHistories.push({
+            program_title: row.program_title,
+            mode: row.mode,
+            started_on: row.started_on,
+            required_lessons: row.required_count,
+            current_completed_lessons: row.current_completed_count,
+            completed_once_lessons: row.completed_once_count,
+            history: histories[index].map((entry) => ({
+              lesson_ordinal: entry.lessonOrdinal,
+              timeline_day_number: entry.timelineDayNumber,
+              title: entry.title,
+              pillar: entry.pillar,
+              state: entry.state,
+              occurred_at: entry.occurredAt,
+            })),
+          });
+        });
+      }
+      if (programHistories.length) sections.programs_started = programHistories;
+    } catch (error) {
+      console.error("Data export section programs_started failed", error);
+    }
+  }
 
   return {
     exported_at: new Date().toISOString(),

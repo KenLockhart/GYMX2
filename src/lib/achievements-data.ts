@@ -9,6 +9,7 @@ import {
   type MemberActivity,
   type Progress,
 } from "@/lib/achievements";
+import { loadProgramCompletedOnceActivity } from "@/lib/program-progress-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Reads one person's activity with the server key: only IDs and dates, never what they wrote.
@@ -26,8 +27,8 @@ export async function loadMemberActivity(
     purchases,
     coaches,
     habits,
-    programDays,
     attended,
+    programActivity,
   ] = await Promise.all([
     db
       .from("task_assignments")
@@ -63,15 +64,15 @@ export async function loadMemberActivity(
       .eq("user_id", userId)
       .limit(10000),
     db
-      .from("program_day_completions")
-      .select("completed_at, day:program_days(pillar)")
-      .eq("member_id", userId)
-      .limit(5000),
-    db
       .from("session_attendance")
       .select("joined_at")
       .eq("member_id", userId)
       .limit(5000),
+    loadProgramCompletedOnceActivity({
+      from: null,
+      to: new Date().toISOString(),
+      memberIds: [userId],
+    }),
   ]);
 
   return {
@@ -97,14 +98,9 @@ export async function loadMemberActivity(
       }))
       // Finished program days count like finished tasks.
       .concat(
-        (
-          (programDays.data ?? []) as unknown as {
-            completed_at: string;
-            day: { pillar: string | null } | null;
-          }[]
-        ).map((row) => ({
-          at: row.completed_at,
-          pillar: isPillar(row.day?.pillar) ? row.day.pillar : null,
+        programActivity.map((row) => ({
+          at: row.first_completed_at,
+          pillar: row.pillar,
         })),
       ),
     memoDays: (memos.data ?? []).map((row) => row.memo_date as string),
