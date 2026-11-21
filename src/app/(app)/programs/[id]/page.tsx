@@ -9,12 +9,15 @@ import {
   SubmitButton,
 } from "@/components/form-parts";
 import { PillarTag } from "@/components/game-parts";
+import { ProgramPurchasePanel } from "@/components/program-purchase-panel";
 import { PILLARS } from "@/lib/achievements";
 import { LOCALE_TAG, type Locale } from "@/i18n/config";
 import type { Messages } from "@/i18n/messages";
 import { getLocale, getT } from "@/i18n/server";
 import { requireAccount } from "@/lib/auth";
 import { isProgramPaidAuthoringEnabled } from "@/lib/program-authoring-server";
+import { isProgramPurchaseEnabled } from "@/lib/program-purchase-server";
+import { isProgramCheckoutEnabled } from "@/lib/program-checkout-server";
 import { loadProgramProgressSummariesForProgram } from "@/lib/program-progress-data";
 import { parseProgramVersionedProgress } from "@/lib/program-versioned-progress";
 import {
@@ -636,6 +639,8 @@ export default async function ProgramPage({
   const legacyVideos = new Map(
     legacyVideoRows.map((row) => [row.id, row]),
   );
+  const purchaseEnabled = isProgramPurchaseEnabled();
+  const checkoutEnabled = isProgramCheckoutEnabled();
 
   return (
     <div className="space-y-8">
@@ -656,6 +661,15 @@ export default async function ProgramPage({
       </div>
 
       {intro && <ProgramIntroPreview intro={intro} t={t} />}
+
+      <ProgramPurchasePanel
+        key={`${profile.id}:${program.id}`}
+        buyerId={profile.id}
+        programId={program.id}
+        programTitle={program.title}
+        purchaseEnabled={purchaseEnabled}
+        checkoutEnabled={checkoutEnabled}
+      />
 
       {progress.enrollmentId || progress.mode === "paid_order" ? (
         <div className="max-w-2xl space-y-2">

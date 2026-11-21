@@ -10,11 +10,28 @@ const mocks = vi.hoisted(() => ({
   getLocale: vi.fn(),
   notFound: vi.fn(),
   paidAuthoringEnabled: vi.fn(),
+  purchaseEnabled: vi.fn(),
+  checkoutEnabled: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ requireAccount: mocks.requireAccount }));
 vi.mock("@/lib/program-authoring-server", () => ({
   isProgramPaidAuthoringEnabled: mocks.paidAuthoringEnabled,
+}));
+vi.mock("@/lib/program-purchase-server", () => ({
+  isProgramPurchaseEnabled: mocks.purchaseEnabled,
+}));
+vi.mock("@/lib/program-checkout-server", () => ({
+  isProgramCheckoutEnabled: mocks.checkoutEnabled,
+}));
+vi.mock("@/components/program-purchase-panel", () => ({
+  ProgramPurchasePanel: (props: {
+    buyerId: string;
+    programId: string;
+    programTitle: string;
+    purchaseEnabled: boolean;
+    checkoutEnabled: boolean;
+  }) => <aside>purchase-panel:{props.buyerId}:{props.programId}:{props.programTitle}:{String(props.purchaseEnabled)}:{String(props.checkoutEnabled)}</aside>,
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -168,6 +185,8 @@ describe("Program member detail progress", () => {
       profile: { id: MEMBER_ID, role: "member" },
     });
     mocks.paidAuthoringEnabled.mockReturnValue(false);
+    mocks.purchaseEnabled.mockReturnValue(false);
+    mocks.checkoutEnabled.mockReturnValue(false);
     mocks.createClient.mockResolvedValue(makeClient());
     mocks.createAdminClient.mockReturnValue({
       from(table: string) {
@@ -254,6 +273,16 @@ describe("Program member detail progress", () => {
     expect(queries).toEqual(["programs"]);
   });
 
+  it("mounts the member purchase panel with server-derived identity while keeping reads available when purchase is off", async () => {
+    mocks.purchaseEnabled.mockReturnValue(false);
+    mocks.checkoutEnabled.mockReturnValue(true);
+
+    const html = await renderPage();
+
+    expect(html).toContain(`purchase-panel:${MEMBER_ID}:${PROGRAM_ID}:Foundations:false:true`);
+    expect(html).not.toContain("LOCKED LESSON PRIVATE INSTRUCTIONS");
+  });
+
   it("does not load lessons when the self progress RPC denies the reader", async () => {
     rawProgress = null;
 
@@ -330,6 +359,7 @@ describe("Program member detail progress", () => {
     expect(html).not.toContain("Delete");
     expect(queries).toEqual(["programs"]);
     expect(adminQueries).toEqual(["program_days"]);
+    expect(html).not.toContain("Program purchase panel");
   });
 
   it("does not elevate another coach to the admin preview", async () => {

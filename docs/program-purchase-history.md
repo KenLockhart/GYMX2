@@ -104,7 +104,8 @@ preserved. After the one-character correction, the migration was applied on
 H2. H2's first read-only wrapper attempts also failed: one had an include-path
 error and another counted the three new 630 functions as 620 functions. Those
 raw outputs are preserved; only the ignored QA wrapper/inventory was corrected
-before the successful read-only audit. The H2 migration and TAP each ran once; neither was retried or rerun. This
-evidence is limited to the isolated local databases; it does not verify
-hosted deployment, provider behavior, authenticated HTTP, or UI flows. The QA command and raw-output index is
+before the successful read-only audit. The H2 migration and TAP each ran
+once; neither was retried or rerun. This evidence is limited to the isolated
+local databases; it does not verify hosted deployment, provider behavior,
+authenticated HTTP, or UI flows. The QA command and raw-output index is
 [qa-index-h2.json](../.vercel/program-purchase-history-qa/local-h2/qa-index-h2.json).
