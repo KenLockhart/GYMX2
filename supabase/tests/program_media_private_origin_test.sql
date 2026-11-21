@@ -208,6 +208,90 @@ select ok(private.program_media_private_origin_is_current(
     'synthetic-private-origin-intro-uid','c6220000-0000-4000-8000-000000000002'),
   'the independent intro also has its own complete post-epoch private-origin certificate');
 
+-- A separate fresh Library UID is later exposed and returned to private. Its ordinary 315
+-- producer chain is independent of both the paid candidate and the Program intro.
+set local role authenticated;
+set local request.jwt.claim.role='authenticated';
+set local request.jwt.claims='{"sub":"c6100000-0000-4000-8000-000000000001","role":"authenticated"}';
+select set_config('test.private_origin_shared_prepare',public.prepare_stream_library_video_upload(
+  'c6410000-0000-4000-8000-000000000001','c6420000-0000-4000-8000-000000000003',
+  'Synthetic shared-origin rejection candidate','',repeat('b',64))::text,true);
+set local role service_role;
+set local request.jwt.claim.role='service_role';
+set local request.jwt.claims='{"role":"service_role"}';
+select set_config('test.private_origin_shared_claim',public.claim_stream_media_create(
+  (current_setting('test.private_origin_shared_prepare')::jsonb->>'operation_id')::uuid,
+  'c6410000-0000-4000-8000-000000000002',
+  current_setting('test.private_origin_shared_prepare')::jsonb->>'request_digest')::text,true);
+select set_config('test.private_origin_shared_transport',public.record_stream_media_upload_transport(
+  (current_setting('test.private_origin_shared_prepare')::jsonb->>'operation_id')::uuid,
+  (current_setting('test.private_origin_shared_prepare')::jsonb->>'transport_request_id')::uuid,
+  current_setting('test.private_origin_shared_prepare')::jsonb->>'request_digest',
+  'synthetic-shared-rejected-uid','https://upload.provider.invalid/tus/shared-rejected',
+  (now()+interval '15 minutes')::timestamptz,7200,true,
+  current_setting('test.private_origin_shared_prepare')::jsonb->'metadata',repeat('c',64))::text,true);
+select set_config('test.private_origin_shared_advance',public.advance_stream_media_upload(
+  (current_setting('test.private_origin_shared_prepare')::jsonb->>'operation_id')::uuid,
+  'c6410000-0000-4000-8000-000000000003','created_unverified',repeat('d',64))::text,true);
+select set_config('test.private_origin_shared_observation',public.record_stream_media_upload_observation(
+  (current_setting('test.private_origin_shared_prepare')::jsonb->>'operation_id')::uuid,
+  current_setting('test.private_origin_registry')::uuid,'exact_uid_get',
+  'synthetic-shared-rejected-uid',200::smallint,true,true,true,true,
+  'c6410000-0000-4000-8000-000000000004',repeat('e',64))::text,true);
+select set_config('test.private_origin_shared_readback',public.bind_stream_media_upload_readback(
+  (current_setting('test.private_origin_shared_prepare')::jsonb->>'operation_id')::uuid,
+  'c6410000-0000-4000-8000-000000000004','c6410000-0000-4000-8000-000000000005')::text,true);
+reset role;
+set local role authenticated;
+set local request.jwt.claim.role='authenticated';
+set local request.jwt.claims='{"sub":"c6100000-0000-4000-8000-000000000001","role":"authenticated"}';
+select set_config('test.private_origin_shared_commit',public.commit_stream_library_video_upload(
+  (current_setting('test.private_origin_shared_prepare')::jsonb->>'operation_id')::uuid,
+  'c6410000-0000-4000-8000-000000000006')::text,true);
+reset role;
+select is(current_setting('test.private_origin_shared_commit')::jsonb->>'outcome','ready_for_publication',
+  'the later exposure fixture is a complete ordinary 315 Library upload');
+select ok(private.program_media_private_origin_is_current(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-shared-rejected-uid',
+    'c6420000-0000-4000-8000-000000000003'),
+  'the fresh exposure candidate starts with a current private-origin certificate');
+select set_config('app.stream_media_operation_id','',true);
+select ok(nullif(current_setting('app.stream_media_operation_id',true),'') is null,
+  'the member-visibility owner request starts without a caller operation selector');
+set local role authenticated;
+set local request.jwt.claim.role='authenticated';
+set local request.jwt.claims='{"sub":"c6100000-0000-4000-8000-000000000001","role":"authenticated"}';
+update public.videos set visibility='members'
+where id='c6420000-0000-4000-8000-000000000003' and coach_id=auth.uid();
+reset role;
+select is((select video.visibility::text from public.videos video
+  where video.id='c6420000-0000-4000-8000-000000000003'),'members',
+  'the authenticated owner exposes the fresh Library video to members');
+select is((select origin.origin_state from private.program_media_private_origins origin
+  where origin.uid_digest=private.program_media_private_origin_uid_digest(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-shared-rejected-uid')),
+  'shared','the real video exposure hook monotonically shares the new UID');
+set local role authenticated;
+set local request.jwt.claim.role='authenticated';
+set local request.jwt.claims='{"sub":"c6100000-0000-4000-8000-000000000001","role":"authenticated"}';
+update public.videos set visibility='private'
+where id='c6420000-0000-4000-8000-000000000003' and coach_id=auth.uid();
+reset role;
+select is((select video.visibility::text from public.videos video
+  where video.id='c6420000-0000-4000-8000-000000000003'),'private',
+  'the same authenticated owner returns the video to private');
+select is((select origin.origin_state from private.program_media_private_origins origin
+  where origin.uid_digest=private.program_media_private_origin_uid_digest(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-shared-rejected-uid')),
+  'shared','returning to private cannot revive the exposed UID');
+select ok((select origin.origin_proof_digest is null from private.program_media_private_origins origin
+  where origin.uid_digest=private.program_media_private_origin_uid_digest(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-shared-rejected-uid'))
+  and not private.program_media_private_origin_is_current(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-shared-rejected-uid',
+    'c6420000-0000-4000-8000-000000000003'),
+  'the members-to-private cycle leaves proof cleared and paid eligibility false');
+
 insert into public.payout_accounts(coach_id,stripe_account_id,charges_enabled,payouts_enabled)
 values('c6100000-0000-4000-8000-000000000001','acct_PrivateOriginFixture',true,false);
 set local role authenticated;
@@ -216,11 +300,85 @@ set local request.jwt.claims='{"sub":"c6100000-0000-4000-8000-000000000001","rol
 insert into public.programs(id,coach_id,title,description,published,intro_video_id)
 values('c6130000-0000-4000-8000-000000000001','c6100000-0000-4000-8000-000000000001',
   'Private origin paid publication test','',false,'c6220000-0000-4000-8000-000000000002');
+insert into public.programs(id,coach_id,title,description,published,intro_video_id)
+values('c6430000-0000-4000-8000-000000000001','c6100000-0000-4000-8000-000000000001',
+  'Shared origin rejection test','',false,'c6220000-0000-4000-8000-000000000002');
 reset role;
 select is((select origin.origin_state from private.program_media_private_origins origin
   where origin.uid_digest=private.program_media_private_origin_uid_digest(
       current_setting('test.private_origin_registry')::uuid,'synthetic-private-origin-intro-uid')),
   'shared','the separate Program intro UID is monotonically classified as shared');
+
+-- Publish through the normal 600 entrypoint with the separate, freshly tainted Library UID.
+-- The 610 immediate paid-lesson guard must reject it before offers, pointers, or receipts change.
+set local role service_role;
+set local request.jwt.claim.role='service_role';
+set local request.jwt.claims='{"role":"service_role"}';
+select set_config('test.private_origin_shared_snapshot',public.get_program_authoring_draft(
+  'c6430000-0000-4000-8000-000000000001','c6100000-0000-4000-8000-000000000001')::text,true);
+select set_config('test.private_origin_shared_draft',public.save_program_authoring_draft(
+  'c6430000-0000-4000-8000-000000000001','c6100000-0000-4000-8000-000000000001',null,0,
+  (current_setting('test.private_origin_shared_snapshot')::jsonb->>'current_content_version_id')::uuid,
+  (current_setting('test.private_origin_shared_snapshot')::jsonb->>'current_offer_version_id')::uuid,
+  '[{"lesson_ordinal":1,"timeline_day_number":1,"title":"Shared origin lesson","instructions":"Must fail","pillar":"body","video_id":"c6420000-0000-4000-8000-000000000003"}]'::jsonb
+)::text,true);
+select set_config('test.private_origin_shared_pointer_before',(
+  select state.current_content_version_id::text||':'||state.current_offer_version_id::text
+  from public.program_commerce_state state where state.program_id='c6430000-0000-4000-8000-000000000001'
+),true);
+do $$
+declare
+  caught_state text;
+  caught_message text;
+begin
+  begin
+    perform public.publish_program_authoring_draft(
+      'c6430000-0000-4000-8000-000000000001','c6100000-0000-4000-8000-000000000001',
+      (current_setting('test.private_origin_shared_draft')::jsonb->>'draft_id')::uuid,
+      (current_setting('test.private_origin_shared_draft')::jsonb->>'draft_revision')::bigint,
+      (current_setting('test.private_origin_shared_snapshot')::jsonb->>'current_content_version_id')::uuid,
+      (current_setting('test.private_origin_shared_snapshot')::jsonb->>'current_offer_version_id')::uuid,
+      'c6440000-0000-4000-8000-000000000001',900,1::smallint);
+    perform set_config('test.private_origin_shared_failure','NO_ERROR',true);
+  exception when others then
+    get stacked diagnostics caught_state=returned_sqlstate,caught_message=message_text;
+    perform set_config('test.private_origin_shared_failure',
+      coalesce(caught_state,'<no-sqlstate>')||':'||coalesce(caught_message,'<no-message>'),true);
+  end;
+end;
+$$;
+reset role;
+select is(current_setting('test.private_origin_shared_failure'),
+  '23514:Paid Program media requires a valid never-shared Library origin',
+  'the actual 610 paid-lesson guard rejects a shared UID through the normal 600 publication path');
+select is((select state.current_content_version_id::text||':'||state.current_offer_version_id::text
+  from public.program_commerce_state state where state.program_id='c6430000-0000-4000-8000-000000000001'),
+  current_setting('test.private_origin_shared_pointer_before'),
+  'the shared-origin rejection rolls back both Program pointers');
+select ok(not (select program.published from public.programs program
+  where program.id='c6430000-0000-4000-8000-000000000001'),
+  'the shared-origin rejection leaves the new Program unpublished');
+select is((select count(*) from public.program_content_versions version
+  where version.program_id='c6430000-0000-4000-8000-000000000001'
+    and version.revision_kind='paid'),0::bigint,
+  'the rejected publication leaves no paid content version');
+select is((select count(*) from public.program_offer_versions offer
+  where offer.program_id='c6430000-0000-4000-8000-000000000001' and offer.offer_kind='paid'),0::bigint,
+  'the rejected publication leaves no paid offer');
+select is((select count(*) from public.program_content_version_lessons lesson
+  join public.program_content_versions version on version.program_id=lesson.program_id
+    and version.id=lesson.content_version_id
+  where lesson.program_id='c6430000-0000-4000-8000-000000000001'
+    and version.revision_kind='paid'),0::bigint,
+  'the rejected publication leaves no paid lesson');
+select is((select count(*) from public.stream_media_source_bindings binding
+  where binding.source_kind='program_lesson'
+    and binding.parent_identity='c6430000-0000-4000-8000-000000000001'),0::bigint,
+  'the rejected publication leaves no provisional paid lesson binding');
+select is((select count(*) from private.program_authoring_receipts receipt
+  where receipt.request_id='c6440000-0000-4000-8000-000000000001'
+    and receipt.operation_kind='publish_content'),0::bigint,
+  'the rejected publication appends no successful publish receipt');
 
 set local role service_role;
 set local request.jwt.claim.role='service_role';
@@ -285,6 +443,79 @@ select ok((select count(*)=2 from public.program_content_version_lessons lesson
     and lesson.cloudflare_uid='synthetic-private-origin-uid'),
   'the deferred final constraint also validates same-Program paid UID reuse');
 set constraints program_lessons_private_origin_final_check deferred;
+
+-- An authenticated owner request cannot target Program-only media: the restrictive SELECT
+-- policy hides the row, so UPDATE affects no rows before reaching either write trigger. A
+-- separate server-role mutation below demonstrates the frozen 315 retained-media guard.
+select set_config('test.private_origin_paid_visibility_pointer_before',(
+  select state.current_content_version_id::text||':'||state.current_offer_version_id::text
+  from public.program_commerce_state state where state.program_id='c6130000-0000-4000-8000-000000000001'
+),true);
+select set_config('test.private_origin_paid_visibility_proof_before',(
+  select origin.origin_proof_digest from private.program_media_private_origins origin
+  where origin.uid_digest=private.program_media_private_origin_uid_digest(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-private-origin-uid')
+),true);
+select set_config('app.stream_media_operation_id','',true);
+select ok(nullif(current_setting('app.stream_media_operation_id',true),'') is null,
+  'the paid-media owner request starts without a caller operation selector');
+set local role authenticated;
+set local request.jwt.claim.role='authenticated';
+set local request.jwt.claims='{"sub":"c6100000-0000-4000-8000-000000000001","role":"authenticated"}';
+select ok(current_user='authenticated' and auth.uid()='c6100000-0000-4000-8000-000000000001',
+  'the ordinary visibility request runs as the exact authenticated video owner');
+do $$
+declare
+  affected_rows bigint;
+  caught_state text;
+  caught_message text;
+begin
+  begin
+    update public.videos set visibility='members'
+    where id='c6120000-0000-4000-8000-000000000001' and coach_id=auth.uid();
+    get diagnostics affected_rows = row_count;
+    perform set_config('test.private_origin_paid_visibility_result','NO_ERROR:'||affected_rows::text,true);
+  exception when others then
+    get stacked diagnostics caught_state=returned_sqlstate,caught_message=message_text;
+    perform set_config('test.private_origin_paid_visibility_result',
+      'ERROR:'||coalesce(caught_state,'<no-sqlstate>')||':'||coalesce(caught_message,'<no-message>'),true);
+  end;
+end;
+$$;
+select is(current_setting('test.private_origin_paid_visibility_result'),'NO_ERROR:0',
+  'the ordinary owner update completes without error but RLS filters the Program-only row');
+select is((select count(*)::bigint from public.videos video
+  where video.id='c6120000-0000-4000-8000-000000000001'),0::bigint,
+  'the authenticated owner cannot SELECT a Program-only video');
+reset role;
+
+select ok(nullif(current_setting('app.stream_media_operation_id',true),'') is null,
+  'the direct server-side visibility probe still has no caller operation selector');
+set local role service_role;
+set local request.jwt.claim.role='service_role';
+set local request.jwt.claims='{"role":"service_role"}';
+select throws_ok($$update public.videos set visibility='members'
+  where id='c6120000-0000-4000-8000-000000000001'$$,
+  '42501','Paid Program media cannot be exposed outside protected visibility',
+  'a server-side mutation with an empty selector reaches the frozen 315 retained-media guard');
+reset role;
+
+select is((select video.visibility::text from public.videos video
+  where video.id='c6120000-0000-4000-8000-000000000001'),'program_only',
+  'the owner-filtered and server-rejected attempts leave the paid video program-only');
+select ok((select origin.origin_state='protected_private'
+    and origin.origin_proof_digest=current_setting('test.private_origin_paid_visibility_proof_before')
+    from private.program_media_private_origins origin
+    where origin.uid_digest=private.program_media_private_origin_uid_digest(
+      current_setting('test.private_origin_registry')::uuid,'synthetic-private-origin-uid'))
+  and private.program_media_private_origin_is_current(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-private-origin-uid',
+    'c6120000-0000-4000-8000-000000000001'),
+  'the filtered and rejected visibility attempts preserve paid UID proof and current eligibility');
+select is((select state.current_content_version_id::text||':'||state.current_offer_version_id::text
+  from public.program_commerce_state state where state.program_id='c6130000-0000-4000-8000-000000000001'),
+  current_setting('test.private_origin_paid_visibility_pointer_before'),
+  'the filtered and rejected visibility attempts leave both paid Program pointers unchanged');
 
 -- The paid Program's separate intro is a nonpaid consumer. It shares and permanently
 -- disqualifies its own UID; detaching the intro does not revive it.
@@ -377,6 +608,17 @@ select is((select count(*) from public.program_content_version_lessons lesson
 -- A separate fresh private UID reaches 610's actual final constraint. It uses the normal 315
 -- Library producer, then adds one same-Program paid version/lesson without completing 600's
 -- Program-only visibility and current-pointer publication transition.
+select set_config('test.private_origin_paid_proof_before_later_upload',(
+  select origin.origin_proof_digest from private.program_media_private_origins origin
+  where origin.uid_digest=private.program_media_private_origin_uid_digest(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-private-origin-uid')
+),true);
+select set_config('test.private_origin_profile_fence_before_later_upload',(
+  select fence.source_revision::text from public.stream_media_parent_fences fence
+  where fence.source_kind='profile'
+    and fence.source_identity='c6100000-0000-4000-8000-000000000001'
+    and fence.owner_id='c6100000-0000-4000-8000-000000000001'
+),true);
 set local role authenticated;
 set local request.jwt.claim.role='authenticated';
 set local request.jwt.claims='{"sub":"c6100000-0000-4000-8000-000000000001","role":"authenticated"}';
@@ -421,6 +663,21 @@ select ok(private.program_media_private_origin_is_current(
     current_setting('test.private_origin_registry')::uuid,'synthetic-private-final-uid',
     'c6320000-0000-4000-8000-000000000003'),
   'the independent final-guard UID has valid canonical private-origin evidence');
+select is((select fence.source_revision from public.stream_media_parent_fences fence
+  where fence.source_kind='profile'
+    and fence.source_identity='c6100000-0000-4000-8000-000000000001'
+    and fence.owner_id='c6100000-0000-4000-8000-000000000001'),
+  current_setting('test.private_origin_profile_fence_before_later_upload')::bigint+1,
+  'a later ordinary 315 upload advances the owner profile fence by one revision');
+select ok((select origin.origin_proof_digest=
+      current_setting('test.private_origin_paid_proof_before_later_upload')
+    from private.program_media_private_origins origin
+    where origin.uid_digest=private.program_media_private_origin_uid_digest(
+      current_setting('test.private_origin_registry')::uuid,'synthetic-private-origin-uid'))
+  and private.program_media_private_origin_is_current(
+    current_setting('test.private_origin_registry')::uuid,'synthetic-private-origin-uid',
+    'c6120000-0000-4000-8000-000000000001'),
+  'the earlier paid UID retains its immutable origin proof after unrelated profile-fence advance');
 
 select set_config('test.private_origin_final_pointer_before',(
   select state.current_content_version_id::text||':'||state.current_offer_version_id::text
