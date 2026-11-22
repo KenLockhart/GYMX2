@@ -9,7 +9,13 @@ import type {
   SaleRow,
   SubscriptionRow,
 } from "@/lib/coach-insights";
+import {
+  loadProgramCompletedOnceActivity,
+  loadProgramProgressSummariesForProgram,
+  type ProgramProgressRpcClient,
+} from "@/lib/program-progress-data";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 // Reads one coach's business with the server key. Callers must check the viewer is that coach or
 // an admin. Only what the coach can already see elsewhere: their sales, their members and how
@@ -73,10 +79,10 @@ export async function loadCoachInsights(coachId: string) {
       .limit(2000),
     db
       .from("programs")
-      .select(
-        "id, title, program_days(count), program_enrollments(member_id, program_day_completions(completed_at))",
-      )
-      .eq("coach_id", coachId),
+      .select("id, title", { count: "exact" })
+      .eq("coach_id", coachId)
+      .order("id")
+      .limit(200),
   ]);
 
   const members: MemberRow[] = (
@@ -104,12 +110,10 @@ export async function loadCoachInsights(coachId: string) {
   const programRows = (programs.data ?? []) as unknown as {
     id: string;
     title: string;
-    program_days: { count: number }[];
-    program_enrollments: {
-      member_id: string;
-      program_day_completions: { completed_at: string }[];
-    }[];
   }[];
+  if ((programs.count ?? 0) > programRows.length) {
+    throw new Error("Program insights exceeded the supported result limit.");
+  }
   const assignmentRows = (assignments.data ??
     []) as unknown as (AssignmentRow & { member_id: string })[];
 
@@ -126,6 +130,46 @@ export async function loadCoachInsights(coachId: string) {
         .gte("created_at", since)
         .limit(10000)
     : { data: [] };
+
+  const programProgressClient =
+    (await createClient()) as unknown as ProgramProgressRpcClient;
+  const programActivity: ActivityRow[] = [];
+  const progressByProgram = new Map<
+    string,
+    Awaited<ReturnType<typeof loadProgramProgressSummariesForProgram>>
+  >();
+  for (let start = 0; start < programRows.length; start += 8) {
+    const batch = programRows.slice(start, start + 8);
+    const [summaries, activities] = await Promise.all([
+      Promise.all(
+        batch.map((program) =>
+          loadProgramProgressSummariesForProgram(
+            program.id,
+            programProgressClient,
+          ),
+        ),
+      ),
+      Promise.all(
+        batch.map((program) =>
+          loadProgramCompletedOnceActivity({
+            from: since,
+            to: new Date().toISOString(),
+            memberIds: members.map((member) => member.member_id),
+            programId: program.id,
+          }),
+        ),
+      ),
+    ]);
+    batch.forEach((program, index) => {
+      progressByProgram.set(program.id, summaries[index]);
+      programActivity.push(
+        ...activities[index].map((row) => ({
+          member_id: row.member_id,
+          at: row.first_completed_at,
+        })),
+      );
+    });
+  }
 
   const activity: ActivityRow[] = [
     ...(checkins ?? []).map((row) => ({
@@ -156,14 +200,7 @@ export async function loadCoachInsights(coachId: string) {
         at: row.joined_at,
       })),
     ]),
-    ...programRows.flatMap((program) =>
-      program.program_enrollments.flatMap((enrollment) =>
-        enrollment.program_day_completions.map((row) => ({
-          member_id: enrollment.member_id,
-          at: row.completed_at,
-        })),
-      ),
-    ),
+    ...programActivity,
   ];
 
   return {
@@ -189,10 +226,17 @@ export async function loadCoachInsights(coachId: string) {
     programs: programRows.map((program) => ({
       id: program.id,
       title: program.title,
-      days: program.program_days[0]?.count ?? 0,
-      enrollments: program.program_enrollments.map((row) => ({
-        done: row.program_day_completions.length,
-      })),
+      enrollments: (progressByProgram.get(program.id) ?? [])
+        .filter(
+          (row) =>
+            row.program_exists &&
+            row.mode !== "history_only" &&
+            row.mode !== "not_enrolled",
+        )
+        .map((row) => ({
+          done: row.current_completed_count,
+          required: row.required_count,
+        })),
     })) satisfies ProgramRow[],
   };
 }

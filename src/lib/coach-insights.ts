@@ -31,8 +31,7 @@ export type AttendanceRow = { session_id: string; member_id: string };
 export type ProgramRow = {
   id: string;
   title: string;
-  days: number;
-  enrollments: { done: number }[];
+  enrollments: { done: number; required: number }[];
 };
 
 const net = (sale: SaleRow) => sale.amount_cents - sale.fee_cents;
@@ -210,19 +209,19 @@ export function programStats(programs: ProgramRow[]) {
   return programs
     .map((program) => {
       const finished = program.enrollments.filter(
-        (row) => program.days > 0 && row.done >= program.days,
+        (row) => row.required > 0 && row.done >= row.required,
       ).length;
-      const average =
-        program.enrollments.length && program.days
-          ? Math.round(
-              (program.enrollments.reduce(
-                (sum, row) => sum + Math.min(row.done, program.days),
-                0,
-              ) /
-                (program.enrollments.length * program.days)) *
-                100,
-            )
-          : null;
+      const totalRequired = program.enrollments.reduce(
+        (sum, row) => sum + row.required,
+        0,
+      );
+      const totalCompleted = program.enrollments.reduce(
+        (sum, row) => sum + Math.min(row.done, row.required),
+        0,
+      );
+      const average = totalRequired
+        ? Math.round((totalCompleted / totalRequired) * 100)
+        : null;
       return {
         id: program.id,
         title: program.title,

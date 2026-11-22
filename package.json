@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-form-coach-assets.mjs && node scripts/build-form-coach-worker.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-form-coach-assets.mjs && node scripts/build-form-coach-worker.mjs",
+    "form-coach:worker": "node scripts/build-form-coach-worker.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,11 +14,14 @@
     "test:db": "supabase test db"
   },
   "dependencies": {
+    "@ai-sdk/openai": "4.0.122",
     "@cloudflare/realtimekit": "2.0.4",
+    "@mediapipe/tasks-vision": "1.2.3",
     "@stripe/react-stripe-js": "7.0.1",
     "@stripe/stripe-js": "10.2.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
+    "ai": "7.0.178",
     "lucide-react": "1.62.0",
     "next": "16.4.5",
     "react": "19.3.0",
@@ -32,8 +38,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "3.6.4",
+    "esbuild": "0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
+    "jsdom": "31.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.1.0"

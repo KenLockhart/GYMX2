@@ -14,6 +14,7 @@ import { tasks } from "./tasks";
 import { track } from "./track";
 import { welcome } from "./welcome";
 import { intake } from "./intake";
+import { featurePricing } from "./feature-pricing";
 
 export const es: Messages = {
   auth,
@@ -34,4 +35,5 @@ export const es: Messages = {
   track,
   welcome,
   intake,
+  featurePricing,
 };
