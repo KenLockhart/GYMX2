@@ -1,0 +1,39 @@
+# Printful catalog staging
+
+This feature imports Printful catalog observations into private GYMX2 staging tables. A scheduled or administrator-triggered sync reads catalog data only. A separate administrator action can create a private draft; another explicit action can publish a curated, display-only Gear preview. The integration does not create Printful products or orders, submit fulfillment, or enable checkout for managed previews.
+
+The feature flag is off by default. The daily Vercel cron is installed in configuration, but `PRINTFUL_CATALOG_SYNC_ENABLED` must be explicitly enabled before the route will stage a read. No live setting or deployment was changed during this implementation.
+
+## Read-only provider collection
+
+The reader uses Printful's Manual/API store endpoints: `GET /stores`, paginated `GET /store/products?status=all&offset=…&limit=…`, and one `GET /store/products/{id}` for each listed product. It does not use the ecommerce Sync API path `/sync/products`. The reader checks the returned store identity, exact decimal product and variant IDs, duplicate IDs, page totals and offsets, product/detail variant counts, variant parent IDs, ignored state, and a final bounded listing for product/count/state drift. It makes no retries and does not persist until all checks pass.
+
+The result describes a consistent paginated read, not an atomic Printful snapshot. The SQL stage operation stores one complete accepted observation in a transaction using the catalog revision captured before the provider request. A stale concurrent read is rejected. Provider IDs, configuration facts, and pricing evidence remain in private tables and private admin results; member/guest Armory projections contain no Printful identifiers or cost data.
+
+Only known provider fields are selected. Configuration fingerprints include the exact catalog variant, production files and their stable identity, design/placement/technique/options, and bounded configuration fields such as `message` and `stitch_count_tier`. Rotating transport and preview URLs do not change design identity. Unrecognized or unsupported cost-affecting shapes remain incomplete and cannot support cost review or publication.
+
+## Cost evidence and readiness
+
+Printful API retail prices are never treated as production cost. The current API reader collects no configured production price. Production costs are accepted only through an administrator-reviewed, read-only Printful product-editor observation. The administrator enters the displayed price for each named color/size and confirms that the currency is USD and no provider price or design was changed. The server brackets the review with provider reads, maps each entered value by the exact external variant ID, and requires the variant set and configuration fingerprints to match. The evidence is private, immutable after completion, source-labeled `admin-reviewed-printful-ui`, and expires after 24 hours. A stale, changed, ambiguous, invalid, or range-valued price stays ineligible.
+
+At the pre-release verification on 2026-11-22, the live API read completed for 16 products and 95 variants: all 95 were synced, 93 were active, 2 were temporarily unavailable, and all 95 configurations had complete fingerprints. A separate read-only product-editor observation contained 16 products and 95 rows (93 scalar prices and 2 ranges). Those observations were not captured inside an application review session and are not bound to the API configuration fingerprints. At that verification point, the application had 0 accepted cost observations, 0 price-ready variants, and 0 eligible products for import. No prices were imported or published. The private local QA folder stores the separate timestamped UI rows; public documentation and committed fixtures contain no per-variant prices or provider identifiers.
+
+The published Printful API reference includes fields that affect configuration, including embroidery stitch-count tier. The current reader fingerprints both the tier and bounded file messages; unknown file keys or unsupported shapes remain incomplete. This documentation reports no API-verified production costs, and the existing editor observations are not a replacement for a newly bracketed cost review. Raw API response bodies and credentials are not retained in QA artifacts or source; the verification token remains protected outside the checkout. The timestamped editor rows and per-variant prices are retained only in the ignored local QA evidence folder; no such values or identifiers are committed.
+
+## Private staging and Armory drafts
+
+Every catalog row is keyed by the expected store and the provider's exact stable product/variant IDs. Repeated reads reuse local product, variant, and reserved Armory UUIDs; temporarily omitted variants remain linked but unavailable, and restocking restores the same local variant identity. Missing products are retained. A failed, malformed, incomplete, wrong-store, or stale read causes no stage writes.
+
+An administrator can import only an already-existing Printful store product selected from the private catalog. The import creates a private draft and permanent origin tombstone, not a public `armory_items` row. It never adopts an ordinary product by title or SKU. A new draft starts with no approved image or copy, and it is not publishable without an exact, fresh production-cost observation for every current variant. If eligible, the suggested customer price is the highest exact production cost plus $20; customer shipping is initially $0 and remains separately curated. This does not include Printful shipping, taxes, or seasonal charges.
+
+Refresh changes provider facts and variant availability while preserving approved local copy, image, customer price, shipping, visibility, publication, and local IDs. Provider thumbnails and files are not used as Armory images; an administrator uploads and approves an image through the existing Armory upload flow. Draft audience selection applies only after publication. Publishing requires a separate explicit confirmation and creates a `kind='preview'`, Gear row with the draft owner's identity. The permanent database origin fence prevents direct row insertion, identity reassignment, or conversion to a sellable product.
+
+Printful-managed Gear remains display-only. The central server checkout path and the locked checkout RPC reject managed identities, including when a caller changes the row kind. No order or fulfillment worker is part of this scope; no delivery estimate is claimed. Existing guest Armory commerce and the #75 manual Printful SKU/variant-reference flow remain available independently.
+
+## Local verification and limits
+
+Implementation validation ran on a new local database clone with the Printful migration applied only to that clone. It did not change the source rehearsal database or a hosted database. The focused Printful TAP suite and existing Armory/account-deletion regression suites were run on the local target. The guest commerce regression had one pre-existing source-baseline permission expectation that differs from the current rehearsal and production ACL metadata; it was recorded without changing the assertion or ACL.
+
+The new catalog tables, administrator page and actions, feature-off daily route, and checkout/save guards are local source changes only. They have not been deployed, enabled, or used to import a live product. Production activation still requires a separately reviewed migration/release, a fresh bracketed administrator cost review, and confirmation that every required configuration is complete. Automatic fulfillment, provider images, and API-derived production-cost synchronization are not implemented.
+
+References: [Printful Manual/API documentation](https://developers.printful.com/docs/) and [Printful v2 Beta pricing documentation](https://developers.printful.com/docs/v2-beta/).
