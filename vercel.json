@@ -3,6 +3,7 @@
   "crons": [
     { "path": "/api/cron/reminders?job=morning", "schedule": "0 14 * * *" },
     { "path": "/api/cron/reminders?job=evening", "schedule": "30 23 * * *" },
-    { "path": "/api/cron/intake-reminders", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/intake-reminders", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/printful-catalog", "schedule": "0 7 * * *" }
   ]
 }

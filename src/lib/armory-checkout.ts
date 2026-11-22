@@ -89,7 +89,25 @@ export async function createArmoryCheckout(input: {
     }
   }
 
-  if (!item || (item.kind !== "paid" && item.kind !== "product") || !item.price_cents || item.price_cents < MIN_PAID_PRICE_CENTS) {
+  if (!item) return { error: "This item can't be bought right now." };
+
+  // The Printful managed-item fence is independent of the editable Armory
+  // kind. Keep this lookup ahead of all sale-kind checks and fail closed if
+  // the private membership service is unavailable.
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+    const { data: printfulManaged, error: managedError } = await admin.rpc("is_printful_managed_item", {
+      target_item_id: item.id,
+    });
+    if (managedError || typeof printfulManaged !== "boolean" || printfulManaged) {
+      return { error: "This item can't be bought right now." };
+    }
+  } catch {
+    return { error: "This item can't be bought right now." };
+  }
+
+  if ((item.kind !== "paid" && item.kind !== "product") || !item.price_cents || item.price_cents < MIN_PAID_PRICE_CENTS) {
     return { error: "This item can't be bought right now." };
   }
   if (!item.visible_to_all && !authorizedMemberRead) {
@@ -155,7 +173,6 @@ export async function createArmoryCheckout(input: {
     if (owned?.length) return { error: "You already own this. Use the Download button." };
   }
 
-  const admin = createAdminClient();
   const { data: seller } = await admin
     .from("profiles")
     .select("role")

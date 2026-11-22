@@ -27,6 +27,7 @@ export async function prepareArmoryUpload(input: {
   bucket: "armory-files" | "armory-images";
   file_name: string;
   size: number;
+  managed_item_id?: string;
 }): Promise<{ error?: string; path?: string; token?: string }> {
   const { profile } = await requireCoachOrAdmin();
   const parsed = uploadRequestSchema.safeParse(input);
@@ -46,7 +47,28 @@ export async function prepareArmoryUpload(input: {
     return { error: isImage ? "Images can be up to 5 MB." : "Files can be up to 50 MB." };
   }
 
-  const path = `${profile.id}/${randomUUID().slice(0, 8)}-${safeFileName(parsed.data.file_name)}`;
+  let ownerId = profile.id;
+  if (input.managed_item_id !== undefined) {
+    if (parsed.data.bucket !== "armory-images" || profile.role !== "admin" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.managed_item_id)) {
+      return { error: "Choose an image for this Printful draft." };
+    }
+    try {
+      const { data, error } = await createAdminClient().rpc("get_printful_armory_draft_upload_owner", {
+        target_item_id: input.managed_item_id,
+        target_admin_id: profile.id,
+      });
+      if (error || typeof data !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data)) {
+        return { error: "This Printful draft is unavailable for image upload." };
+      }
+      ownerId = data;
+    } catch {
+      return { error: "This Printful draft is unavailable for image upload." };
+    }
+  }
+
+  const path = `${ownerId}/${randomUUID().slice(0, 8)}-${safeFileName(parsed.data.file_name)}`;
   const { data, error } = await createAdminClient()
     .storage.from(parsed.data.bucket)
     .createSignedUploadUrl(path);
@@ -166,6 +188,23 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     if (!before) return { error: "We couldn't find that item." };
     if (item.category === "other" && before.category !== "other") {
       return { error: "Legacy / Other is only available for existing legacy items." };
+    }
+
+    // Managed Printful previews are curated only through the dedicated
+    // server action. This also prevents an administrator from changing one
+    // into an ordinary sellable product through the generic form.
+    try {
+      const { data: printfulManaged, error: managedError } = await createAdminClient().rpc("is_printful_managed_item", {
+        target_item_id: itemId,
+      });
+      if (managedError || typeof printfulManaged !== "boolean") {
+        return { error: "We couldn't verify whether this item is managed. Please try again." };
+      }
+      if (printfulManaged) {
+        return { error: "Use the Printful catalog page to edit this preview." };
+      }
+    } catch {
+      return { error: "We couldn't verify whether this item is managed. Please try again." };
     }
 
     const { error } = await supabase.from("armory_items").update(fields).eq("id", itemId).eq("coach_id", profile.id);

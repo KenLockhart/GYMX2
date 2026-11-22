@@ -91,7 +91,8 @@ describe("Armory Checkout quote reservation", () => {
     expect(result).toEqual({
       error: "This item changed while checkout was opening. Refresh and try again.",
     });
-    expect(mocks.adminRpc).toHaveBeenCalledOnce();
+    expect(mocks.adminRpc).toHaveBeenNthCalledWith(1, "is_printful_managed_item", { target_item_id: itemId });
+    expect(mocks.adminRpc).toHaveBeenNthCalledWith(2, "create_armory_checkout_intent", expect.any(Object));
     expect(mocks.adminRpc).toHaveBeenCalledWith("create_armory_checkout_intent", {
       target_intent_id: expect.any(String),
       target_item_id: itemId,
@@ -149,7 +150,8 @@ describe("Armory Checkout quote reservation", () => {
         profile: { id: buyerId, role: "member" },
       })).resolves.toHaveProperty("error");
 
-      expect(mocks.adminRpc).not.toHaveBeenCalled();
+      expect(mocks.adminRpc).toHaveBeenCalledWith("is_printful_managed_item", { target_item_id: itemId });
+      expect(mocks.adminRpc).not.toHaveBeenCalledWith("create_armory_checkout_intent", expect.anything());
       expect(mocks.stripeCreate).not.toHaveBeenCalled();
     },
   );
@@ -165,6 +167,23 @@ describe("Armory Checkout quote reservation", () => {
     })).resolves.toHaveProperty("error");
 
     expect(mocks.adminRpc).not.toHaveBeenCalled();
+    expect(mocks.stripeCreate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: "managed preview", result: { data: true, error: null } },
+    { label: "membership lookup failure", result: { data: null, error: { message: "unavailable" } } },
+    { label: "malformed membership result", result: { data: null, error: null } },
+  ])("fails closed for $label before Stripe", async ({ result }) => {
+    mocks.adminRpc.mockResolvedValueOnce(result);
+    await expect(createArmoryCheckout({
+      itemId,
+      size: "",
+      email: "buyer@example.test",
+      profile: { id: buyerId, role: "member" },
+    })).resolves.toEqual({ error: "This item can't be bought right now." });
+    expect(mocks.adminRpc).toHaveBeenCalledOnce();
+    expect(mocks.adminRpc).toHaveBeenCalledWith("is_printful_managed_item", { target_item_id: itemId });
     expect(mocks.stripeCreate).not.toHaveBeenCalled();
   });
 });

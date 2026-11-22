@@ -56,7 +56,7 @@ type Upload = {
   message?: string;
 };
 
-function UploadField({
+export function UploadField({
   label,
   hint,
   accept,
@@ -64,6 +64,7 @@ function UploadField({
   current,
   onUploaded,
   onCleared,
+  managedItemId,
 }: {
   label: string;
   hint: string;
@@ -72,6 +73,7 @@ function UploadField({
   current: string | null;
   onUploaded: (path: string, fileName: string) => void;
   onCleared?: () => void;
+  managedItemId?: string;
 }) {
   const tr = useTr();
   const [upload, setUpload] = useState<Upload>({ status: "idle" });
@@ -88,6 +90,7 @@ function UploadField({
       bucket,
       file_name: file.name,
       size: file.size,
+      ...(managedItemId ? { managed_item_id: managedItemId } : {}),
     });
     if (prepared.error || !prepared.path || !prepared.token) {
       setUpload({

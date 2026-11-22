@@ -57,6 +57,11 @@ function Groups({
   badges: Record<string, number>;
   pathname: string;
 }) {
+  const printfulCatalog: NavItem = {
+    href: "/admin/printful",
+    label: "Printful catalog",
+    icon: "sales",
+  };
   return (
     <>
       <Item entry={ADMIN_NAV.overview} pathname={pathname} prominent />
@@ -74,6 +79,7 @@ function Groups({
                 pathname={pathname}
               />
             ))}
+            {group.title === "Commerce" && <Item entry={printfulCatalog} pathname={pathname} />}
           </div>
         </div>
       ))}
