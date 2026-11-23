@@ -26,6 +26,12 @@ function response(result: unknown, status = 200): Response {
   return new Response(JSON.stringify({ code: status, result }), { status, headers: { "content-type": "application/json" } });
 }
 
+function responseWithRawShipping(shipping: string): Response {
+  const body = JSON.stringify({ code: 200, result: { costs: costs({ shipping: "__RAW_SHIPPING__" }) } })
+    .replace('"__RAW_SHIPPING__"', shipping);
+  return new Response(body, { status: 200, headers: { "content-type": "application/json" } });
+}
+
 function costs(overrides: Record<string, unknown> = {}) {
   return {
     currency: "USD",
@@ -97,10 +103,53 @@ describe("Printful apparel Orders client", () => {
       costs({ currency: "CAD" }),
       costs({ digitization: undefined }),
       costs({ tax: 0.001 }),
+      costs({ shipping: null }),
+      costs({ shipping: "5.090000000000001" }),
+      costs({ shipping: 5.090000000000002 }),
+      costs({ shipping: -0.01 }),
+      costs({ shipping: 1_000_000.01 }),
     ]) {
       fetchMock.mockResolvedValueOnce(response({ costs: value }));
       expect(await client.estimateCosts(ADDRESS, LINE)).toEqual({ ok: false, reason: "invalid_response" });
     }
+    for (const value of ["NaN", "Infinity", "1e400"]) {
+      fetchMock.mockResolvedValueOnce(responseWithRawShipping(value));
+      expect(await client.estimateCosts(ADDRESS, LINE)).toEqual({ ok: false, reason: "invalid_response" });
+    }
+  });
+
+  it("accepts only one ULP of numeric noise at the cent boundary", async () => {
+    fetchMock.mockResolvedValue(response({ costs: costs({
+      subtotal: 18.44,
+      discount: 0,
+      shipping: 5.090000000000001,
+      additional_fee: 0,
+      fulfillment_fee: 0,
+      tax: 0,
+      vat: 0,
+      digitization: 6.5,
+      total: 30.03,
+    }) }));
+
+    const result = await client.estimateCosts(ADDRESS, LINE);
+
+    expect(result).toMatchObject({ ok: true, value: {
+      currency: "USD", subtotalCents: 1844, discountCents: 0, shippingCents: 509,
+      additionalFeeCents: 0, fulfillmentFeeCents: 0, taxCents: 0, vatCents: 0,
+      digitizationCents: 650, totalCents: 3003,
+    } });
+  });
+
+  it("applies the same bounded numeric money parsing to native order-cost readbacks", async () => {
+    fetchMock.mockResolvedValue(response(order({ costs: {
+      currency: "USD", subtotal: 18.44, discount: 0, shipping: 5.090000000000001,
+      digitization: 6.5, additional_fee: 0, fulfillment_fee: 0, retail_delivery_fee: 0,
+      tax: 0, vat: 0, total: 30.03,
+    } })));
+
+    const result = await client.createDraft(ADDRESS, LINE, DESIGN);
+
+    expect(result).toMatchObject({ ok: true, value: { currency: "USD", totalCents: 3003, costFactsComplete: true } });
   });
 
   it("treats the provider's documented total as authoritative when other fees are separate", async () => {

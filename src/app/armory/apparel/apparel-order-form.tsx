@@ -23,6 +23,11 @@ export function ApparelOrderForm(props: Readonly<{
     size: requestedSize,
     variantId: requestedVariantId,
   });
+  const exactNameCounts = new Map<string, number>();
+  for (const variant of selection.variants) {
+    const name = variant.name.trim();
+    if (name) exactNameCounts.set(name, (exactNameCounts.get(name) ?? 0) + 1);
+  }
 
   return (
     <form action={action} className="mt-5 grid gap-4 rounded-xl border border-border bg-surface p-4">
@@ -53,9 +58,12 @@ export function ApparelOrderForm(props: Readonly<{
             required
             className="field-input"
           >
-            {selection.variants.map((variant) => (
+            {selection.variants.map((variant, index) => (
               <option key={variant.id} value={variant.id}>
-                {variant.name.trim() || "Apparel option"} — {variant.id}
+                {variant.name.trim() || (selection.variants.length > 1 ? `Option ${index + 1}` : "Apparel option")}
+                {selection.variants.length > 1 && (exactNameCounts.get(variant.name.trim()) ?? 0) > 1
+                  ? ` (Option ${index + 1})`
+                  : ""}
               </option>
             ))}
           </select>

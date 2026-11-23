@@ -77,8 +77,19 @@ function safeProviderInteger(value: unknown): string | null {
 }
 
 function moneyToCents(value: unknown): number | null {
-  const text = typeof value === "number" && Number.isFinite(value) ? String(value) : value;
-  if (typeof text !== "string" || !/^(0|[1-9][0-9]{0,8})(?:\.([0-9]{1,2}))?$/.test(text)) return null;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 0 || value > 1_000_000) return null;
+    const scaled = value * 100;
+    const cents = Math.round(scaled);
+    if (!Number.isSafeInteger(cents) || cents > 100_000_000) return null;
+    const magnitude = Math.abs(scaled);
+    const oneUlp = magnitude === 0
+      ? Number.MIN_VALUE
+      : 2 ** (Math.floor(Math.log2(magnitude)) - 52);
+    return Math.abs(scaled - cents) <= oneUlp ? cents : null;
+  }
+  if (typeof value !== "string" || !/^(0|[1-9][0-9]{0,8})(?:\.([0-9]{1,2}))?$/.test(value)) return null;
+  const text = value;
   const [whole, fraction = ""] = text.split(".");
   const cents = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
   return Number.isSafeInteger(cents) && cents <= 100_000_000 ? cents : null;

@@ -49,6 +49,31 @@ function stableValue(value: unknown, depth = 0): unknown | typeof INVALID {
   return INVALID;
 }
 
+function commonFileOptions(value: unknown): unknown | typeof INVALID {
+  const stable = stableValue(value);
+  if (!Array.isArray(stable)) return stable;
+
+  const isRecord = (item: unknown): item is Record<string, unknown> =>
+    !!item && typeof item === "object" && !Array.isArray(item);
+  const canonical = stable.filter((item) => isRecord(item) && item.id === "full_color");
+  const camelCase = stable.filter((item) => isRecord(item) && item.id === "fullColor");
+  if (canonical.length !== 1 || camelCase.length !== 1) return stable;
+
+  const [canonicalOption] = canonical;
+  const [camelCaseOption] = camelCase;
+  const isExactBooleanOption = (option: Record<string, unknown>) =>
+    Object.keys(option).length === 2 && Object.hasOwn(option, "id") && Object.hasOwn(option, "value") &&
+    typeof option.value === "boolean";
+  if (!isExactBooleanOption(canonicalOption) || !isExactBooleanOption(camelCaseOption) ||
+      canonicalOption.value !== camelCaseOption.value) return stable;
+
+  // Observed native product/order response normalization inference only: do not
+  // treat this as a vendor-documented alias guarantee. Collapse only the exact,
+  // equal pair for common readback identity; the raw approval/config fingerprint
+  // remains unchanged.
+  return stable.filter((item) => item !== camelCaseOption);
+}
+
 /**
  * Common production identity observable in both a SyncVariant read and an Order
  * response. It intentionally excludes provider-only/transport fields and the
@@ -79,7 +104,7 @@ export function printfulCommonDesignIdentity(input: Readonly<{
       : typeof file.hash === "string" && /^[0-9a-f]{32}$/i.test(file.hash) ? file.hash.toLowerCase() : null;
     if ((file.id !== undefined && file.id !== null && id === null) ||
       (file.hash !== undefined && file.hash !== null && hash === null) || (!id && !hash)) return null;
-    const fileOptions = file.options === undefined ? [] : stableValue(file.options);
+    const fileOptions = file.options === undefined ? [] : commonFileOptions(file.options);
     if (fileOptions === INVALID || !Array.isArray(fileOptions)) return null;
     files.push({ id, hash, type, options: fileOptions });
   }
