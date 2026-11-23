@@ -32,6 +32,7 @@ export async function reviewCoachProfile(
       error: error.code === "P0001" ? `${error.message}.` : "That didn't work.",
     };
   revalidatePath("/admin/coach-profiles");
+  if (parsed.data.approve) revalidatePath("/coaches");
   revalidatePath(`/coaches/${parsed.data.coachId}`);
   return {};
 }
@@ -48,6 +49,7 @@ export async function unpublishCoachProfile(
   });
   if (error) return { error: "That didn't work." };
   revalidatePath("/admin/coach-profiles");
+  revalidatePath("/coaches");
   revalidatePath(`/coaches/${id.data}`);
   return {};
 }
