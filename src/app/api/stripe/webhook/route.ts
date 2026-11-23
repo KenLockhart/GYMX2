@@ -9,6 +9,8 @@ import {
   syncPlatformSubscriptionById,
 } from "@/lib/platform-membership-server";
 import { updateArmoryCheckoutStatus } from "@/lib/armory-purchases";
+import { handlePrintfulApparelRiskEvent, handlePrintfulApparelStripeEvent } from "@/lib/printful/apparel-stripe-events";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Stripe calls this after a payment. The signature check proves the message really came from Stripe.
 export async function POST(request: NextRequest) {
@@ -21,6 +23,35 @@ export async function POST(request: NextRequest) {
     event = getStripe().webhooks.constructEvent(await request.text(), signature, secret);
   } catch {
     return new NextResponse("Invalid signature", { status: 400 });
+  }
+
+  // Dedicated apparel settlements are dispatched before the legacy purchase fallback so a
+  // paid Printful order can never become an ordinary `purchases/to_ship` row.
+  const metadata = "metadata" in event.data.object ? event.data.object.metadata : null;
+  const apparelResult = metadata?.kind === "printful_apparel_purchase"
+    ? await handlePrintfulApparelStripeEvent(event, {
+        stripe: getStripe(),
+        admin: createAdminClient(),
+        expectedStripeAccountId: process.env.PRINTFUL_APPAREL_STRIPE_ACCOUNT_ID ?? "",
+      })
+    : "not_apparel";
+  if (apparelResult !== "not_apparel") {
+    return apparelResult === "handled"
+      ? NextResponse.json({ received: true })
+      : new NextResponse("Could not record apparel payment", { status: 500 });
+  }
+
+  if (event.type === "charge.refunded" || event.type.startsWith("charge.dispute.")) {
+    const riskResult = await handlePrintfulApparelRiskEvent(event, {
+      stripe: getStripe(), admin: createAdminClient(),
+      expectedStripeAccountId: process.env.PRINTFUL_APPAREL_STRIPE_ACCOUNT_ID ?? "",
+    });
+    if (riskResult !== "not_apparel") {
+      return riskResult === "handled"
+        ? NextResponse.json({ received: true })
+        : new NextResponse("Could not record apparel payment risk", { status: 500 });
+    }
+    if (event.type.startsWith("charge.dispute.")) return NextResponse.json({ received: true });
   }
 
   // Memberships: keep each subscription's status in step, and record every paid invoice.

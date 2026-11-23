@@ -225,3 +225,29 @@ export async function publishPrintfulPreviewAction(formData: FormData) {
   revalidatePath("/admin/printful");
   safeResult("preview_published");
 }
+
+export async function setPrintfulApparelApprovalAction(formData: FormData) {
+  const { profile } = await requireAdmin();
+  const productId = formData.get("product_id");
+  const enabled = formData.get("enable_apparel") === "on";
+  if (typeof productId !== "string" || !UUID_PATTERN.test(productId) ||
+    (enabled && formData.get("attest_apparel") !== "on")) safeResult("apparel_attestation_required");
+  let approvedVersion: unknown = null;
+  let approvalError = false;
+  try {
+    const { data, error } = await createAdminClient().rpc("set_printful_apparel_product_approval", {
+      target_product_id: productId,
+      target_admin_id: profile.id,
+      target_enabled: enabled,
+      target_apparel_attestation: enabled && formData.get("attest_apparel") === "on",
+    });
+    approvedVersion = data;
+    approvalError = !!error;
+  } catch {
+    approvalError = true;
+  }
+  if (approvalError || !Number.isSafeInteger(approvedVersion) || Number(approvedVersion) < 1) safeResult("apparel_approval_failed");
+  revalidatePath("/armory/apparel");
+  revalidatePath("/admin/printful");
+  safeResult(enabled ? "apparel_approved" : "apparel_approval_disabled");
+}

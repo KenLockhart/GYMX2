@@ -34,12 +34,15 @@ function matchesPrefix(pathname: string, prefix: string) {
 }
 
 const PUBLIC_ARMORY_DETAIL = /^\/armory\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PUBLIC_PRINTFUL_APPAREL_ORDER = /^\/armory\/apparel\/order\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function requiresArmorySignIn(pathname: string) {
   if (
     pathname === "/armory" ||
     pathname === "/armory/checkout-complete" ||
     pathname === "/armory/claim" ||
+    pathname === "/armory/apparel" ||
+    PUBLIC_PRINTFUL_APPAREL_ORDER.test(pathname) ||
     PUBLIC_ARMORY_DETAIL.test(pathname)
   ) {
     return false;
