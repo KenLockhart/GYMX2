@@ -99,15 +99,27 @@ export async function setCoachPhoto(
     .select("coach_id")
     .eq("coach_id", profile.id)
     .maybeSingle();
-  const { error } = existing
+  const { data: saved, error } = existing
     ? await supabase
         .from("coach_profile_drafts")
         .update({ photo_path: path })
         .eq("coach_id", profile.id)
+        .select("coach_id, photo_path")
+        .maybeSingle()
     : await supabase
         .from("coach_profile_drafts")
-        .insert({ coach_id: profile.id, data: {}, photo_path: path });
-  if (error) return { error: "We couldn't save the photo." };
+        .insert({ coach_id: profile.id, data: {}, photo_path: path })
+        .select("coach_id, photo_path")
+        .maybeSingle();
+  if (
+    error ||
+    saved?.coach_id !== profile.id ||
+    saved.photo_path !== path
+  )
+    return { error: "We couldn't save the photo." };
+  revalidatePath("/profile/coach");
+  revalidatePath("/admin/coach-profiles");
+  revalidatePath(`/admin/coach-profiles/${profile.id}`);
   if (!path) return { url: null };
   const { data } = await admin.storage
     .from(PHOTO_BUCKET)
@@ -153,6 +165,7 @@ export async function unpublishMyProfile(): Promise<{ error?: string }> {
   });
   if (error) return { error: "We couldn't take your profile down." };
   revalidatePath("/profile/coach");
+  revalidatePath("/coaches");
   revalidatePath(`/coaches/${profile.id}`);
   return {};
 }
