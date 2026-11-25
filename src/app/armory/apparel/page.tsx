@@ -45,11 +45,17 @@ export default async function PrintfulApparelPage({
 }: {
   searchParams: Promise<{ cancelled?: string }>;
 }) {
-  const [supabase, params] = await Promise.all([createClient(), searchParams]);
-  const { data, error } = await supabase.rpc("list_printful_apparel_catalog");
-  const products = !error && Array.isArray(data)
-    ? data.map(parseProduct).filter((product): product is PublicApparelProduct => product !== null)
-    : [];
+  const params = await searchParams;
+  const checkoutEnabled = process.env.PRINTFUL_APPAREL_CHECKOUT_ENABLED === "true" &&
+    process.env.PRINTFUL_APPAREL_FULFILLMENT_ENABLED === "true";
+  let products: PublicApparelProduct[] = [];
+  if (checkoutEnabled) {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("list_printful_apparel_catalog");
+    products = !error && Array.isArray(data)
+      ? data.map(parseProduct).filter((product): product is PublicApparelProduct => product !== null)
+      : [];
+  }
 
   return (
     <>
