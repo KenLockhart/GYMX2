@@ -28,6 +28,15 @@ function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+function parseCatalogRevision(value: unknown): string | null {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value > 0 ? String(value) : null;
+  }
+  if (typeof value !== "string" || !/^[1-9][0-9]*$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && String(parsed) === value ? value : null;
+}
+
 function validEmail(value: string): string | null {
   const email = value.trim().toLowerCase();
   return email.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
@@ -123,21 +132,21 @@ export async function startPrintfulApparelCheckout(input: ApparelCheckoutInput):
     return { ok: false, reason: "checkout_unavailable" };
   }
   const state = contextResult.data.state;
-  const revision = contextResult.data.revision;
+  const revision = parseCatalogRevision(contextResult.data.revision);
   const product = contextResult.data.product;
   const approved = contextResult.data.approval;
   const variant = contextResult.data.variant;
   const draft = contextResult.data.draft;
   if (!record(state) || state.mode !== "printful_apparel_only" || state.salesEnabled !== true ||
-    state.fulfillmentEnabled !== true || !state.refundPolicy || !record(revision) || !record(product) ||
+    state.fulfillmentEnabled !== true || !state.refundPolicy || revision === null || !record(product) ||
     !record(approved) || !record(variant) || !record(draft) || product.storeId !== "19050731" ||
     product.ignored !== false || approved.classification !== "apparel" || approved.enabled !== true ||
     String(approved.productId) !== input.productId || !UUID.test(String(approved.itemId)) ||
     variant.approvedForSale !== true ||
     draft.publishedAt === null || draft.curationApprovedAt === null || draft.visibleToAll !== true ||
     typeof draft.imagePath !== "string" || !Number.isSafeInteger(draft.priceCents) || draft.shippingCents !== 0 ||
-    String(revision.revision) !== String(product.lastSeenRevision) ||
-    String(variant.lastSeenRevision) !== String(revision.revision)) {
+    revision !== parseCatalogRevision(product.lastSeenRevision) ||
+    revision !== parseCatalogRevision(variant.lastSeenRevision)) {
     return { ok: false, reason: "variant_unavailable" };
   }
   const publicProduct = publicResult.data.find((entry: unknown) => record(entry) && entry.product_id === input.productId);
@@ -155,7 +164,7 @@ export async function startPrintfulApparelCheckout(input: ApparelCheckoutInput):
   const currentListing = {
     productId: String(product.id),
     storeId: String(product.storeId),
-    catalogRevision: String(revision.revision),
+    catalogRevision: revision,
     approvalVersion: Number(approved.approvalVersion),
     classification: String(approved.classification),
     enabled: approved.enabled === true,
@@ -165,7 +174,7 @@ export async function startPrintfulApparelCheckout(input: ApparelCheckoutInput):
     id: String(variant.id),
     productId: String(variant.productId),
     storeId: String(variant.storeId),
-    catalogRevision: String(revision.revision),
+    catalogRevision: revision,
     syncVariantId: String(variant.syncVariantId),
     color: typeof variant.color === "string" ? variant.color : null,
     size: typeof variant.size === "string" ? variant.size : null,
@@ -208,7 +217,7 @@ export async function startPrintfulApparelCheckout(input: ApparelCheckoutInput):
   });
   const afterReadContext = afterReadResult.data;
   if (afterReadResult.error || !record(afterReadContext) ||
-    String((afterReadContext.revision as Record<string, unknown> | null)?.revision) !== String(revision.revision) ||
+    parseCatalogRevision(afterReadContext.revision) !== revision ||
     !record(afterReadContext.variant) || afterReadContext.variant.configurationFingerprint !== currentVariant.configurationFingerprint ||
     afterReadContext.variant.approvedForSale !== true ||
     !record(afterReadContext.approval) || afterReadContext.approval.approvalVersion !== approved.approvalVersion ||
