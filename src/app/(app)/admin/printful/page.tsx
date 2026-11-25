@@ -9,6 +9,7 @@ import {
   completePrintfulCostReviewAction,
   importPrintfulPreviewAction,
   publishPrintfulPreviewAction,
+  setPrintfulApparelApprovalAction,
   syncPrintfulCatalogAction,
   updatePrintfulPreviewCurationAction,
 } from "./actions";
@@ -51,6 +52,17 @@ type AdminProduct = {
   variants?: AdminVariant[];
 };
 
+type AdminApparelOrder = {
+  orderId: string;
+  orderStatus: string;
+  fulfillmentStatus: string;
+  providerStatus: string | null;
+  safeErrorCode: string | null;
+  costExceptionCode: string | null;
+  updatedAt: string;
+  retryAt: string | null;
+};
+
 function money(cents: number | null | undefined): string {
   return typeof cents === "number" ? `$${(cents / 100).toFixed(2)}` : "Not verified";
 }
@@ -58,6 +70,40 @@ function money(cents: number | null | undefined): string {
 function toReviewProduct(value: unknown): AdminProduct | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as AdminProduct;
+}
+
+function toAdminApparelOrder(value: unknown): AdminApparelOrder | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  if (typeof row.order_id !== "string" || !UUID_PATTERN.test(row.order_id) ||
+    typeof row.order_status !== "string" || typeof row.fulfillment_status !== "string" ||
+    typeof row.updated_at !== "string" || !Number.isFinite(Date.parse(row.updated_at)) ||
+    !(row.provider_status === null || typeof row.provider_status === "string") ||
+    !(row.safe_error_code === null || typeof row.safe_error_code === "string" && /^[a-z0-9_]{1,80}$/.test(row.safe_error_code)) ||
+    !(row.provider_cost_exception_code === null || typeof row.provider_cost_exception_code === "string" && /^[a-z0-9_]{1,80}$/.test(row.provider_cost_exception_code)) ||
+    !(row.retry_at === null || typeof row.retry_at === "string" && Number.isFinite(Date.parse(row.retry_at)))) return null;
+  return {
+    orderId: row.order_id,
+    orderStatus: row.order_status,
+    fulfillmentStatus: row.fulfillment_status,
+    providerStatus: row.provider_status as string | null,
+    safeErrorCode: row.safe_error_code as string | null,
+    costExceptionCode: row.provider_cost_exception_code as string | null,
+    updatedAt: row.updated_at,
+    retryAt: row.retry_at as string | null,
+  };
+}
+
+function adminExceptionLabel(code: string): string {
+  const known = new Map<string, string>([
+    ["provider_cost_facts_unverified", "Supplier cost facts need review"],
+    ["provider_cost_changed", "Supplier cost differs from the approved quote"],
+    ["provider_cost_above_cap", "Supplier cost exceeds the authorized cap"],
+    ["provider_cost_above_net", "Supplier cost exceeds verified payment proceeds"],
+    ["stripe_payment_risk_requires_review", "Stripe refund or dispute needs review"],
+    ["confirm_outcome_requires_review", "Supplier confirmation outcome needs review"],
+  ]);
+  return known.get(code) ?? "Order needs admin review";
 }
 
 function resultMessage(value: string | undefined): string | null {
@@ -87,6 +133,10 @@ function resultMessage(value: string | undefined): string | null {
     ["curation_saved", "Preview curation saved."],
     ["invalid_curation", "The curated preview could not be saved. Check the title, image path and prices."],
     ["published_image_required", "A published preview must keep an image. Upload a replacement before saving."],
+    ["apparel_attestation_required", "Confirm that this published listing is apparel before approving it for guest checkout."],
+    ["apparel_approval_failed", "The Apparel approval could not be saved. Check that the published preview and exact costs are still eligible."],
+    ["apparel_approved", "This published listing is explicitly classified as Apparel. Global sales activation remains separately gated."],
+    ["apparel_approval_disabled", "Apparel checkout approval was disabled for this listing."],
   ]);
   if (value.startsWith("synced-")) return `Private catalog sync completed: ${value.slice(7).replace("-", " products and ")} variants.`;
   if (value.startsWith("costs-reviewed-")) return `Private UI cost evidence saved for ${value.slice("costs-reviewed-".length)} variants. Ranges remain ineligible for import.`;
@@ -105,6 +155,29 @@ export default async function PrintfulAdminPage({
   const products = Array.isArray(snapshot?.products)
     ? snapshot.products.map(toReviewProduct).filter((product): product is AdminProduct => product !== null)
     : [];
+  let apparelApprovalByProduct = new Map<string, boolean>();
+  try {
+    const { data, error } = await createAdminClient().rpc("get_printful_apparel_admin_approvals");
+    if (!error && Array.isArray(data)) {
+      apparelApprovalByProduct = new Map(data.flatMap((entry: unknown) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+        const row = entry as { product_id?: unknown; enabled?: unknown };
+        return typeof row.product_id === "string" && typeof row.enabled === "boolean"
+          ? [[row.product_id, row.enabled] as const] : [];
+      }));
+    }
+  } catch {
+    apparelApprovalByProduct = new Map();
+  }
+  let apparelOrders: AdminApparelOrder[] = [];
+  let apparelOrdersReadFailed = false;
+  try {
+    const { data, error } = await createAdminClient().rpc("list_printful_apparel_admin_orders");
+    if (error || !Array.isArray(data)) apparelOrdersReadFailed = true;
+    else apparelOrders = data.map(toAdminApparelOrder).filter((row): row is AdminApparelOrder => row !== null);
+  } catch {
+    apparelOrdersReadFailed = true;
+  }
   const reviewId = typeof query.review === "string" && UUID_PATTERN.test(query.review) ? query.review : null;
   let reviewSnapshot: Record<string, unknown> | null = null;
   if (reviewId) {
@@ -164,6 +237,37 @@ export default async function PrintfulAdminPage({
         <p className="mt-3 text-xs text-muted">
           API retail prices are ignored. Production prices below come only from an administrator-reviewed Printful UI observation, expire after 24 hours, and are tied to the exact design fingerprint. Free customer shipping is the initial setting; Printful merchant shipping and seasonal charges remain separate.
         </p>
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-border bg-surface p-5" aria-labelledby="private-apparel-order-status">
+        <div>
+          <h2 id="private-apparel-order-status" className="text-xl font-semibold">Private Apparel order status</h2>
+          <p className="mt-1 text-sm text-muted">
+            Review holds and supplier-cost exceptions here. This list contains no customer address, payment details or Printful IDs, and has no refund or fulfillment controls.
+          </p>
+        </div>
+        {apparelOrdersReadFailed ? (
+          <p role="status" className="rounded-lg border border-border p-3 text-sm">Private Apparel order status is temporarily unavailable.</p>
+        ) : apparelOrders.length === 0 ? (
+          <p className="rounded-lg bg-surface-raised p-3 text-sm text-muted">No private Apparel orders have been recorded.</p>
+        ) : (
+          <ul className="space-y-3">
+            {apparelOrders.map((order) => (
+              <li key={order.orderId} className="rounded-xl bg-surface-raised p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">Order ending {order.orderId.slice(-8)}</p>
+                    <p className="text-sm text-muted">Payment: {order.orderStatus} · Fulfillment: {order.fulfillmentStatus}{order.providerStatus ? ` · Supplier: ${order.providerStatus}` : ""}</p>
+                  </div>
+                  {order.costExceptionCode || order.safeErrorCode ? (
+                    <p className="text-sm font-medium text-accent">{adminExceptionLabel(order.costExceptionCode ?? order.safeErrorCode!)}</p>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-xs text-muted">Updated {new Date(order.updatedAt).toLocaleString()}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {reviewId && reviewSnapshot && (
@@ -269,6 +373,21 @@ export default async function PrintfulAdminPage({
                   <input type="hidden" name="item_id" value={product.importedArmoryItemId} />
                   <label className="flex gap-2 text-sm"><input type="checkbox" name="attest_publish" required />I approve the saved copy, image, customer price and shipping for publication in the Armory.</label>
                   <button className="rounded-lg bg-accent px-4 py-2 font-semibold text-accent-foreground">Publish curated Gear preview</button>
+                </form>
+              )}
+              {product.importedArmoryItemId && product.importedPublished && product.localProductId && (
+                <form action={setPrintfulApparelApprovalAction} className="space-y-3 rounded-xl border border-accent/40 bg-surface p-4">
+                  <input type="hidden" name="product_id" value={product.localProductId} />
+                  <p className="text-sm text-muted">Guest sale approval is separate from publication. Only explicitly reviewed Apparel is eligible; mats, bags, bottles and unclassified gear stay blocked.</p>
+                  <label className="flex gap-2 text-sm">
+                    <input type="checkbox" name="enable_apparel" defaultChecked={apparelApprovalByProduct.get(product.localProductId) === true} />
+                    Approve this published product as Apparel for guest checkout
+                  </label>
+                  <label className="flex gap-2 text-sm">
+                    <input type="checkbox" name="attest_apparel" />
+                    I verified this is Apparel and its exact size/color variants and current scalar Printful costs are reviewed
+                  </label>
+                  <button className="rounded-lg border border-border px-4 py-2 font-semibold">Save Apparel approval</button>
                 </form>
               )}
             </article>

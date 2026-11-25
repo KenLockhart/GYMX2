@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordAffiliateCommissions } from "@/lib/affiliate-server";
 import { notifyNewSale } from "@/lib/notify";
 import { getStripe } from "@/lib/stripe";
+import { recordLegacyPhysicalPaidResolution } from "@/lib/printful/legacy-paid-resolution";
 import {
   confirmArmoryCheckoutSession,
   recordArmoryCheckoutPurchase,
@@ -25,6 +26,33 @@ export async function recordPurchase(session: Stripe.Checkout.Session) {
 
   // Gear needs shipping. Stripe collected the address at checkout.
   const isGear = kind === "product";
+  if (isGear) {
+    const admin = createAdminClient();
+    const { data: priorPurchase, error: priorPurchaseError } = await admin
+      .from("purchases")
+      .select("id")
+      .eq("stripe_session_id", session.id)
+      .maybeSingle();
+    if (priorPurchaseError) return false;
+    if (priorPurchase) return true;
+
+    const resolution = await recordLegacyPhysicalPaidResolution(
+      admin,
+      {
+        sessionId: session.id,
+        paymentIntentId:
+          typeof session.payment_intent === "string"
+            ? session.payment_intent
+            : session.payment_intent?.id ?? null,
+        amountCents: session.amount_total,
+        currency: session.currency,
+        paymentStatus: session.payment_status,
+        checkoutIntentId: null,
+      },
+    );
+    if (resolution === "recorded") return true;
+    if (resolution === "failed") return false;
+  }
   const shipping = session.collected_information?.shipping_details ?? null;
 
   const { data: inserted, error } = await createAdminClient()

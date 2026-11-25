@@ -9,6 +9,7 @@ export function ArmoryPublicHeader({ signedIn }: { signedIn: boolean }) {
         <BrandLink />
         <nav aria-label="Armory navigation" className="flex flex-wrap items-center gap-4 text-sm">
           <Link href="/armory" className="font-semibold text-link"><T>The Armory</T></Link>
+          <Link href="/armory/apparel" className="text-link"><T>Apparel</T></Link>
           {signedIn ? (
             <>
               <Link href="/armory/purchases" className="text-link"><T>My purchases</T></Link>

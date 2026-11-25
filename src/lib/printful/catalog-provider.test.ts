@@ -16,7 +16,7 @@ type TestFetch = Mock<(input: string | URL | Request, init?: RequestInit) => Pro
 
 function productDetail(
   productIndex: number,
-  optionValue = "flat",
+  optionValue: unknown = "flat",
   fileOptionValue = "standard",
   ignored = false,
   extra: {
@@ -35,6 +35,7 @@ function productDetail(
     malformedIdentity?: boolean;
     missingOptionValue?: boolean;
     emptyOptions?: boolean;
+    protoOptionCollision?: boolean;
   } = {},
 ) {
   const productId = productIds[productIndex];
@@ -79,7 +80,9 @@ function productDetail(
           },
           { type: "preview", url: "https://example.invalid/preview-a" },
         ],
-        options: extra.emptyOptions ? [] : [{ id: "embroidery_type", ...(extra.missingOptionValue ? {} : { value: optionValue }) }],
+        options: extra.emptyOptions ? [] : [{ id: "embroidery_type", ...(extra.missingOptionValue ? {} : {
+          value: extra.protoOptionCollision ? JSON.parse('{"__proto__":{"x":1}}') : optionValue,
+        }) }],
       }],
     },
   };
@@ -111,6 +114,7 @@ function createFakeReader(options: {
   malformedIdentity?: boolean;
   missingOptionValue?: boolean;
   emptyOptions?: boolean;
+  protoOptionCollision?: boolean;
 } = {}) {
   let listCalls = 0;
   const fetcher = vi.fn(async (input: string | URL | Request) => {
@@ -153,6 +157,21 @@ function createFakeReader(options: {
 }
 
 describe("Printful live catalog reader", () => {
+  it("reads only the selected native product while independently proving the configured store", async () => {
+    const { fetcher } = createFakeReader();
+    const reader = createPrintfulStoreCatalogReader({ enabled: true, token: "synthetic-token", fetcher, pageSize: 1 });
+    const result = await reader.readProduct(productIds[0]);
+    expect(result.status).toBe("complete");
+    if (result.status === "complete") {
+      expect(result.storeId).toBe(storeId);
+      expect(result.product.syncProductId).toBe(productIds[0]);
+      expect(result.product.variants).toHaveLength(1);
+      expect(result.atomicProviderSnapshotProven).toBe(false);
+    }
+    const paths = fetcher.mock.calls.map(([input]) => new URL(typeof input === "string" || input instanceof URL ? input.toString() : input.url).pathname);
+    expect(paths).toEqual(["/stores", `/store/products/${productIds[0]}`]);
+  });
+
   it("verifies the expected store and collects a complete paginated read with exact decimal IDs", async () => {
     const { fetcher } = createFakeReader();
     const reader = createPrintfulStoreCatalogReader({ enabled: true, token: "synthetic-token", fetcher, pageSize: 1 });
@@ -168,6 +187,7 @@ describe("Printful live catalog reader", () => {
     expect(result.snapshot.products[0].variants[0].syncVariantId).toBe(variantIds[0]);
     expect(result.snapshot.products[0].variants[0].externalId).toBe("external-0");
     expect(result.snapshot.products[0].variants[0].configurationFingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.snapshot.products[0].variants[0].designIdentityFingerprint).toMatch(/^[0-9a-f]{64}$/);
     expect(result.snapshot.products[0].variants[0].placementTypes).toEqual(["embroidery_front_large", "preview"]);
     expect(result.snapshot.readStartedAt).toBeTruthy();
     expect(result.snapshot.readCompletedAt).toBe(result.snapshot.observedAt);
@@ -205,6 +225,19 @@ describe("Printful live catalog reader", () => {
     }
   });
 
+  it("preserves own __proto__ option keys in the configuration fingerprint", async () => {
+    const ordinary = createFakeReader();
+    const withProtoKey = createFakeReader({ protoOptionCollision: true });
+    const a = await createPrintfulStoreCatalogReader({ enabled: true, token: "x", fetcher: ordinary.fetcher, pageSize: 1 }).readCompleteStore();
+    const b = await createPrintfulStoreCatalogReader({ enabled: true, token: "x", fetcher: withProtoKey.fetcher, pageSize: 1 }).readCompleteStore();
+    expect(a.status).toBe("complete");
+    expect(b.status).toBe("complete");
+    if (a.status === "complete" && b.status === "complete") {
+      expect(a.snapshot.products[0].variants[0].configurationFingerprint)
+        .not.toBe(b.snapshot.products[0].variants[0].configurationFingerprint);
+    }
+  });
+
   it("changes the configuration fingerprint for nested file placement options", async () => {
     const first = createFakeReader();
     const second = createFakeReader({ changedFileOption: true });
@@ -227,6 +260,7 @@ describe("Printful live catalog reader", () => {
     expect(b.status).toBe("complete");
     if (a.status === "complete" && b.status === "complete") {
       expect(a.snapshot.products[0].variants[0].configurationFingerprint).not.toBe(b.snapshot.products[0].variants[0].configurationFingerprint);
+      expect(a.snapshot.products[0].variants[0].designIdentityFingerprint).not.toBe(b.snapshot.products[0].variants[0].designIdentityFingerprint);
     }
   });
 

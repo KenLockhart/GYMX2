@@ -123,6 +123,12 @@ describe("Armory paid Checkout settlement", () => {
       error: null,
     });
     mocks.rpc.mockImplementation((name: string) => {
+      if (name === "is_printful_apparel_auto_only") {
+        return Promise.resolve({ data: false, error: null });
+      }
+      if (name === "record_printful_apparel_legacy_paid_resolution") {
+        return Promise.resolve({ data: "synthetic-resolution", error: null });
+      }
       if (name === "claim_armory_guest_confirmation") {
         return Promise.resolve({ data: true, error: null });
       }
@@ -173,6 +179,74 @@ describe("Armory paid Checkout settlement", () => {
     expect(mocks.retrieveSession).not.toHaveBeenCalled();
     expect(mocks.bind).not.toHaveBeenCalled();
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("holds a verified late-paid physical Armory session during auto-only cutover", async () => {
+    mocks.intent.mockResolvedValueOnce({
+      data: { ...intent, item_kind: "product", price_cents: 2400, shipping_cents: 0 },
+      error: null,
+    });
+    mocks.retrieveSession.mockResolvedValueOnce({
+      ...paidSession,
+      amount_total: 2400,
+      payment_intent: {
+        ...paidSession.payment_intent,
+        amount: 2400,
+      },
+      collected_information: {
+        shipping_details: {
+          name: "Synthetic Buyer",
+          address: { line1: "1 Test Street", city: "Albany", country: "US" },
+        },
+      },
+    });
+    mocks.rpc.mockImplementation((name: string) => {
+      if (name === "is_printful_apparel_auto_only") {
+        return Promise.resolve({ data: true, error: null });
+      }
+      if (name === "record_printful_apparel_legacy_paid_resolution") {
+        return Promise.resolve({ data: "synthetic-resolution", error: null });
+      }
+      throw new Error("Unexpected RPC: " + name);
+    });
+
+    await expect(recordArmoryCheckoutPurchase(paidSession as never)).resolves.toBe(true);
+
+    expect(mocks.rpc).toHaveBeenCalledWith("record_printful_apparel_legacy_paid_resolution", {
+      target_checkout_intent_id: intentId,
+      target_session_id: sessionId,
+      target_payment_intent_id: paymentIntentId,
+      target_amount_cents: 2400,
+      target_currency: "usd",
+      target_reason_code: "physical_paid_after_auto_only_cutover",
+    });
+    expect(mocks.bind).not.toHaveBeenCalled();
+    expect(mocks.recordResult).not.toHaveBeenCalled();
+  });
+
+  it("does not turn an already-recorded physical purchase into a cutover resolution", async () => {
+    mocks.intent.mockResolvedValueOnce({
+      data: { ...intent, item_kind: "product", price_cents: 2400, shipping_cents: 0 },
+      error: null,
+    });
+    mocks.retrieveSession.mockResolvedValueOnce({
+      ...paidSession,
+      amount_total: 2400,
+      payment_intent: { ...paidSession.payment_intent, amount: 2400 },
+      collected_information: {
+        shipping_details: {
+          name: "Synthetic Buyer",
+          address: { line1: "1 Test Street", city: "Albany", country: "US" },
+        },
+      },
+    });
+    mocks.purchase.mockResolvedValueOnce({ data: { id: "existing-synthetic-purchase" }, error: null });
+
+    await expect(recordArmoryCheckoutPurchase(paidSession as never)).resolves.toBe(true);
+
+    expect(mocks.rpc).not.toHaveBeenCalledWith("record_printful_apparel_legacy_paid_resolution", expect.anything());
+    expect(mocks.bind).not.toHaveBeenCalled();
+    expect(mocks.recordResult).not.toHaveBeenCalled();
   });
 
   it("returns a retryable failure when a guest receipt email fails, then succeeds on paid-event replay without duplicating the order", async () => {

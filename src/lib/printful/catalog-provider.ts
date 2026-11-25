@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { EXPECTED_PRINTFUL_STORE_ID, parseCatalogId, type CatalogId } from "./catalog";
+import { printfulCommonDesignIdentity } from "./design-identity";
 
 const PRINTFUL_ORIGIN = "https://api.printful.com";
 const EXPECTED_STORE_NAME = "GYMX2";
@@ -22,6 +23,7 @@ export type PrintfulCatalogVariant = Readonly<{
   ignored: boolean | null;
   availabilityStatus: string | null;
   configurationFingerprint: string;
+  designIdentityFingerprint: string | null;
   configurationComplete: boolean;
   placementTypes: readonly string[];
   optionNames: readonly string[];
@@ -52,6 +54,19 @@ export type CompletePrintfulStoreRead = Readonly<{
 export type PrintfulStoreReadResult =
   | { status: "disabled" | "missing_credentials" | "missing_fetcher" | "provider_failed" }
   | { status: "complete"; snapshot: CompletePrintfulStoreRead };
+
+export type PrintfulProductReadResult =
+  | { status: "disabled" | "missing_credentials" | "missing_fetcher" | "provider_failed" }
+  | {
+      status: "complete";
+      storeId: typeof EXPECTED_PRINTFUL_STORE_ID;
+      storeName: "GYMX2";
+      storeType: "native";
+      readStartedAt: string;
+      readCompletedAt: string;
+      atomicProviderSnapshotProven: false;
+      product: PrintfulCatalogProduct;
+    };
 
 export type PrintfulStoreReaderOptions = Readonly<{
   enabled?: boolean;
@@ -103,7 +118,10 @@ function stableJsonValue(value: unknown, depth = 0): unknown | undefined {
   if (isRecord(value)) {
     const keys = Object.keys(value).sort();
     if (keys.length > 32) return undefined;
-    const result: Record<string, unknown> = {};
+    // Keep JSON keys as data, including an own `__proto__` property. Assigning
+    // that key on `{}` would invoke the legacy prototype setter and collapse
+    // distinct provider configurations to the same fingerprint.
+    const result = Object.create(null) as Record<string, unknown>;
     for (const key of keys) {
       if (!readText(key, 64)) return undefined;
       const entry = stableJsonValue(value[key], depth + 1);
@@ -245,6 +263,79 @@ function parseSummary(value: unknown): {
   return { syncProductId, name, ignored, variants, synced };
 }
 
+function parseProductDetail(
+  detail: unknown,
+  summary: NonNullable<ReturnType<typeof parseSummary>>,
+  seenVariantIds: Set<string> = new Set(),
+): PrintfulCatalogProduct | null {
+  if (!isRecord(detail) || !isRecord(detail.sync_product) || !Array.isArray(detail.sync_variants)) return null;
+  const product = detail.sync_product;
+  const productId = readCatalogId(product.id);
+  const productName = readText(product.name, 200);
+  const variantCount = readCount(product.variants, MAX_VARIANTS_PER_PRODUCT);
+  const syncedVariantCount = readCount(product.synced, MAX_VARIANTS_PER_PRODUCT);
+  const productIgnored = readOptionalBoolean(product.is_ignored);
+  if (productId !== summary.syncProductId || productName !== summary.name ||
+    variantCount !== summary.variants || syncedVariantCount !== summary.synced ||
+    detail.sync_variants.length !== summary.variants || productIgnored === undefined ||
+    productIgnored !== summary.ignored || detail.sync_variants.length > MAX_VARIANTS_PER_PRODUCT) return null;
+
+  const variants: PrintfulCatalogVariant[] = [];
+  let syncedCount = 0;
+  for (const rawVariant of detail.sync_variants) {
+    if (!isRecord(rawVariant)) return null;
+    const syncVariantId = readCatalogId(rawVariant.id);
+    const externalId = rawVariant.external_id === undefined || rawVariant.external_id === null
+      ? null : readText(rawVariant.external_id, 128);
+    const parentId = rawVariant.sync_product_id === undefined || rawVariant.sync_product_id === null
+      ? null : readCatalogId(rawVariant.sync_product_id);
+    const catalogVariantId = rawVariant.variant_id === undefined || rawVariant.variant_id === null
+      ? null : readCatalogId(rawVariant.variant_id);
+    const name = readText(rawVariant.name, 200);
+    const color = rawVariant.color === undefined || rawVariant.color === null ? null : readText(rawVariant.color, 80);
+    const size = rawVariant.size === undefined || rawVariant.size === null ? null : readText(rawVariant.size, 80);
+    const synced = rawVariant.synced;
+    const ignored = readOptionalBoolean(rawVariant.is_ignored);
+    const availabilityStatus = rawVariant.availability_status === undefined || rawVariant.availability_status === null
+      ? null : readText(rawVariant.availability_status, 64, true);
+    const configuration = parseConfiguration(rawVariant);
+    const designIdentityFingerprint = printfulCommonDesignIdentity({
+      syncVariantId,
+      catalogVariantId,
+      files: rawVariant.files,
+      options: rawVariant.options,
+    });
+    const configurationFingerprint = createHash("sha256")
+      .update(JSON.stringify({ parsed: configuration.fingerprint, catalogVariantId }))
+      .digest("hex");
+    if (!syncVariantId || seenVariantIds.has(syncVariantId) || !name || typeof synced !== "boolean" || ignored === undefined ||
+      (rawVariant.external_id !== undefined && rawVariant.external_id !== null && !externalId) ||
+      (rawVariant.sync_product_id !== undefined && rawVariant.sync_product_id !== null && parentId === null) ||
+      (parentId !== null && parentId !== summary.syncProductId) ||
+      (rawVariant.variant_id !== undefined && rawVariant.variant_id !== null && catalogVariantId === null) ||
+      (rawVariant.color !== undefined && rawVariant.color !== null && color === null) ||
+      (rawVariant.size !== undefined && rawVariant.size !== null && size === null) ||
+      (rawVariant.availability_status !== undefined && rawVariant.availability_status !== null && availabilityStatus === null) ||
+      !configuration.fingerprint) return null;
+    seenVariantIds.add(syncVariantId);
+    if (synced) syncedCount += 1;
+    variants.push({
+      syncVariantId, externalId, catalogVariantId, name, color, size, synced, ignored, availabilityStatus,
+      configurationFingerprint, designIdentityFingerprint,
+      configurationComplete: configuration.complete && catalogVariantId !== null,
+      placementTypes: configuration.placementTypes, optionNames: configuration.optionNames,
+    });
+  }
+  if (syncedCount !== summary.synced) return null;
+  return {
+    syncProductId: summary.syncProductId,
+    name: summary.name,
+    ignored: productIgnored,
+    syncedVariantCount,
+    variants,
+  };
+}
+
 async function readBoundedBody(response: Response): Promise<Uint8Array | null> {
   const contentLength = response.headers.get("content-length");
   if (contentLength !== null && (!/^(0|[1-9][0-9]*)$/.test(contentLength) || Number(contentLength) > MAX_RESPONSE_BYTES)) return null;
@@ -320,6 +411,40 @@ export function createPrintfulStoreCatalogReader(options: PrintfulStoreReaderOpt
   }
 
   return {
+    async readProduct(syncProductId: string): Promise<PrintfulProductReadResult> {
+      const unavailable = unavailableStatus();
+      if (unavailable) return { status: unavailable };
+      const requestedProductId = readCatalogId(syncProductId);
+      if (!requestedProductId) return { status: "provider_failed" };
+      const readStartedAt = new Date().toISOString();
+      const identityEnvelope = parseEnvelope(await getJson("/stores"));
+      if (!identityEnvelope || !Array.isArray(identityEnvelope.result)) return { status: "provider_failed" };
+      const storeMatches = identityEnvelope.result.filter((entry) => isRecord(entry) &&
+        readCatalogId(entry.id) === EXPECTED_PRINTFUL_STORE_ID &&
+        entry.name === EXPECTED_STORE_NAME && entry.type === EXPECTED_STORE_TYPE);
+      if (storeMatches.length !== 1) return { status: "provider_failed" };
+
+      const detailEnvelope = parseEnvelope(await getJson(`/store/products/${requestedProductId}`));
+      if (!detailEnvelope || !isRecord(detailEnvelope.result) || !isRecord(detailEnvelope.result.sync_product)) {
+        return { status: "provider_failed" };
+      }
+      const summary = parseSummary(detailEnvelope.result.sync_product);
+      const product = summary?.syncProductId === requestedProductId
+        ? parseProductDetail(detailEnvelope.result, summary)
+        : null;
+      if (!product) return { status: "provider_failed" };
+      return {
+        status: "complete",
+        storeId: EXPECTED_PRINTFUL_STORE_ID,
+        storeName: EXPECTED_STORE_NAME,
+        storeType: EXPECTED_STORE_TYPE,
+        readStartedAt,
+        readCompletedAt: new Date().toISOString(),
+        atomicProviderSnapshotProven: false,
+        product,
+      };
+    },
+
     async readCompleteStore(): Promise<PrintfulStoreReadResult> {
       const unavailable = unavailableStatus();
       if (unavailable) return { status: unavailable };
@@ -368,83 +493,9 @@ export function createPrintfulStoreCatalogReader(options: PrintfulStoreReaderOpt
       for (const summary of summaries) {
         const detailEnvelope = parseEnvelope(await getJson(`/store/products/${summary.syncProductId}`));
         if (!detailEnvelope || !isRecord(detailEnvelope.result)) return { status: "provider_failed" };
-        const detail = detailEnvelope.result;
-        if (!isRecord(detail.sync_product) || !Array.isArray(detail.sync_variants)) return { status: "provider_failed" };
-        const product = detail.sync_product;
-        const productId = readCatalogId(product.id);
-        const productName = readText(product.name, 200);
-        const variantCount = readCount(product.variants, MAX_VARIANTS_PER_PRODUCT);
-        const syncedVariantCount = readCount(product.synced, MAX_VARIANTS_PER_PRODUCT);
-        const productIgnored = readOptionalBoolean(product.is_ignored);
-        if (
-          productId !== summary.syncProductId || productName !== summary.name ||
-          variantCount !== summary.variants || syncedVariantCount !== summary.synced ||
-          detail.sync_variants.length !== summary.variants ||
-          productIgnored === undefined || productIgnored !== summary.ignored || detail.sync_variants.length > MAX_VARIANTS_PER_PRODUCT
-        ) return { status: "provider_failed" };
-        const variants: PrintfulCatalogVariant[] = [];
-        let syncedCount = 0;
-        for (const rawVariant of detail.sync_variants) {
-          if (!isRecord(rawVariant)) return { status: "provider_failed" };
-          const syncVariantId = readCatalogId(rawVariant.id);
-          const externalId = rawVariant.external_id === undefined || rawVariant.external_id === null
-            ? null
-            : readText(rawVariant.external_id, 128);
-          const parentId = rawVariant.sync_product_id === undefined || rawVariant.sync_product_id === null
-            ? null
-            : readCatalogId(rawVariant.sync_product_id);
-          const catalogVariantId = rawVariant.variant_id === undefined || rawVariant.variant_id === null
-            ? null
-            : readCatalogId(rawVariant.variant_id);
-          const name = readText(rawVariant.name, 200);
-          const color = rawVariant.color === undefined || rawVariant.color === null ? null : readText(rawVariant.color, 80);
-          const size = rawVariant.size === undefined || rawVariant.size === null ? null : readText(rawVariant.size, 80);
-          const synced = rawVariant.synced;
-          const ignored = readOptionalBoolean(rawVariant.is_ignored);
-          const availabilityStatus = rawVariant.availability_status === undefined || rawVariant.availability_status === null
-            ? null
-            : readText(rawVariant.availability_status, 64, true);
-          const configuration = parseConfiguration(rawVariant);
-          const configurationFingerprint = createHash("sha256")
-            .update(JSON.stringify({ parsed: configuration.fingerprint, catalogVariantId }))
-            .digest("hex");
-          if (
-            !syncVariantId || variantIds.has(syncVariantId) || !name || typeof synced !== "boolean" || ignored === undefined ||
-            (rawVariant.external_id !== undefined && rawVariant.external_id !== null && !externalId) ||
-            (rawVariant.sync_product_id !== undefined && rawVariant.sync_product_id !== null && parentId === null) ||
-            (parentId !== null && parentId !== summary.syncProductId) ||
-            (rawVariant.variant_id !== undefined && rawVariant.variant_id !== null && catalogVariantId === null) ||
-            (rawVariant.color !== undefined && rawVariant.color !== null && color === null) ||
-            (rawVariant.size !== undefined && rawVariant.size !== null && size === null) ||
-            (rawVariant.availability_status !== undefined && rawVariant.availability_status !== null && availabilityStatus === null) ||
-            !configuration.fingerprint
-          ) return { status: "provider_failed" };
-          variantIds.add(syncVariantId);
-          if (synced) syncedCount += 1;
-          variants.push({
-            syncVariantId,
-            externalId,
-            catalogVariantId,
-            name,
-            color,
-            size,
-            synced,
-            ignored,
-            availabilityStatus,
-            configurationFingerprint,
-            configurationComplete: configuration.complete && catalogVariantId !== null,
-            placementTypes: configuration.placementTypes,
-            optionNames: configuration.optionNames,
-          });
-        }
-        if (syncedCount !== summary.synced) return { status: "provider_failed" };
-        products.push({
-          syncProductId: summary.syncProductId,
-          name: summary.name,
-          ignored: productIgnored,
-          syncedVariantCount,
-          variants,
-        });
+        const product = parseProductDetail(detailEnvelope.result, summary, variantIds);
+        if (!product) return { status: "provider_failed" };
+        products.push(product);
       }
 
       // A final bounded listing catches products/count/state drift during detail collection.

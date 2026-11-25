@@ -14,6 +14,7 @@ import { notifyNewSale } from "@/lib/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { getStripe } from "@/lib/stripe";
+import { recordLegacyPhysicalPaidResolution } from "@/lib/printful/legacy-paid-resolution";
 
 type CheckoutIntent = {
   id: string;
@@ -155,6 +156,26 @@ export async function recordArmoryCheckoutPurchase(
 
   const current = await retrieveCurrentPaidSession(eventSession.id, intent).catch(() => null);
   if (!current) return false;
+  if (intent.item_kind === "product") {
+    const { data: priorPurchase, error: priorPurchaseError } = await admin
+      .from("purchases")
+      .select("id")
+      .eq("stripe_session_id", current.session.id)
+      .maybeSingle();
+    if (priorPurchaseError) return false;
+    if (priorPurchase) return true;
+
+    const resolution = await recordLegacyPhysicalPaidResolution(admin, {
+      sessionId: current.session.id,
+      paymentIntentId: current.paymentIntent.id,
+      amountCents: current.session.amount_total,
+      currency: current.session.currency,
+      paymentStatus: current.session.payment_status,
+      checkoutIntentId: intent.id,
+    });
+    if (resolution === "recorded") return true;
+    if (resolution === "failed") return false;
+  }
   if (!(await bindArmoryCheckoutSession(intent.id, current.session.id))) return false;
   if (current.refundedCharge) {
     const marked = await recordRefundMarker(
