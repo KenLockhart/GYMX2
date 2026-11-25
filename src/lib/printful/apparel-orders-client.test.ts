@@ -94,8 +94,36 @@ describe("Printful apparel Orders client", () => {
     const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
     expect(url.href).toBe("https://api.printful.com/orders/estimate-costs");
     expect(init.method).toBe("POST");
-    expect(JSON.parse(String(init.body))).toMatchObject({ shipping: "STANDARD", items: [{ sync_variant_id: 5635838147, quantity: 1 }] });
+    const body = JSON.parse(String(init.body));
+    expect(body).toMatchObject({ shipping: "STANDARD", items: [{ sync_variant_id: 5635838147, quantity: 1 }] });
+    expect(body).not.toHaveProperty("external_id");
+    expect(body.items[0]).not.toHaveProperty("external_id");
     expect(JSON.stringify(init.body)).not.toMatch(/catalog_variant_id|retail_price/);
+  });
+
+  it("estimates without a reused order ID but keeps external IDs on draft creation", async () => {
+    fetchMock.mockImplementation(async (input: URL | RequestInfo, init?: RequestInit) => {
+      const url = new URL(input instanceof URL ? input.href : String(input));
+      const body = JSON.parse(String(init?.body));
+      if (url.pathname === "/orders/estimate-costs") {
+        if (Object.hasOwn(body, "external_id") || Object.hasOwn(body.items[0], "external_id")) {
+          return response({ error: "EXTERNAL_ID_IN_USE" }, 400);
+        }
+        return response({ costs: costs() });
+      }
+      return response(order());
+    });
+
+    const estimate = await client.estimateCosts(ADDRESS, LINE);
+    const draft = await client.createDraft(ADDRESS, LINE, DESIGN);
+
+    expect(estimate.ok).toBe(true);
+    expect(draft.ok).toBe(true);
+    const estimateBody = JSON.parse(String((fetchMock.mock.calls[0] as [URL, RequestInit])[1].body));
+    expect(estimateBody.items).toEqual([{ sync_variant_id: 5635838147, quantity: 1 }]);
+    const draftBody = JSON.parse(String((fetchMock.mock.calls[1] as [URL, RequestInit])[1].body));
+    expect(draftBody.external_id).toBe(LINE.externalId);
+    expect(draftBody.items).toEqual([{ sync_variant_id: 5635838147, quantity: 1, external_id: LINE.externalId }]);
   });
 
   it("rejects incomplete, inconsistent, non-USD, and fractional-cent estimates", async () => {
@@ -169,6 +197,7 @@ describe("Printful apparel Orders client", () => {
     expect(url.href).toBe("https://api.printful.com/orders?confirm=0&update_existing=0");
     expect(init.method).toBe("POST");
     const body = JSON.parse(String(init.body));
+    expect(body.external_id).toBe(LINE.externalId);
     expect(body.items).toEqual([{ sync_variant_id: 5635838147, quantity: 1, external_id: LINE.externalId }]);
     expect(body).not.toHaveProperty("catalog_variant_id");
     expect(body).not.toHaveProperty("retail_price");

@@ -330,22 +330,22 @@ export function createPrintfulOrdersClient(input: Readonly<{
     return Number.isSafeInteger(number) ? number : null;
   }
 
-  function orderInput(recipient: PrintfulAddress, line: PrintfulOrderLine) {
+  function orderInput(recipient: PrintfulAddress, line: PrintfulOrderLine, includeExternalIds = true) {
     const syncVariantId = toProviderId(line.syncVariantId);
     if (!syncVariantId || line.quantity !== 1 || !EXTERNAL_ID.test(line.externalId)) return null;
     if (recipient.country_code !== "US" || !recipient.email || !recipient.name || !recipient.address1 ||
       !recipient.city || !recipient.state_code || !recipient.zip) return null;
     return {
-      external_id: line.externalId,
+      ...(includeExternalIds ? { external_id: line.externalId } : {}),
       shipping: "STANDARD",
       recipient,
-      items: [{ sync_variant_id: syncVariantId, quantity: 1, external_id: line.externalId }],
+      items: [{ sync_variant_id: syncVariantId, quantity: 1, ...(includeExternalIds ? { external_id: line.externalId } : {}) }],
     };
   }
 
   return {
     async estimateCosts(recipient: PrintfulAddress, line: PrintfulOrderLine): Promise<PrintfulOrdersResult<PrintfulEstimate>> {
-      const body = orderInput(recipient, line);
+      const body = orderInput(recipient, line, false);
       if (!body) return { ok: false, reason: "invalid_response" };
       const response = await request("/orders/estimate-costs", "POST", body);
       if (!response.ok) return response;
