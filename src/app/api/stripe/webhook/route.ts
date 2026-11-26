@@ -54,8 +54,22 @@ export async function POST(request: NextRequest) {
     if (event.type.startsWith("charge.dispute.")) return NextResponse.json({ received: true });
   }
 
-  // Memberships: keep each subscription's status in step, and record every paid invoice.
+  // Memberships: reconcile subscription and invoice state without crossing billing systems.
   try {
+    if (
+      event.type === "customer.subscription.paused" ||
+      event.type === "customer.subscription.resumed"
+    ) {
+      const subscription = event.data.object;
+      if (subscription.metadata?.kind === "platform_membership") {
+        await syncPlatformSubscriptionById(subscription.id, {
+          id: event.id,
+          created: event.created,
+        });
+      }
+      // These lifecycle events are platform-only. Keep existing coach dispatch unchanged.
+      return NextResponse.json({ received: true });
+    }
     if (
       event.type === "customer.subscription.created" ||
       event.type === "customer.subscription.updated" ||
@@ -77,17 +91,28 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json({ received: true });
     }
-    if (event.type === "invoice.paid") {
-      const subscriptionMetadata =
-        event.data.object.parent?.subscription_details?.metadata;
-      if (
-        subscriptionMetadata?.kind === "platform_membership" ||
-        subscriptionMetadata?.kind === "armory_purchase"
-      ) {
-        // Platform invoices are not coach purchases and never include Connect commissions.
+    if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
+      const invoice = event.data.object;
+      const subscriptionDetails = invoice.parent?.subscription_details;
+      const subscriptionMetadata = subscriptionDetails?.metadata;
+      if (subscriptionMetadata?.kind === "platform_membership") {
+        const subscription = subscriptionDetails?.subscription;
+        const subscriptionId = typeof subscription === "string" ? subscription : subscription?.id;
+        if (!subscriptionId) throw new Error("Platform invoice has no subscription ID.");
+        await syncPlatformSubscriptionById(subscriptionId, {
+          id: event.id,
+          created: event.created,
+        });
         return NextResponse.json({ received: true });
       }
-      const saved = await recordMembershipInvoice(event.data.object);
+      if (event.type === "invoice.payment_failed") {
+        return NextResponse.json({ received: true });
+      }
+      if (subscriptionMetadata?.kind === "armory_purchase") {
+        // Armory purchase invoices do not belong to the coach membership recorder.
+        return NextResponse.json({ received: true });
+      }
+      const saved = await recordMembershipInvoice(invoice);
       return saved ? NextResponse.json({ received: true }) : new NextResponse("Could not record invoice", { status: 500 });
     }
     if (event.type === "checkout.session.completed" && event.data.object.mode === "subscription") {

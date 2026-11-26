@@ -3,7 +3,9 @@ import type Stripe from "stripe";
 import {
   cancelAllPlatformMemberships,
   confirmPlatformCheckout,
+  createPlatformBillingPortalSession,
   createPlatformCheckoutSession,
+  getPlatformEntitlement,
   reconcilePlatformMembership,
   syncPlatformSubscriptionById,
 } from "./platform-membership-server";
@@ -16,10 +18,12 @@ const mocks = vi.hoisted(() => ({
   operations: [] as Array<Record<string, unknown>>,
   stripe: {
     prices: { retrieve: vi.fn() },
+    invoices: { retrieve: vi.fn() },
     subscriptions: { retrieve: vi.fn(), cancel: vi.fn() },
     checkout: {
       sessions: { create: vi.fn(), retrieve: vi.fn(), expire: vi.fn(), list: vi.fn() },
     },
+    billingPortal: { sessions: { create: vi.fn() } },
   },
 }));
 
@@ -175,6 +179,8 @@ function subscription(
   status: string = "active",
   overrides: Record<string, unknown> = {},
 ) {
+  const currentPrice = price(tier);
+  const currentPeriodEnd = 4_102_444_800;
   return {
     id: "sub_synthetic_platform",
     customer: "cus_synthetic_platform",
@@ -185,18 +191,76 @@ function subscription(
       member_id: MEMBER_ID,
       checkout_request_id: REQUEST_ID,
     },
+    latest_invoice: {
+      id: "in_synthetic_paid",
+      status: "paid",
+      customer: "cus_synthetic_platform",
+      parent: {
+        type: "subscription_details",
+        quote_details: null,
+        subscription_details: {
+          subscription: "sub_synthetic_platform",
+          metadata: {
+            kind: "platform_membership",
+            member_id: MEMBER_ID,
+            checkout_request_id: REQUEST_ID,
+          },
+        },
+      },
+      lines: {
+        has_more: false,
+        data: [{
+          amount: currentPrice.unit_amount,
+          quantity: 1,
+          period: { start: 1_700_000_000, end: currentPeriodEnd },
+          parent: {
+            type: "subscription_item_details",
+            subscription_item_details: {
+              invoice_item: null,
+              proration: false,
+              proration_details: null,
+              subscription: "sub_synthetic_platform",
+              subscription_item: "si_synthetic_platform",
+            },
+          },
+          pricing: {
+            type: "price_details",
+            price_details: {
+              price: currentPrice.id,
+              product: "prod_synthetic_platform",
+            },
+            unit_amount_decimal: String(currentPrice.unit_amount),
+          },
+        }],
+      },
+    },
     items: {
       data: [
         {
           id: "si_synthetic_platform",
           quantity: 1,
-          current_period_end: 4_102_444_800,
-          price: price(tier),
+          current_period_end: currentPeriodEnd,
+          price: currentPrice,
         },
       ],
     },
     ...overrides,
   } as unknown as Stripe.Subscription;
+}
+
+function testRecord(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Expected a synthetic Stripe object.");
+  }
+  return value as Record<string, unknown>;
+}
+
+function paidInvoiceRecord(tier: "regular" | "premium") {
+  const invoice = subscription(tier).latest_invoice;
+  if (!invoice || typeof invoice === "string") {
+    throw new Error("Expected a synthetic expanded invoice.");
+  }
+  return structuredClone(invoice) as unknown as Record<string, unknown>;
 }
 
 function billingRow(
@@ -264,6 +328,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("STRIPE_PLATFORM_REGULAR_PRICE_ID", REGULAR_PRICE_ID);
   vi.stubEnv("STRIPE_PLATFORM_PREMIUM_PRICE_ID", PREMIUM_PRICE_ID);
+  vi.stubEnv("STRIPE_PLATFORM_MEMBER_PORTAL_CONFIGURATION_ID", "bpc_memberSynthetic");
+  vi.stubEnv("STRIPE_PLATFORM_PREMIUM_PORTAL_CONFIGURATION_ID", "bpc_premiumSynthetic");
   mocks.tableResults = {};
   mocks.rpcResults = {};
   mocks.subscriptionResults = [];
@@ -273,8 +339,12 @@ beforeEach(() => {
     mocks.operations.push({ kind: "stripe", name: "prices.retrieve" });
     return price("regular");
   });
-  mocks.stripe.subscriptions.retrieve.mockImplementation(async () => {
-    mocks.operations.push({ kind: "stripe", name: "subscriptions.retrieve" });
+  mocks.stripe.invoices.retrieve.mockImplementation(async (invoiceId: string) => {
+    mocks.operations.push({ kind: "stripe", name: "invoices.retrieve", invoiceId });
+    return { id: invoiceId, status: "paid" };
+  });
+  mocks.stripe.subscriptions.retrieve.mockImplementation(async (subscriptionId: string, params?: unknown) => {
+    mocks.operations.push({ kind: "stripe", name: "subscriptions.retrieve", subscriptionId, params });
     const result = mocks.subscriptionResults.shift();
     if (result instanceof Error) throw result;
     if (!result) throw new Error("No synthetic subscription was queued.");
@@ -297,6 +367,7 @@ beforeEach(() => {
     url: null,
   }));
   mocks.stripe.checkout.sessions.list.mockResolvedValue({ data: [], has_more: false });
+  mocks.stripe.billingPortal.sessions.create.mockResolvedValue({ url: "https://billing.example/synthetic" });
 });
 
 afterEach(() => {
@@ -324,6 +395,11 @@ describe("platform subscription compare-and-swap orchestration", () => {
 
     expect(result).toBe(true);
     expect(mocks.stripe.subscriptions.retrieve).toHaveBeenCalledTimes(2);
+    expect(mocks.stripe.subscriptions.retrieve).toHaveBeenNthCalledWith(
+      1,
+      "sub_synthetic_platform",
+      { expand: ["latest_invoice"] },
+    );
     expect(syncCalls().map((args) => args.target_expected_revision)).toEqual([7, 8]);
     expect(syncCalls().map((args) => [args.target_tier, args.target_status])).toEqual([
       ["premium", "active"],
@@ -533,6 +609,150 @@ describe("confirmation and portal reconciliation", () => {
     expect(syncCalls()).toHaveLength(0);
   });
 
+  it("does not create an active entitlement when the initial latest invoice is unpaid", async () => {
+    queueTable("platform_memberships", ok(null));
+    queueNotDeleting();
+    queueStripeSubscriptions(subscription("premium", "active", {
+      latest_invoice: { id: "in_initial_unpaid", status: "open" },
+    }));
+
+    await expect(syncPlatformSubscriptionById("sub_synthetic_platform", null)).resolves.toBe(false);
+
+    expect(syncCalls()).toHaveLength(0);
+    expect(mocks.stripe.subscriptions.retrieve).toHaveBeenCalledWith(
+      "sub_synthetic_platform",
+      { expand: ["latest_invoice"] },
+    );
+  });
+
+  it.each([
+    { label: "an unpaid renewal", freshTier: "regular" as const },
+    { label: "an unpaid Premium upgrade", freshTier: "premium" as const },
+  ])("preserves the prior paid-through Regular row during $label", async ({ freshTier }) => {
+    const savedPeriodEnd = "2099-12-31T00:00:00.000Z";
+    queueTable(
+      "platform_memberships",
+      ok({ state_revision: 7 }),
+      ok([billingRow("regular", "active", { current_period_end: savedPeriodEnd })]),
+    );
+    queueNotDeleting();
+    appendTable("platform_membership_deletion_locks", ok(null));
+    queueTable("platform_test_entitlements", ok([]));
+    queueTable("platform_checkout_attempts", ok(null));
+    queueStripeSubscriptions(subscription(freshTier, "active", {
+      latest_invoice: { id: "in_renewal_unpaid", status: "open" },
+    }));
+
+    await expect(syncPlatformSubscriptionById("sub_synthetic_platform", null)).resolves.toBe(false);
+    const entitlement = await getPlatformEntitlement(MEMBER_ID);
+
+    expect(syncCalls()).toHaveLength(0);
+    expect(entitlement).toEqual({
+      ok: true,
+      entitlement: {
+        tier: "regular",
+        source: "stripe",
+        currentPeriodEnd: savedPeriodEnd,
+      },
+    });
+  });
+
+  it("retrieves and verifies an unexpanded latest invoice before syncing", async () => {
+    queueRevision(7);
+    queueNotDeleting();
+    queueStripeSubscriptions(subscription("regular", "active", {
+      latest_invoice: "in_string_unpaid",
+    }));
+    mocks.stripe.invoices.retrieve.mockResolvedValueOnce({ id: "in_string_unpaid", status: "open" });
+
+    await expect(syncPlatformSubscriptionById("sub_synthetic_platform", null)).resolves.toBe(false);
+
+    expect(mocks.stripe.invoices.retrieve).toHaveBeenCalledWith("in_string_unpaid");
+    expect(syncCalls()).toHaveLength(0);
+  });
+
+  it("does not grant a Premium upgrade from an older paid Regular invoice", async () => {
+    queueRevision(7);
+    queueNotDeleting();
+    const oldRegularInvoice = subscription("regular", "active").latest_invoice;
+    queueStripeSubscriptions(subscription("premium", "active", {
+      latest_invoice: oldRegularInvoice,
+    }));
+
+    await expect(syncPlatformSubscriptionById("sub_synthetic_platform", null)).resolves.toBe(false);
+
+    expect(syncCalls()).toHaveLength(0);
+  });
+
+  it("accepts a paid upgrade invoice with a current-price debit and old-price credit", async () => {
+    const invoice = paidInvoiceRecord("premium");
+    const lines = testRecord(invoice.lines);
+    const positiveLine = testRecord((lines.data as unknown[])[0]);
+    const negativeLine = structuredClone(positiveLine);
+    positiveLine.amount = 1_000;
+    testRecord(testRecord(positiveLine.parent).subscription_item_details).proration = true;
+    negativeLine.amount = -800;
+    testRecord(testRecord(negativeLine.parent).subscription_item_details).proration = true;
+    testRecord(testRecord(negativeLine.pricing).price_details).price = REGULAR_PRICE_ID;
+    lines.data = [negativeLine, positiveLine];
+    queueRevision(7);
+    queueNotDeleting();
+    queueStripeSubscriptions(subscription("premium", "active", { latest_invoice: invoice }));
+    queueRpc("sync_platform_membership", ok("applied"));
+
+    await expect(syncPlatformSubscriptionById("sub_synthetic_platform", null)).resolves.toBe(true);
+
+    expect(syncCalls()).toHaveLength(1);
+    expect(syncCalls()[0]).toMatchObject({ target_tier: "premium", target_status: "active" });
+  });
+
+  it.each([
+    "wrong invoice customer",
+    "wrong invoice subscription",
+    "wrong subscription item",
+    "same-price old-period line",
+    "truncated invoice lines",
+    "negative current-price line",
+  ])("does not grant an active plan from a paid invoice with %s", async (reason) => {
+    const invoice = paidInvoiceRecord("premium");
+    const lines = testRecord(invoice.lines);
+    const line = testRecord((lines.data as unknown[])[0]);
+    if (reason === "wrong invoice customer") {
+      invoice.customer = "cus_other_synthetic";
+    } else if (reason === "wrong invoice subscription") {
+      testRecord(testRecord(invoice.parent).subscription_details).subscription = "sub_other_synthetic";
+    } else if (reason === "wrong subscription item") {
+      testRecord(testRecord(line.parent).subscription_item_details).subscription_item = "si_other_synthetic";
+    } else if (reason === "same-price old-period line") {
+      testRecord(line.period).end = 4_102_444_799;
+    } else if (reason === "truncated invoice lines") {
+      lines.has_more = true;
+    } else {
+      line.amount = -1;
+    }
+    queueRevision(7);
+    queueNotDeleting();
+    queueStripeSubscriptions(subscription("premium", "active", { latest_invoice: invoice }));
+
+    await expect(syncPlatformSubscriptionById("sub_synthetic_platform", null)).resolves.toBe(false);
+
+    expect(syncCalls()).toHaveLength(0);
+  });
+
+  it("persists a nonactive subscription state even when its latest invoice is unpaid", async () => {
+    queueRevision(7);
+    queueNotDeleting();
+    queueStripeSubscriptions(subscription("premium", "canceled", {
+      latest_invoice: { id: "in_cancelled_unpaid", status: "open" },
+    }));
+    queueRpc("sync_platform_membership", ok("applied"));
+
+    await expect(syncPlatformSubscriptionById("sub_synthetic_platform", null)).resolves.toBe(true);
+
+    expect(syncCalls()).toHaveLength(1);
+    expect(syncCalls()[0]).toMatchObject({ target_status: "canceled", target_tier: "premium" });
+  });
+
   it("reconciles portal state from a fresh subscription after a CAS conflict", async () => {
     queueTable(
       "platform_memberships",
@@ -564,6 +784,45 @@ describe("confirmation and portal reconciliation", () => {
     );
     expect(baselineIndex).toBeGreaterThanOrEqual(0);
     expect(baselineIndex).toBeLessThan(retrieveIndex);
+  });
+
+  it.each([
+    { allowRegularPlan: true, tier: "regular" as const, configuration: "bpc_memberSynthetic" },
+    { allowRegularPlan: false, tier: "premium" as const, configuration: "bpc_premiumSynthetic" },
+  ])("pins the platform portal to the role-scoped configuration", async ({ allowRegularPlan, tier, configuration }) => {
+    queueTable("platform_memberships", ok([billingRow(tier, "active")]));
+    queueTable("platform_test_entitlements", ok([]));
+    queueTable("platform_checkout_attempts", ok(null));
+    queueTable("platform_membership_deletion_locks", ok(null));
+    queueStripeSubscriptions(subscription(tier, "active"));
+
+    await expect(createPlatformBillingPortalSession(
+      MEMBER_ID,
+      { type: "manage" },
+      { allowRegularPlan },
+    )).resolves.toBe("https://billing.example/synthetic");
+
+    expect(mocks.stripe.billingPortal.sessions.create).toHaveBeenCalledWith({
+      customer: "cus_synthetic_platform",
+      configuration,
+      return_url: "https://gymx2.example/membership",
+    });
+  });
+
+  it.each([
+    { allowRegularPlan: true, variable: "STRIPE_PLATFORM_MEMBER_PORTAL_CONFIGURATION_ID" },
+    { allowRegularPlan: false, variable: "STRIPE_PLATFORM_PREMIUM_PORTAL_CONFIGURATION_ID" },
+  ])("fails closed before Stripe when $variable is missing", async ({ allowRegularPlan, variable }) => {
+    vi.stubEnv(variable, "");
+
+    await expect(createPlatformBillingPortalSession(
+      MEMBER_ID,
+      { type: "manage" },
+      { allowRegularPlan },
+    )).rejects.toMatchObject({ code: "not_configured" });
+
+    expect(mocks.stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+    expect(mocks.stripe.billingPortal.sessions.create).not.toHaveBeenCalled();
   });
 });
 
@@ -666,6 +925,7 @@ describe("platform checkout lifecycle", () => {
     ]);
     expect(mocks.stripe.checkout.sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({
+        payment_method_types: ["card"],
         expires_at: Math.floor(Date.parse(expiresAt) / 1000),
         metadata: expect.objectContaining({
           kind: "platform_membership",
