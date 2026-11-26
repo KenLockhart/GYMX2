@@ -4,13 +4,13 @@ import { getPrintfulAdminSnapshot } from "@/lib/printful/catalog-runtime";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isReviewablePrintfulCostProduct } from "@/lib/printful/catalog-cost-evidence";
 import { PrintfulImageField } from "@/components/printful-image-field";
+import { PrintfulOperationForm } from "@/components/printful-operation-form";
+import { PrintfulReviewFocus } from "@/components/printful-review-focus";
 import {
-  beginPrintfulCostReviewAction,
   completePrintfulCostReviewAction,
   importPrintfulPreviewAction,
   publishPrintfulPreviewAction,
   setPrintfulApparelApprovalAction,
-  syncPrintfulCatalogAction,
   updatePrintfulPreviewCurationAction,
 } from "./actions";
 
@@ -115,6 +115,7 @@ function resultMessage(value: string | undefined): string | null {
   if (!value) return null;
   const safe = new Map<string, string>([
     ["provider_failed", "Printful could not provide a complete consistent catalog read. No catalog rows were written."],
+    ["sync_failed", "Printful sync did not return a verified result. Check the private catalog revision before retrying."],
     ["disabled", "Automatic sync is disabled. The feature flag must be explicitly enabled after deployment review."],
     ["missing_credentials", "The server is missing the Printful read-only credential."],
     ["wrong_store", "The server is not configured for the expected GYMX2 store."],
@@ -185,20 +186,23 @@ export default async function PrintfulAdminPage({
   }
   const reviewId = typeof query.review === "string" && UUID_PATTERN.test(query.review) ? query.review : null;
   let reviewSnapshot: Record<string, unknown> | null = null;
+  let reviewContextUnavailable = false;
   if (reviewId) {
     try {
-      const { data } = await createAdminClient().rpc("get_printful_ui_cost_review_context", {
+      const { data, error } = await createAdminClient().rpc("get_printful_ui_cost_review_context", {
         target_session_id: reviewId,
         target_admin_id: profile.id,
       });
-      if (data && typeof data === "object" && !Array.isArray(data)) {
+      if (!error && data && typeof data === "object" && !Array.isArray(data)) {
         const context = data as { snapshot?: unknown };
         if (context.snapshot && typeof context.snapshot === "object" && !Array.isArray(context.snapshot)) {
           reviewSnapshot = context.snapshot as Record<string, unknown>;
         }
       }
+      reviewContextUnavailable = reviewSnapshot === null;
     } catch {
       reviewSnapshot = null;
+      reviewContextUnavailable = true;
     }
   }
   const reviewProducts = Array.isArray(reviewSnapshot?.products)
@@ -231,18 +235,20 @@ export default async function PrintfulAdminPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <form action={syncPrintfulCatalogAction}>
-              <button className="rounded-lg bg-accent px-4 py-2 font-semibold text-accent-foreground">Sync catalog now</button>
-            </form>
-            <form action={beginPrintfulCostReviewAction}>
-              <button className="rounded-lg border border-border px-4 py-2 font-semibold">Start configured-cost review</button>
-            </form>
+            <PrintfulOperationForm operation="sync" />
+            <PrintfulOperationForm operation="cost-review" />
           </div>
         </div>
         <p className="mt-3 text-xs text-muted">
           API retail prices are ignored. Production prices below come only from an administrator-reviewed Printful UI observation, expire after 24 hours, and are tied to the exact design fingerprint. Free customer shipping is the initial setting; Printful merchant shipping and seasonal charges remain separate.
         </p>
       </section>
+
+      {reviewContextUnavailable && (
+        <p role="alert" className="rounded-xl border border-border bg-surface p-4 text-sm">
+          This cost-review session could not be loaded. No prices were changed during this page load. Start a new configured-cost review to try again.
+        </p>
+      )}
 
       <section className="space-y-4 rounded-2xl border border-border bg-surface p-5" aria-labelledby="private-apparel-order-status">
         <div>
@@ -276,9 +282,13 @@ export default async function PrintfulAdminPage({
       </section>
 
       {reviewId && reviewSnapshot && (
-        <section className="space-y-4 rounded-2xl border border-accent/40 bg-surface p-5">
+        <section key={reviewId} id="cost-review" tabIndex={-1} className="scroll-mt-5 space-y-4 rounded-2xl border border-accent/40 bg-surface p-5 focus:outline-none focus:ring-2 focus:ring-accent" aria-labelledby="cost-review-heading">
+          <PrintfulReviewFocus active />
           <div>
-            <h2 className="text-xl font-semibold">Review configured production prices</h2>
+            <h2 id="cost-review-heading" className="text-xl font-semibold">Review configured production prices</h2>
+            <p role="status" className="mt-2 rounded-lg bg-surface-raised p-3 text-sm">
+              Cost review is ready. Match each displayed color and size with Printful. Prices are saved only after you submit the completed review below.
+            </p>
             <p className="mt-1 text-sm text-muted">
               Compare every color and size below with the published product’s Printful price. Enter a scalar such as $18.44 or preserve a range such as $11.92 - $12.25. A range is recorded as a range and blocks import until an exact configured cost is known. Do not change or save prices in Printful.
             </p>

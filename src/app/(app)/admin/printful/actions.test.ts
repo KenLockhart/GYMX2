@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ adminRpc: vi.fn(), sync: vi.fn(), redirect: vi.fn() }));
+const mocks = vi.hoisted(() => ({ adminRpc: vi.fn(), sync: vi.fn(), redirect: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock("server-only", () => ({}));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/auth", () => ({ requireAdmin: async () => ({ profile: { id: "00000000-0000-4000-8000-000000000001", role: "admin" } }) }));
 vi.mock("@/lib/printful/catalog-runtime", () => ({ syncPrintfulCatalogToPrivateStage: mocks.sync }));
@@ -12,7 +12,7 @@ vi.mock("@/lib/printful/catalog-provider", () => ({
 }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc: mocks.adminRpc }) }));
 
-import { beginPrintfulCostReviewAction, updatePrintfulPreviewCurationAction } from "./actions";
+import { beginPrintfulCostReviewAction, syncPrintfulCatalogAction, updatePrintfulPreviewCurationAction } from "./actions";
 
 function curationForm(audience?: string) {
   const form = new FormData();
@@ -37,12 +37,41 @@ beforeEach(() => {
 });
 
 describe("Printful admin actions", () => {
+  it("redirects to the existing success banner after a verified catalog sync", async () => {
+    await expect(syncPrintfulCatalogAction()).rejects.toThrow("NEXT_REDIRECT:/admin/printful?result=synced-16-95");
+    expect(mocks.sync).toHaveBeenCalledOnce();
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/admin/printful");
+  });
+
+  it("redirects catalog failures to the existing result banner without revalidating", async () => {
+    mocks.sync.mockResolvedValue({ status: "provider_failed" });
+    await expect(syncPrintfulCatalogAction()).rejects.toThrow("NEXT_REDIRECT:/admin/printful?result=provider_failed");
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("shows a safe result when an unexpected sync error interrupts the action", async () => {
+    mocks.sync.mockRejectedValue(new Error("private transport detail"));
+    await expect(syncPrintfulCatalogAction()).rejects.toThrow("NEXT_REDIRECT:/admin/printful?result=sync_failed");
+    expect(mocks.redirect).not.toHaveBeenCalledWith(expect.stringContaining("private transport detail"));
+  });
+
   it("redirects to the created cost-review session after sync succeeds", async () => {
-    await expect(beginPrintfulCostReviewAction()).rejects.toThrow("NEXT_REDIRECT:/admin/printful?review=00000000-0000-4000-8000-000000000099");
+    await expect(beginPrintfulCostReviewAction()).rejects.toThrow("NEXT_REDIRECT:/admin/printful?review=00000000-0000-4000-8000-000000000099#cost-review");
     expect(mocks.adminRpc).toHaveBeenCalledWith("begin_printful_ui_cost_review", {
       target_admin_id: "00000000-0000-4000-8000-000000000001",
     });
     expect(mocks.redirect).toHaveBeenCalledOnce();
+  });
+
+  it("does not create a cost-review session when the catalog read fails", async () => {
+    mocks.sync.mockResolvedValue({ status: "provider_failed" });
+    await expect(beginPrintfulCostReviewAction()).rejects.toThrow("NEXT_REDIRECT:/admin/printful?result=provider_failed");
+    expect(mocks.adminRpc).not.toHaveBeenCalled();
+  });
+
+  it("redirects to the existing error banner when review-session creation fails", async () => {
+    mocks.adminRpc.mockResolvedValue({ data: null, error: { code: "XX000" } });
+    await expect(beginPrintfulCostReviewAction()).rejects.toThrow("NEXT_REDIRECT:/admin/printful?result=review_unavailable");
   });
 
   it("saves Printful preview audience through the atomic curation RPC", async () => {
