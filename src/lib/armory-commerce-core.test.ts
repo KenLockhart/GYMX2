@@ -13,6 +13,7 @@ const regularProduct: ArmorySaleSnapshot = {
   coach_id: "223e4567-e89b-42d3-a456-426614174000",
   kind: "product",
   category: "gear",
+  required_membership_tier: "everyone",
   title: "Training shirt",
   price_cents: 2495,
   shipping_cents: 450,
@@ -29,6 +30,8 @@ describe("public Armory commerce rules", () => {
     expect(isPublicArmorySale({ ...regularProduct, visible_to_all: false })).toBe(false);
     expect(isPublicArmorySale({ ...regularProduct, category: "supplements" })).toBe(false);
     expect(isPublicArmorySale({ ...regularProduct, category: "doctor_network" })).toBe(false);
+    expect(isPublicArmorySale({ ...regularProduct, category: "ebook", required_membership_tier: "premium" })).toBe(false);
+    expect(isPublicArmorySale({ ...regularProduct, required_membership_tier: "unknown" })).toBe(false);
     expect(isPublicArmorySale({ ...regularProduct, kind: "preview" })).toBe(false);
     expect(isPublicArmorySale({ ...regularProduct, price_cents: 0 })).toBe(false);
   });

@@ -15,37 +15,37 @@ where id in ('80000000-0000-0000-0000-000000000002', '80000000-0000-0000-0000-00
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"80000000-0000-0000-0000-000000000002","role":"authenticated"}';
 select lives_ok(
-  $$insert into public.armory_items (coach_id, kind, category, title, price_cents, shipping_cents, sizes, visible_to_all)
+  $$insert into public.armory_items (coach_id, kind, category, title, price_cents, shipping_cents, sizes, visible_to_all, required_membership_tier)
     values ('80000000-0000-0000-0000-000000000002', 'product', 'gear', 'Shirt', 4995, 599,
-            array['S', 'M', 'L'], true)$$,
+            array['S', 'M', 'L'], true, 'everyone')$$,
   'a coach can list gear with sizes and a shipping fee'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, shipping_cents)
-    values ('80000000-0000-0000-0000-000000000002', 'product', 'No price', 500)$$,
+  $$insert into public.armory_items (coach_id, kind, title, shipping_cents, required_membership_tier)
+    values ('80000000-0000-0000-0000-000000000002', 'product', 'No price', 500, 'everyone')$$,
   '23514',
   null,
   'gear needs a price'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, price_cents, file_path, file_name)
+  $$insert into public.armory_items (coach_id, kind, title, price_cents, file_path, file_name, required_membership_tier)
     values ('80000000-0000-0000-0000-000000000002', 'product', 'With file', 1000,
-            '80000000-0000-0000-0000-000000000002/x.png', 'x.png')$$,
+            '80000000-0000-0000-0000-000000000002/x.png', 'x.png', 'everyone')$$,
   '23514',
   null,
   'gear has no download file'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, price_cents, sizes)
-    values ('80000000-0000-0000-0000-000000000002', 'product', 'Blank size', 1000, array['M', ''])$$,
+  $$insert into public.armory_items (coach_id, kind, title, price_cents, sizes, required_membership_tier)
+    values ('80000000-0000-0000-0000-000000000002', 'product', 'Blank size', 1000, array['M', ''], 'everyone')$$,
   '23514',
   null,
   'sizes cannot be blank'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, category, title, price_cents, file_path, file_name)
+  $$insert into public.armory_items (coach_id, kind, category, title, price_cents, file_path, file_name, required_membership_tier)
     values ('80000000-0000-0000-0000-000000000002', 'paid', 'gear', 'Shirt file', 1000,
-            '80000000-0000-0000-0000-000000000002/shirt.png', 'shirt.png')$$,
+            '80000000-0000-0000-0000-000000000002/shirt.png', 'shirt.png', 'everyone')$$,
   '23514',
   null,
   'gear can never be sold as a download'

@@ -179,11 +179,16 @@ export async function updatePrintfulPreviewCurationAction(formData: FormData) {
   const imagePath = formData.get("image_path");
   const price = formData.get("price");
   const shipping = formData.get("shipping");
+  const hasAudience = formData.has("required_membership_tier");
+  const audience = formData.get("required_membership_tier");
+  const requiredMembershipTier = audience === "everyone" || audience === "premium" ? audience : null;
   const priceCents = typeof price === "string" && /^\d+(?:\.\d{1,2})?$/.test(price.trim()) ? Math.round(Number(price) * 100) : NaN;
   const shippingCents = typeof shipping === "string" && /^\d+(?:\.\d{1,2})?$/.test(shipping.trim()) ? Math.round(Number(shipping) * 100) : NaN;
-  if (typeof itemId !== "string" || !UUID_PATTERN.test(itemId) || typeof title !== "string" ||
+  if (!hasAudience || requiredMembershipTier === null ||
+    typeof itemId !== "string" || !UUID_PATTERN.test(itemId) || typeof title !== "string" ||
     typeof description !== "string" || !(imagePath === "" || typeof imagePath === "string") ||
-    !Number.isSafeInteger(priceCents) || !Number.isSafeInteger(shippingCents)) safeResult("invalid_curation");
+    !Number.isSafeInteger(priceCents) || !Number.isSafeInteger(shippingCents) ||
+    (hasAudience && requiredMembershipTier === null)) safeResult("invalid_curation");
   let curationError: string | null = null;
   try {
     const { error } = await createAdminClient().rpc("update_printful_armory_preview", {
@@ -195,6 +200,7 @@ export async function updatePrintfulPreviewCurationAction(formData: FormData) {
       target_price_cents: priceCents,
       target_shipping_cents: shippingCents,
       target_visible_to_all: formData.get("visible_to_all") === "on",
+      target_required_membership_tier: requiredMembershipTier,
     });
     if (error) curationError = error.code === "P0001" ? "published_image_required" : "invalid_curation";
   } catch {

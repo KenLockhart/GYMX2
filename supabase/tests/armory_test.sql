@@ -31,39 +31,39 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"50000000-0000-0000-0000-000000000002","role":"authenticated"}';
 select lives_ok(
-  $$insert into public.armory_items (coach_id, kind, category, title, price_cents, buy_url)
-    values ('50000000-0000-0000-0000-000000000002', 'link', 'gear', 'Bands', 2499, 'https://shop.example.com/bands')$$,
+  $$insert into public.armory_items (coach_id, kind, category, title, price_cents, buy_url, required_membership_tier)
+    values ('50000000-0000-0000-0000-000000000002', 'link', 'gear', 'Bands', 2499, 'https://shop.example.com/bands', 'everyone')$$,
   'a coach can add an outside-link item'
 );
 select lives_ok(
-  $$insert into public.armory_items (coach_id, kind, title, file_path, file_name)
+  $$insert into public.armory_items (coach_id, kind, title, file_path, file_name, required_membership_tier)
     values ('50000000-0000-0000-0000-000000000002', 'download', 'Meal plan',
-            '50000000-0000-0000-0000-000000000002/plan.pdf', 'plan.pdf')$$,
+            '50000000-0000-0000-0000-000000000002/plan.pdf', 'plan.pdf', 'everyone')$$,
   'a coach can add a free download'
 );
 select lives_ok(
-  $$insert into public.armory_items (coach_id, kind, title, buy_url, visible_to_all)
-    values ('50000000-0000-0000-0000-000000000002', 'link', 'Public guide', 'https://shop.example.com/guide', true)$$,
+  $$insert into public.armory_items (coach_id, kind, title, buy_url, visible_to_all, required_membership_tier)
+    values ('50000000-0000-0000-0000-000000000002', 'link', 'Public guide', 'https://shop.example.com/guide', true, 'everyone')$$,
   'a coach can share an item with everyone'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, file_path, file_name)
+  $$insert into public.armory_items (coach_id, kind, title, file_path, file_name, required_membership_tier)
     values ('50000000-0000-0000-0000-000000000002', 'download', 'Stolen',
-            '50000000-0000-0000-0000-000000000003/secret.pdf', 'secret.pdf')$$,
+            '50000000-0000-0000-0000-000000000003/secret.pdf', 'secret.pdf', 'everyone')$$,
   '23514',
   null,
   'a coach cannot point an item at another coach''s file'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, buy_url)
-    values ('50000000-0000-0000-0000-000000000002', 'link', 'Insecure', 'http://shop.example.com')$$,
+  $$insert into public.armory_items (coach_id, kind, title, buy_url, required_membership_tier)
+    values ('50000000-0000-0000-0000-000000000002', 'link', 'Insecure', 'http://shop.example.com', 'everyone')$$,
   '23514',
   null,
   'a buy link must use https'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, buy_url)
-    values ('50000000-0000-0000-0000-000000000003', 'link', 'Forged', 'https://shop.example.com')$$,
+  $$insert into public.armory_items (coach_id, kind, title, buy_url, required_membership_tier)
+    values ('50000000-0000-0000-0000-000000000003', 'link', 'Forged', 'https://shop.example.com', 'everyone')$$,
   '42501',
   null,
   'a coach cannot add an item as someone else'
@@ -75,8 +75,8 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"50000000-0000-0000-0000-000000000004","role":"authenticated"}';
 select is((select count(*)::int from public.armory_items), 3, 'a joined member sees all of their coach''s items');
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, buy_url)
-    values ('50000000-0000-0000-0000-000000000004', 'link', 'Member item', 'https://shop.example.com')$$,
+  $$insert into public.armory_items (coach_id, kind, title, buy_url, required_membership_tier)
+    values ('50000000-0000-0000-0000-000000000004', 'link', 'Member item', 'https://shop.example.com', 'everyone')$$,
   '42501',
   null,
   'a member cannot add items'

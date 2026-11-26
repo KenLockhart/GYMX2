@@ -5,7 +5,7 @@ import {
   describeSize,
   fileExtension,
   addressLines,
-  canAccessArmoryCategory,
+  canAccessArmoryAudience,
   deliveryEstimate,
   formatMoney,
   formatPrice,
@@ -57,6 +57,9 @@ describe("categories", () => {
     expect(categoryLabel("gear")).toBe("Gear");
     expect(categoryLabel("accessories")).toBe("Accessories");
     expect(categoryLabel("supplements")).toBe("Supplements");
+    expect(categoryLabel("peptides")).toBe("Peptides");
+    expect(categoryLabel("partners")).toBe("Partners");
+    expect(categoryLabel("other_products")).toBe("Other");
     expect(categoryLabel("doctor_network")).toBe("Doctor Network");
     expect(categoryLabel("other")).toBe("Legacy / Other");
     expect(categoryLabel("unknown")).toBe("Other");
@@ -66,15 +69,20 @@ describe("categories", () => {
     expect(isCategory("ebook")).toBe(true);
     expect(isCategory("accessories")).toBe(true);
     expect(isCategory("supplements")).toBe(true);
+    expect(isCategory("peptides")).toBe(true);
+    expect(isCategory("partners")).toBe(true);
+    expect(isCategory("other_products")).toBe(true);
     expect(isCategory("doctor_network")).toBe(true);
     expect(isCategory("weapons")).toBe(false);
   });
 
-  it("keeps premium categories hidden from regular entitlements", () => {
-    expect(canAccessArmoryCategory("ebook", "regular")).toBe(true);
-    expect(canAccessArmoryCategory("supplements", "regular")).toBe(false);
-    expect(canAccessArmoryCategory("doctor_network", null)).toBe(false);
-    expect(canAccessArmoryCategory("supplements", "premium")).toBe(true);
+  it("checks item audience independently from category", () => {
+    expect(canAccessArmoryAudience("everyone", null)).toBe(true);
+    expect(canAccessArmoryAudience("everyone", "regular")).toBe(true);
+    expect(canAccessArmoryAudience("premium", "regular")).toBe(false);
+    expect(canAccessArmoryAudience("premium", null)).toBe(false);
+    expect(canAccessArmoryAudience("premium", "premium")).toBe(true);
+    expect(canAccessArmoryAudience("unknown", "premium")).toBe(false);
   });
 });
 
@@ -164,16 +172,20 @@ describe("categoriesFor", () => {
     expect(categoriesFor("link").map((c) => c.value)).toContain("gear");
   });
 
-  it("offers the six current categories for new items and retains legacy Other only while editing it", () => {
+  it("offers new categories for every allowed kind and retains legacy Other only while editing it", () => {
     expect(categoriesFor("link").map((category) => category.value)).toEqual([
       "ebook",
       "gear",
       "accessories",
       "program",
       "supplements",
+      "peptides",
       "doctor_network",
+      "partners",
+      "other_products",
     ]);
     expect(categoriesFor("link", "other").at(-1)?.value).toBe("other");
+    expect(categoriesFor("paid").map((category) => category.value)).toContain("partners");
     expect(categoriesFor("paid", "other").map((category) => category.value)).not.toContain("gear");
   });
 });

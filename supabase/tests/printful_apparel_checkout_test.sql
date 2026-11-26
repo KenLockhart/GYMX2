@@ -1,5 +1,5 @@
 begin;
-select plan(90);
+select plan(96);
 
 select is(
   (select mode || ':' || sales_enabled::text || ':' || fulfillment_enabled::text
@@ -193,7 +193,7 @@ select is(
   public.update_printful_armory_preview(
     (select item_id from apparel_qa_refs), (select admin_id from apparel_qa_refs),
     'Synthetic Tee', 'Synthetic apparel fixture for transactional tests.',
-    (select admin_id::text || '/synthetic.webp' from apparel_qa_refs), 3844, 0, true
+    (select admin_id::text || '/synthetic.webp' from apparel_qa_refs), 3844, 0, true, 'everyone'
   ),
   true,
   'admin curation stores synthetic copy and owner-scoped image before publish'
@@ -233,6 +233,32 @@ select is(public.finish_printful_apparel_cutover((select admin_id from apparel_q
   'admin resolution allows the cutover to finish without an ordinary physical fallback');
 select is(public.set_printful_apparel_sales_enabled((select admin_id from apparel_qa_refs), true, 'admin_review'), true,
   'synthetic integration test explicitly enables the isolated target only');
+
+select is(public.update_printful_armory_preview(
+  (select item_id from apparel_qa_refs), (select admin_id from apparel_qa_refs),
+  'Synthetic Tee', 'Synthetic apparel fixture for transactional tests.',
+  (select admin_id::text || '/synthetic.webp' from apparel_qa_refs), 3844, 0, true, 'premium'
+), true, 'published apparel audience can be changed through the locked curation RPC');
+select is((select count(*)::integer from public.list_printful_apparel_catalog()), 0,
+  'guest apparel catalog omits Premium managed items');
+select is(public.get_printful_apparel_checkout_context(
+  (select product_id from apparel_qa_refs), (select red_variant_id from apparel_qa_refs)
+), null::jsonb, 'service checkout context refuses Premium managed items');
+select throws_ok($$select public.create_printful_apparel_checkout_intent(
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7',
+  (select product_id from apparel_qa_refs),
+  (select red_variant_id from apparel_qa_refs),
+  1, 1, 'premium-buyer@example.test', '{}'::jsonb, repeat('a',64), repeat('b',64), now()+interval '1 day', '{}'::jsonb
+)$$, 'P0001', 'Premium Printful items are unavailable in the guest-only apparel checkout',
+  'guest checkout intent rejects Premium before order or provider work');
+select is((select count(*)::integer from private.printful_apparel_orders
+  where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7'), 0,
+  'Premium guest rejection creates no checkout order');
+select is(public.update_printful_armory_preview(
+  (select item_id from apparel_qa_refs), (select admin_id from apparel_qa_refs),
+  'Synthetic Tee', 'Synthetic apparel fixture for transactional tests.',
+  (select admin_id::text || '/synthetic.webp' from apparel_qa_refs), 3844, 0, true, 'everyone'
+), true, 'Everyone audience restores synthetic apparel fixture for existing checkout tests');
 
 select throws_ok(
   $$select public.create_printful_apparel_checkout_intent(
@@ -437,10 +463,11 @@ insert into private.printful_catalog_variants (
   repeat('e',64), repeat('4',64), '11111111-1111-4111-8111-111111111111', 2
 );
 select is(
-  public.get_printful_apparel_checkout_context(
-    (select product_id from apparel_qa_refs), '33333333-3333-4333-8333-333333333333'
-  ) #>> '{variant,approvedForSale}', 'false',
-  'a newly observed exact variant is not implicitly added to the prior approval manifest'
+  (select (context.value #>> '{variant,approvedForSale}') || ':' || (context.value #>> '{draft,requiredMembershipTier}')
+   from (select public.get_printful_apparel_checkout_context(
+     (select product_id from apparel_qa_refs), '33333333-3333-4333-8333-333333333333'
+   ) as value) context), 'false:everyone',
+  'context returns the explicit Everyone audience and does not implicitly approve a new variant'
 );
 select throws_ok(
   $$select pg_temp.create_apparel_test_order(

@@ -47,6 +47,7 @@ type AdminProduct = {
   importedPriceCents?: number | null;
   importedShippingCents?: number | null;
   importedVisibleToAll?: boolean;
+  importedRequiredMembershipTier?: "everyone" | "premium";
   importedPublished?: boolean;
   canImport?: boolean;
   variants?: AdminVariant[];
@@ -69,7 +70,11 @@ function money(cents: number | null | undefined): string {
 
 function toReviewProduct(value: unknown): AdminProduct | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as AdminProduct;
+  const product = value as AdminProduct;
+  if (product.importedRequiredMembershipTier !== "everyone" && product.importedRequiredMembershipTier !== "premium") {
+    return { ...product, importedRequiredMembershipTier: "everyone" };
+  }
+  return product;
 }
 
 function toAdminApparelOrder(value: unknown): AdminApparelOrder | null {
@@ -364,6 +369,7 @@ export default async function PrintfulAdminPage({
                   <label className="grid gap-1 text-sm md:col-span-2">Approved description<textarea name="description" required maxLength={4000} defaultValue={product.importedDescription ?? ""} className="rounded-lg border border-border bg-background px-3 py-2" /></label>
                   <label className="grid gap-1 text-sm">Customer price (USD)<input name="price" required inputMode="decimal" defaultValue={product.importedPriceCents === null || product.importedPriceCents === undefined ? "" : (product.importedPriceCents / 100).toFixed(2)} className="rounded-lg border border-border bg-background px-3 py-2" /></label>
                   <label className="grid gap-1 text-sm">Customer shipping (USD)<input name="shipping" required inputMode="decimal" defaultValue={product.importedShippingCents === null || product.importedShippingCents === undefined ? "0.00" : (product.importedShippingCents / 100).toFixed(2)} className="rounded-lg border border-border bg-background px-3 py-2" /></label>
+                  <label className="grid gap-1 text-sm">Membership access<select name="required_membership_tier" required defaultValue={product.importedRequiredMembershipTier ?? "everyone"} className="rounded-lg border border-border bg-background px-3 py-2"><option value="everyone">Everyone</option><option value="premium">Premium members</option></select></label>
                   <label className="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" name="visible_to_all" defaultChecked={product.importedVisibleToAll === true} />After publication, show this preview to everyone. If unchecked, existing linked-member access rules still apply.</label>
                   <button className="justify-self-start rounded-lg border border-border px-4 py-2 font-semibold">Save curation</button>
                 </form>

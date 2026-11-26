@@ -7,20 +7,17 @@ export const REGULAR_ARMORY_CATEGORIES = [
   { value: "program", label: "Programs" },
 ] as const;
 
-export const PREMIUM_ARMORY_CATEGORIES = [
-  { value: "supplements", label: "Supplements" },
-  { value: "doctor_network", label: "Doctor Network" },
-] as const;
-
-// Retained so items created before the category expansion stay readable and editable.
-export const LEGACY_ARMORY_CATEGORIES = [
-  { value: "other", label: "Legacy / Other" },
-] as const;
-
+// Category taxonomy is separate from REGULAR_ARMORY_CATEGORIES, which also defines
+// the existing public checkout set. Do not add display-only categories there.
 export const ARMORY_CATEGORIES = [
   ...REGULAR_ARMORY_CATEGORIES,
-  ...PREMIUM_ARMORY_CATEGORIES,
-  ...LEGACY_ARMORY_CATEGORIES,
+  { value: "supplements", label: "Supplements" },
+  { value: "peptides", label: "Peptides" },
+  { value: "doctor_network", label: "Doctor Network" },
+  { value: "partners", label: "Partners" },
+  { value: "other_products", label: "Other" },
+  // Retained so legacy records remain readable and editable.
+  { value: "other", label: "Legacy / Other" },
 ] as const;
 
 export const ARMORY_CATEGORY_VALUES = [
@@ -29,9 +26,15 @@ export const ARMORY_CATEGORY_VALUES = [
   "accessories",
   "program",
   "supplements",
+  "peptides",
   "doctor_network",
+  "partners",
+  "other_products",
   "other",
 ] as const;
+
+export const ARMORY_AUDIENCE_VALUES = ["everyone", "premium"] as const;
+export type ArmoryAudience = (typeof ARMORY_AUDIENCE_VALUES)[number];
 
 export type ArmoryCategory = (typeof ARMORY_CATEGORIES)[number]["value"];
 export type ArmoryKind = "link" | "download" | "paid" | "product" | "preview";
@@ -40,15 +43,12 @@ export function categoryLabel(category: string) {
   return ARMORY_CATEGORIES.find((item) => item.value === category)?.label ?? "Other";
 }
 
-export function isPremiumCategory(category: string) {
-  return PREMIUM_ARMORY_CATEGORIES.some((item) => item.value === category);
-}
-
-export function canAccessArmoryCategory(
-  category: string,
+export function canAccessArmoryAudience(
+  requiredMembershipTier: unknown,
   tier: "regular" | "premium" | null,
 ) {
-  return !isPremiumCategory(category) || tier === "premium";
+  return requiredMembershipTier === "everyone" ||
+    (requiredMembershipTier === "premium" && tier === "premium");
 }
 
 // Gear is shipped, never downloaded, so digital items can't use the Gear category.

@@ -143,6 +143,7 @@ export async function startPrintfulApparelCheckout(input: ApparelCheckoutInput):
     product.ignored !== false || approved.classification !== "apparel" || approved.enabled !== true ||
     String(approved.productId) !== input.productId || !UUID.test(String(approved.itemId)) ||
     variant.approvedForSale !== true ||
+    draft.requiredMembershipTier !== "everyone" ||
     draft.publishedAt === null || draft.curationApprovedAt === null || draft.visibleToAll !== true ||
     typeof draft.imagePath !== "string" || !Number.isSafeInteger(draft.priceCents) || draft.shippingCents !== 0 ||
     revision !== parseCatalogRevision(product.lastSeenRevision) ||
@@ -221,6 +222,7 @@ export async function startPrintfulApparelCheckout(input: ApparelCheckoutInput):
     !record(afterReadContext.variant) || afterReadContext.variant.configurationFingerprint !== currentVariant.configurationFingerprint ||
     afterReadContext.variant.approvedForSale !== true ||
     !record(afterReadContext.approval) || afterReadContext.approval.approvalVersion !== approved.approvalVersion ||
+    !record(afterReadContext.draft) || afterReadContext.draft.requiredMembershipTier !== "everyone" ||
     !record(afterReadContext.state) || afterReadContext.state.salesEnabled !== true || afterReadContext.state.fulfillmentEnabled !== true) {
     return { ok: false, reason: "variant_unavailable" };
   }

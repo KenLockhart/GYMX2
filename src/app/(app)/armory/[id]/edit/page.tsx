@@ -51,6 +51,7 @@ export default async function EditArmoryItemPage({
           id: data.id,
           kind: data.kind,
           category: data.category,
+          required_membership_tier: data.required_membership_tier,
           title: data.title,
           description: data.description,
           price:

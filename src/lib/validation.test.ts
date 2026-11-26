@@ -228,6 +228,7 @@ describe("armoryItemSchema", () => {
     kind: "link",
     id: "",
     category: "gear",
+    required_membership_tier: "everyone",
     title: "Bands",
     description: "",
     price_cents: 2499,
@@ -239,6 +240,7 @@ describe("armoryItemSchema", () => {
     kind: "download",
     id: "",
     category: "ebook",
+    required_membership_tier: "everyone",
     title: "Meal plan",
     description: "",
     file_path: `${owner}/abc-plan.pdf`,
@@ -272,6 +274,16 @@ describe("armoryItemSchema", () => {
     expect(armoryItemSchema.safeParse({ ...link, category: "weapons" }).success).toBe(false);
   });
 
+  it.each(["partners", "peptides", "other_products"])("persists the new %s category", (category) => {
+    expect(armoryItemSchema.safeParse({ ...link, category }).success).toBe(true);
+  });
+
+  it("requires an explicit valid audience for every new save", () => {
+    expect(armoryItemSchema.safeParse({ ...link, required_membership_tier: undefined }).success).toBe(false);
+    expect(armoryItemSchema.safeParse({ ...link, required_membership_tier: "regular" }).success).toBe(false);
+    expect(armoryItemSchema.safeParse({ ...link, required_membership_tier: "premium" }).success).toBe(true);
+  });
+
   const paid = { ...download, kind: "paid", price_cents: 1999 };
 
   it("accepts a paid download", () => {
@@ -291,6 +303,7 @@ describe("armoryItemSchema", () => {
     kind: "product",
     id: "",
     category: "gear",
+    required_membership_tier: "everyone",
     title: "Shirt",
     description: "",
     price_cents: 4995,

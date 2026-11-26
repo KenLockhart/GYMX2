@@ -4,11 +4,12 @@ const mocks = vi.hoisted(() => ({
   adminRpc: vi.fn(),
   stripeCreate: vi.fn(),
   itemRead: vi.fn(),
+  platformHasTier: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/purchases", () => ({ refreshPayoutAccount: vi.fn() }));
-vi.mock("@/lib/platform-membership-server", () => ({ platformHasTier: vi.fn() }));
+vi.mock("@/lib/platform-membership-server", () => ({ platformHasTier: mocks.platformHasTier }));
 vi.mock("@/lib/stripe", () => ({
   getStripe: () => ({ checkout: { sessions: { create: mocks.stripeCreate } } }),
   isStripeConfigured: () => true,
@@ -60,6 +61,7 @@ const item = {
   coach_id: sellerId,
   kind: "product",
   category: "gear",
+  required_membership_tier: "everyone",
   title: "Training shirt",
   price_cents: 2495,
   file_path: null,
@@ -78,6 +80,7 @@ describe("Armory Checkout quote reservation", () => {
     vi.resetAllMocks();
     mocks.itemRead.mockResolvedValue({ data: { ...item }, error: null });
     mocks.adminRpc.mockResolvedValue({ data: false, error: null });
+    mocks.platformHasTier.mockResolvedValue(false);
   });
 
   it("rejects a stale or failed atomic snapshot reservation before creating any Stripe session", async () => {
@@ -168,6 +171,41 @@ describe("Armory Checkout quote reservation", () => {
 
     expect(mocks.adminRpc).not.toHaveBeenCalled();
     expect(mocks.stripeCreate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for Premium audience items without an active Premium entitlement", async () => {
+    mocks.itemRead.mockResolvedValueOnce({
+      data: { ...item, required_membership_tier: "premium" },
+      error: null,
+    });
+
+    await expect(createArmoryCheckout({
+      itemId,
+      size: "",
+      email: "buyer@example.test",
+      profile: { id: buyerId, role: "member" },
+    })).resolves.toEqual({ error: "Premium membership required to buy this item." });
+
+    expect(mocks.platformHasTier).toHaveBeenCalledWith(buyerId, "premium");
+    expect(mocks.adminRpc).not.toHaveBeenCalledWith("create_armory_checkout_intent", expect.anything());
+    expect(mocks.stripeCreate).not.toHaveBeenCalled();
+  });
+
+  it("does not infer Premium access from the category when an item is Everyone", async () => {
+    mocks.itemRead.mockResolvedValueOnce({
+      data: { ...item, category: "supplements", required_membership_tier: "everyone" },
+      error: null,
+    });
+
+    await createArmoryCheckout({
+      itemId,
+      size: "",
+      email: "buyer@example.test",
+      profile: { id: buyerId, role: "member" },
+    });
+
+    expect(mocks.platformHasTier).not.toHaveBeenCalled();
+    expect(mocks.adminRpc).toHaveBeenCalledWith("create_armory_checkout_intent", expect.objectContaining({ target_item_category: "supplements" }));
   });
 
   it.each([

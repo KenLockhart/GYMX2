@@ -28,33 +28,33 @@ insert into public.coach_members (coach_id, member_id) values
 insert into public.armory_items (
   id, coach_id, kind, category, title, description, price_cents, buy_url,
   file_path, file_name, visible_to_all, shipping_cents, sizes,
-  printful_variant_mappings
+  printful_variant_mappings, required_membership_tier
 ) values
   ('a1000000-0000-0000-0000-000000000101', 'a1000000-0000-0000-0000-000000000001', 'paid', 'ebook', 'Public paid ebook', 'Paid download', 1800, null,
-   'a1000000-0000-0000-0000-000000000001/ebook.pdf', 'ebook.pdf', true, 0, array[]::text[], '[]'::jsonb),
+   'a1000000-0000-0000-0000-000000000001/ebook.pdf', 'ebook.pdf', true, 0, array[]::text[], '[]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000102', 'a1000000-0000-0000-0000-000000000001', 'link', 'program', 'Public program link', 'External link', 2500, 'https://shop.example.test/program',
-   null, null, true, 0, array[]::text[], '[]'::jsonb),
+   null, null, true, 0, array[]::text[], '[]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000103', 'a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Mapped shirt', 'Printful-backed gear', 4500, null,
    null, null, true, 600, array['S', 'M']::text[],
-   '[{"option":"S","sku":"GYM-S","sync_variant_id":"9007199254740993"},{"option":"M","sku":"GYM-M","sync_variant_id":"0000000000000000001"}]'::jsonb),
+   '[{"option":"S","sku":"GYM-S","sync_variant_id":"9007199254740993"},{"option":"M","sku":"GYM-M","sync_variant_id":"0000000000000000001"}]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000104', 'a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Zero shipping shirt', 'No shipping charge', 2200, null,
-   null, null, true, 0, array[]::text[], '[]'::jsonb),
+   null, null, true, 0, array[]::text[], '[]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000105', 'a1000000-0000-0000-0000-000000000001', 'paid', 'ebook', 'Coach hidden paid', 'Private paid download', 1600, null,
-   'a1000000-0000-0000-0000-000000000001/private.pdf', 'private.pdf', false, 0, array[]::text[], '[]'::jsonb),
+   'a1000000-0000-0000-0000-000000000001/private.pdf', 'private.pdf', false, 0, array[]::text[], '[]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000106', 'a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Refundable shirt', 'Physical product', 3000, null,
-   null, null, true, 500, array[]::text[], '[]'::jsonb),
+   null, null, true, 500, array[]::text[], '[]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000107', 'a1000000-0000-0000-0000-000000000001', 'download', 'ebook', 'Public free download', 'Free file', null, null,
-   'a1000000-0000-0000-0000-000000000001/free.pdf', 'free.pdf', true, 0, array[]::text[], '[]'::jsonb),
+   'a1000000-0000-0000-0000-000000000001/free.pdf', 'free.pdf', true, 0, array[]::text[], '[]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000108', 'a1000000-0000-0000-0000-000000000001', 'link', 'supplements', 'Premium supplements', 'Premium-only listing', 1200, 'https://shop.example.test/supplements',
-   null, null, true, 0, array[]::text[], '[]'::jsonb),
+   null, null, true, 0, array[]::text[], '[]'::jsonb, 'premium'),
   ('a1000000-0000-0000-0000-000000000109', 'a1000000-0000-0000-0000-000000000001', 'link', 'doctor_network', 'Premium doctors', 'Premium-only listing', 1200, 'https://shop.example.test/doctors',
-   null, null, true, 0, array[]::text[], '[]'::jsonb),
+   null, null, true, 0, array[]::text[], '[]'::jsonb, 'premium'),
   ('a1000000-0000-0000-0000-000000000110', 'a1000000-0000-0000-0000-000000000001', 'link', 'other', 'Legacy other row', 'Not public inventory', 1200, 'https://shop.example.test/other',
-   null, null, true, 0, array[]::text[], '[]'::jsonb),
+   null, null, true, 0, array[]::text[], '[]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000111', 'a1000000-0000-0000-0000-000000000001', 'paid', 'supplements', 'Premium paid guide', 'Premium-only download', 1200, null,
-   'a1000000-0000-0000-0000-000000000001/supplements.pdf', 'supplements.pdf', true, 0, array[]::text[], '[]'::jsonb),
+   'a1000000-0000-0000-0000-000000000001/supplements.pdf', 'supplements.pdf', true, 0, array[]::text[], '[]'::jsonb, 'premium'),
   ('a1000000-0000-0000-0000-000000000112', 'a1000000-0000-0000-0000-000000000001', 'preview', 'gear', 'Display-only preview', 'No checkout available', 2000, null,
-   null, null, true, 0, array[]::text[], '[]'::jsonb);
+   null, null, true, 0, array[]::text[], '[]'::jsonb, 'everyone');
 
 update public.armory_items
 set printful_sku = 'PREVIEW-MANUAL-REF', printful_sync_variant_id = '9007199254740993'
@@ -85,7 +85,7 @@ select is(
   (select array_agg(column_name::text order by ordinal_position)
    from information_schema.columns
    where table_schema = 'public' and table_name = 'public_armory_catalog'),
-  array['id','coach_id','seller_label','kind','category','title','description','price_cents','buy_url','sizes','shipping_cents','image_path','made_to_order','delivery_min_weeks','delivery_max_weeks','created_at']::text[],
+  array['id','coach_id','seller_label','kind','category','title','description','price_cents','buy_url','sizes','shipping_cents','image_path','made_to_order','delivery_min_weeks','delivery_max_weeks','created_at','required_membership_tier']::text[],
   'anonymous catalog exposes only the approved public projection'
 );
 select is(
@@ -437,22 +437,22 @@ select lives_ok(
   do $block$
   begin
     begin
-      insert into public.armory_items (coach_id, kind, category, title, price_cents, sizes, printful_variant_mappings)
-      values ('a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Wrong option mapping', 2000, array['S','M'], '[{"option":"XL","sku":"BAD-XL","sync_variant_id":"1"},{"option":"M","sku":"GYM-M","sync_variant_id":"2"}]'::jsonb);
+      insert into public.armory_items (coach_id, kind, category, title, price_cents, sizes, printful_variant_mappings, required_membership_tier)
+      values ('a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Wrong option mapping', 2000, array['S','M'], '[{"option":"XL","sku":"BAD-XL","sync_variant_id":"1"},{"option":"M","sku":"GYM-M","sync_variant_id":"2"}]'::jsonb, 'everyone');
       raise exception 'out-of-set Printful option was accepted';
     exception when check_violation then null;
     end;
 
     begin
-      insert into public.armory_items (coach_id, kind, category, title, price_cents, sizes, printful_variant_mappings)
-      values ('a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Incomplete mapping', 2000, array['S','M'], '[{"option":"S","sku":"ONLY-S","sync_variant_id":"1"}]'::jsonb);
+      insert into public.armory_items (coach_id, kind, category, title, price_cents, sizes, printful_variant_mappings, required_membership_tier)
+      values ('a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Incomplete mapping', 2000, array['S','M'], '[{"option":"S","sku":"ONLY-S","sync_variant_id":"1"}]'::jsonb, 'everyone');
       raise exception 'incomplete Printful size map was accepted';
     exception when check_violation then null;
     end;
 
     begin
-      insert into public.armory_items (coach_id, kind, category, title, price_cents, sizes, printful_variant_mappings)
-      values ('a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Numeric JSON variant', 2000, array['S'], '[{"option":"S","sku":"NUMERIC-ID","sync_variant_id":9007199254740993}]'::jsonb);
+      insert into public.armory_items (coach_id, kind, category, title, price_cents, sizes, printful_variant_mappings, required_membership_tier)
+      values ('a1000000-0000-0000-0000-000000000001', 'product', 'gear', 'Numeric JSON variant', 2000, array['S'], '[{"option":"S","sku":"NUMERIC-ID","sync_variant_id":9007199254740993}]'::jsonb, 'everyone');
       raise exception 'numeric JSON Printful ID was accepted';
     exception when check_violation then null;
     end;
@@ -519,12 +519,12 @@ select is(
 reset role;
 insert into public.armory_items (
   id, coach_id, kind, category, title, description, price_cents, visible_to_all,
-  shipping_cents, file_path, file_name, sizes, printful_variant_mappings
+  shipping_cents, file_path, file_name, sizes, printful_variant_mappings, required_membership_tier
 ) values
   ('a1000000-0000-0000-0000-000000000113', 'a1000000-0000-0000-0000-000000000001', 'paid', 'ebook', 'Delete before settlement', 'Synthetic deletion-order fixture', 1800, true,
-   0, 'a1000000-0000-0000-0000-000000000001/delete-before.pdf', 'delete-before.pdf', array[]::text[], '[]'::jsonb),
+   0, 'a1000000-0000-0000-0000-000000000001/delete-before.pdf', 'delete-before.pdf', array[]::text[], '[]'::jsonb, 'everyone'),
   ('a1000000-0000-0000-0000-000000000114', 'a1000000-0000-0000-0000-000000000001', 'paid', 'ebook', 'Delete after settlement', 'Synthetic deletion-order fixture', 2100, true,
-   0, 'a1000000-0000-0000-0000-000000000001/delete-after.pdf', 'delete-after.pdf', array[]::text[], '[]'::jsonb);
+   0, 'a1000000-0000-0000-0000-000000000001/delete-after.pdf', 'delete-after.pdf', array[]::text[], '[]'::jsonb, 'everyone');
 
 set local role service_role;
 select is(

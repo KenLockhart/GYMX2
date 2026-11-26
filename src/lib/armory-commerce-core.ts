@@ -9,6 +9,7 @@ export type ArmorySaleSnapshot = {
   coach_id: string;
   kind: string;
   category: string;
+  required_membership_tier: string;
   title: string;
   price_cents: number | null;
   shipping_cents: number;
@@ -23,13 +24,19 @@ export type ArmorySaleSnapshot = {
   }[];
 };
 
+export type PublicArmorySaleInput = Pick<
+  ArmorySaleSnapshot,
+  "kind" | "category" | "required_membership_tier" | "price_cents" | "visible_to_all"
+>;
+
 const PUBLIC_CATEGORIES = new Set<string>(
   REGULAR_ARMORY_CATEGORIES.map(({ value }) => value),
 );
 
-export function isPublicArmorySale(item: ArmorySaleSnapshot) {
+export function isPublicArmorySale(item: PublicArmorySaleInput) {
   return (
     item.visible_to_all &&
+    item.required_membership_tier === "everyone" &&
     PUBLIC_CATEGORIES.has(item.category) &&
     (item.kind === "paid" || item.kind === "product") &&
     typeof item.price_cents === "number" &&

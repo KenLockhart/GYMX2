@@ -36,6 +36,7 @@ export default async function NewArmoryItemPage() {
           id: "",
           kind: profile.role === "admin" ? "preview" : "link",
           category: profile.role === "admin" ? "gear" : "ebook",
+          required_membership_tier: "everyone",
           title: "",
           description: "",
           price: "",

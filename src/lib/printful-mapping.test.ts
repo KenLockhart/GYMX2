@@ -32,6 +32,24 @@ describe("Printful mapping validation", () => {
     });
   });
 
+  it("accepts exact variant mappings for Accessories as well as Gear", () => {
+    expect(validatePrintfulMappingInput({
+      ...baseInput,
+      category: "accessories",
+      sizes: "S",
+      printful_variant_mappings: mappingJson([
+        { option: "S", sku: "BAG-S", sync_variant_id: "9007199254740993" },
+      ]),
+    })).toMatchObject({
+      success: true,
+      value: {
+        printful_variant_mappings: [
+          { option: "S", sku: "BAG-S", sync_variant_id: "9007199254740993" },
+        ],
+      },
+    });
+  });
+
   it("preserves SKU case, leading zeroes, and bigint variant IDs", () => {
     const result = validatePrintfulMappingInput({
       ...baseInput,
