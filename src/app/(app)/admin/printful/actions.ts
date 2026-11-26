@@ -37,14 +37,25 @@ function safeResult(status: string): never {
 
 export async function syncPrintfulCatalogAction() {
   await requireAdmin();
-  const result = await syncPrintfulCatalogToPrivateStage();
+  let result: Awaited<ReturnType<typeof syncPrintfulCatalogToPrivateStage>>;
+  try {
+    result = await syncPrintfulCatalogToPrivateStage();
+  } catch {
+    safeResult("sync_failed");
+  }
+  if (result.status !== "synced") safeResult(result.status);
   revalidatePath("/admin/printful");
-  safeResult(result.status === "synced" ? `synced-${result.productCount}-${result.variantCount}` : result.status);
+  safeResult(`synced-${result.productCount}-${result.variantCount}`);
 }
 
 export async function beginPrintfulCostReviewAction() {
   const { profile } = await requireAdmin();
-  const sync = await syncPrintfulCatalogToPrivateStage();
+  let sync: Awaited<ReturnType<typeof syncPrintfulCatalogToPrivateStage>>;
+  try {
+    sync = await syncPrintfulCatalogToPrivateStage();
+  } catch {
+    safeResult("sync_failed");
+  }
   if (sync.status !== "synced") safeResult(sync.status);
   let reviewId: string;
   try {
@@ -56,7 +67,7 @@ export async function beginPrintfulCostReviewAction() {
   } catch {
     safeResult("review_unavailable");
   }
-  redirect(`/admin/printful?review=${encodeURIComponent(reviewId!)}`);
+  redirect(`/admin/printful?review=${encodeURIComponent(reviewId!)}#cost-review`);
 }
 
 export async function completePrintfulCostReviewAction(formData: FormData) {
