@@ -48,7 +48,7 @@ export async function startPlatformCheckout(
   const tier = formData.get("tier");
   if (!isPlatformTier(tier)) return { error: "Choose a platform plan." };
   if (tier === "regular" && profile.role !== "member") {
-    return { error: "Regular membership is available to members. Choose Premium to unlock the Premium Armory." };
+    return { error: "Regular membership is available to members. Choose Premium to access items marked Premium across all categories." };
   }
 
   let checkoutUrl: string;

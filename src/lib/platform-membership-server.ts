@@ -19,6 +19,11 @@ const PRICE_ENV: Record<PlatformTier, string> = {
   premium: "STRIPE_PLATFORM_PREMIUM_PRICE_ID",
 };
 
+const PORTAL_CONFIGURATION_ENV = {
+  member: "STRIPE_PLATFORM_MEMBER_PORTAL_CONFIGURATION_ID",
+  premium: "STRIPE_PLATFORM_PREMIUM_PORTAL_CONFIGURATION_ID",
+} as const;
+
 export type PlatformMembershipRow = {
   id: string;
   member_id: string;
@@ -115,6 +120,17 @@ function configuredPriceId(tier: PlatformTier) {
   const id = configuredPriceIds()[tier];
   if (!id) throw new PlatformMembershipError("not_configured");
   return id;
+}
+
+function configuredPortalId(allowRegularPlan: boolean) {
+  const variable = allowRegularPlan
+    ? PORTAL_CONFIGURATION_ENV.member
+    : PORTAL_CONFIGURATION_ENV.premium;
+  const configurationId = process.env[variable];
+  if (!configurationId || !/^bpc_[A-Za-z0-9]+$/.test(configurationId)) {
+    throw new PlatformMembershipError("not_configured");
+  }
+  return configurationId;
 }
 
 function customerId(customer: Stripe.Subscription["customer"]) {
@@ -269,6 +285,48 @@ function subscriptionPeriodEnd(subscription: Stripe.Subscription) {
   const end = firstSubscriptionPrice(subscription)?.current_period_end;
   if (!end) throw new PlatformMembershipError("invalid_subscription");
   return new Date(end * 1000).toISOString();
+}
+
+async function hasVerifiedPaidCurrentPeriod(
+  subscription: Stripe.Subscription,
+  item: Stripe.SubscriptionItem,
+) {
+  const latestInvoice = subscription.latest_invoice;
+  if (!latestInvoice) return false;
+  const invoice = typeof latestInvoice === "string"
+    ? await getStripe().invoices.retrieve(latestInvoice)
+    : latestInvoice;
+  const parentSubscription = invoice.parent?.subscription_details?.subscription;
+  const invoiceSubscriptionId = typeof parentSubscription === "string"
+    ? parentSubscription
+    : parentSubscription?.id;
+  const invoiceCustomerId = typeof invoice.customer === "string"
+    ? invoice.customer
+    : invoice.customer?.id;
+  if (
+    invoice.status !== "paid" ||
+    invoiceSubscriptionId !== subscription.id ||
+    invoiceCustomerId !== customerId(subscription.customer) ||
+    !invoice.lines ||
+    invoice.lines.has_more !== false ||
+    !Array.isArray(invoice.lines.data)
+  ) return false;
+
+  const now = Math.floor(Date.now() / 1000);
+  return invoice.lines.data.some((line) => {
+    const subscriptionItemDetails = line.parent?.type === "subscription_item_details"
+      ? line.parent.subscription_item_details
+      : null;
+    return line.amount >= 0 &&
+      line.quantity === 1 &&
+      subscriptionItemDetails?.subscription === subscription.id &&
+      subscriptionItemDetails.subscription_item === item.id &&
+      line.pricing?.type === "price_details" &&
+      line.pricing.price_details?.price === item.price.id &&
+      line.period.start <= now &&
+      now < line.period.end &&
+      line.period.end === item.current_period_end;
+  });
 }
 
 async function tierFromSubscriptionPrice(
@@ -448,6 +506,12 @@ export async function syncPlatformSubscription(
   if (!item) throw new PlatformMembershipError("invalid_subscription");
   const tier = await tierFromSubscriptionPrice(subscription, item.price);
   if (!tier) throw new PlatformMembershipError("invalid_price");
+  // Stripe can expose an active subscription while its latest invoice is still unpaid.
+  // Keep the last confirmed row and period until a paid invoice is verified; never grant
+  // a new tier or extend access from the subscription status alone.
+  if (subscription.status === "active" && !(await hasVerifiedPaidCurrentPeriod(subscription, item))) {
+    return false;
+  }
   const customer = customerId(subscription.customer);
   const db = createAdminClient();
   const { data, error } = await db.rpc("sync_platform_membership", {
@@ -482,7 +546,9 @@ export async function syncPlatformSubscriptionById(
 ) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const expectedRevision = await readPlatformRevision(subscriptionId);
-    const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
+    const subscription = await getStripe().subscriptions.retrieve(subscriptionId, {
+      expand: ["latest_invoice"],
+    });
     const metadata = subscription.metadata ?? {};
     if (
       (expected?.memberId && metadata.member_id !== expected.memberId) ||
@@ -938,6 +1004,7 @@ async function createPlatformCheckoutSessionAttempt(
   };
   const params: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
+    payment_method_types: ["card"],
     line_items: [{ price: price.id, quantity: 1 }],
     client_reference_id: member.id,
     customer_email: billing.state.latestSubscription?.stripe_customer_id
@@ -1147,6 +1214,7 @@ export async function createPlatformBillingPortalSession(
     | { type: "change"; tier: PlatformTier },
   options: { allowRegularPlan: boolean },
 ) {
+  const configuration = configuredPortalId(options.allowRegularPlan);
   const current =
     intent.type === "manage"
       ? await getLatestOwnedStripeSubscription(memberId)
@@ -1188,6 +1256,7 @@ export async function createPlatformBillingPortalSession(
   try {
     const session = await getStripe().billingPortal.sessions.create({
       customer: current.row.stripe_customer_id,
+      configuration,
       return_url: returnUrl,
       ...(flowData ? { flow_data: flowData } : {}),
     });

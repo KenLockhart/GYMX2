@@ -26,8 +26,14 @@ export const lists: Record<string, string> = {
   "Platform membership": "Membresía de la plataforma",
   "Choose a paid platform membership to use GYMX2.":
     "Elige una membresía de pago para usar GYMX2.",
-  "Premium membership unlocks the Premium Armory categories for shoppers.":
-    "La membresía Premium desbloquea los artículos de la Armería marcados como Premium.",
+  "Regular membership is available to members. Choose Premium to access items marked Premium across all categories.":
+    "La membresía Regular está disponible para miembros. Elige Premium para acceder a artículos marcados como Premium en cualquier categoría.",
+  "Premium membership gives shoppers access to items marked Premium across all categories.":
+    "La membresía Premium permite acceder a los artículos marcados como Premium en todas las categorías.",
+  "Premium members can access items marked Everyone or Premium across all categories.":
+    "Los miembros Premium pueden acceder a los artículos marcados como «Todos» o «Premium» en cualquier categoría.",
+  "Item access is set individually. Everyone items are open to everyone; Premium items require Premium.":
+    "El acceso se define para cada artículo: los marcados como «Todos» están disponibles para todos; los marcados como «Premium» requieren una membresía Premium.",
   "Choose a paid platform membership to continue using member features.":
     "Elige una membresía de pago para seguir usando las funciones para miembros.",
   "We couldn't verify your membership status. Please refresh and try again.":
@@ -88,10 +94,6 @@ export const lists: Record<string, string> = {
   "Estimated delivery, maximum weeks": "Entrega estimada, máximo de semanas",
   "Made to order. Estimated delivery: {min}–{max} weeks.":
     "Hecho por encargo. Entrega estimada: {min}–{max} semanas.",
-  "Ebooks, gear, accessories and programs for your members. Premium adds supplements and doctor network products.":
-    "Ebooks, equipo, accesorios y programas para tus miembros. Premium agrega suplementos y productos de la red médica.",
-  "Ebooks, gear, accessories and programs chosen by your coaches. Premium also includes supplements and doctor network products.":
-    "Ebooks, equipo, accesorios y programas elegidos por tus coaches. Premium también incluye suplementos y productos de la red médica.",
   "Premium membership is required to browse this category.":
     "Necesitas la membresía Premium para ver esta categoría.",
   "View Premium": "Ver Premium",

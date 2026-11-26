@@ -11,7 +11,7 @@ import {
   reconcilePlatformMembership,
 } from "@/lib/platform-membership-server";
 import { PLATFORM_PLANS } from "@/lib/platform-memberships";
-import { categoryLabel, formatMoney } from "@/lib/armory";
+import { formatMoney } from "@/lib/armory";
 import { requireAuthenticatedAccount } from "@/lib/auth";
 import {
   openPlatformBillingPortal,
@@ -85,7 +85,7 @@ export default async function PlatformMembershipPage({
           {profile.role === "member" ? (
             <T>Choose a paid platform membership to use GYMX2.</T>
           ) : (
-            <T>Premium membership unlocks the Premium Armory categories for shoppers.</T>
+            <T>Premium membership gives shoppers access to items marked Premium across all categories.</T>
           )}
         </p>
       </div>
@@ -256,9 +256,11 @@ export default async function PlatformMembershipPage({
                 </p>
               </div>
               <ul className="space-y-1 text-sm text-muted">
-                {plan.categoryValues.map((category) => (
-                  <li key={category}>· <T>{categoryLabel(category)}</T></li>
-                ))}
+                {plan.tier === "premium" ? (
+                  <li>· <T>Premium members can access items marked Everyone or Premium across all categories.</T></li>
+                ) : (
+                  <li>· <T>Item access is set individually. Everyone items are open to everyone; Premium items require Premium.</T></li>
+                )}
               </ul>
               <p className="text-xs text-muted">
                 <T>Renews monthly until you cancel. No free trial.</T>

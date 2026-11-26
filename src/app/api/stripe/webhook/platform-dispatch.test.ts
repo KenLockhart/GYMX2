@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   recordRefundFromCharge: vi.fn(),
   releasePlatformCheckout: vi.fn(),
   syncPlatformSubscriptionById: vi.fn(),
+  handlePrintfulApparelRiskEvent: vi.fn(),
+  handlePrintfulApparelStripeEvent: vi.fn(),
+  adminClient: vi.fn(() => ({})),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -30,6 +33,13 @@ vi.mock("@/lib/refunds", () => ({
 vi.mock("@/lib/platform-membership-server", () => ({
   releasePlatformCheckout: mocks.releasePlatformCheckout,
   syncPlatformSubscriptionById: mocks.syncPlatformSubscriptionById,
+}));
+vi.mock("@/lib/printful/apparel-stripe-events", () => ({
+  handlePrintfulApparelRiskEvent: mocks.handlePrintfulApparelRiskEvent,
+  handlePrintfulApparelStripeEvent: mocks.handlePrintfulApparelStripeEvent,
+}));
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: mocks.adminClient,
 }));
 
 const WEBHOOK_SECRET = "whsec_synthetic_test_only";
@@ -87,6 +97,8 @@ beforeEach(() => {
   mocks.syncSubscriptionById.mockResolvedValue(undefined);
   mocks.recordRefundFromCharge.mockResolvedValue(undefined);
   mocks.releasePlatformCheckout.mockResolvedValue(undefined);
+  mocks.handlePrintfulApparelRiskEvent.mockResolvedValue("not_apparel");
+  mocks.handlePrintfulApparelStripeEvent.mockResolvedValue("not_apparel");
   mocks.syncPlatformSubscriptionById.mockResolvedValue(undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
@@ -154,6 +166,28 @@ describe("platform membership dispatch", () => {
     expect(mocks.syncSubscriptionById).not.toHaveBeenCalled();
     expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
     expect(mocks.recordPurchase).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "customer.subscription.paused",
+    "customer.subscription.resumed",
+  ])("fresh-syncs platform %s lifecycle state only", async (type) => {
+    const subscription = {
+      id: "sub_platform_synthetic",
+      metadata: { kind: "platform_membership" },
+    };
+    const event = prepareEvent(type, subscription);
+
+    const response = await postSignedWebhook();
+
+    expect(response.status).toBe(200);
+    expect(mocks.syncPlatformSubscriptionById).toHaveBeenCalledWith(
+      subscription.id,
+      { id: event.id, created: event.created },
+    );
+    expect(mocks.syncSubscription).not.toHaveBeenCalled();
+    expect(mocks.syncSubscriptionById).not.toHaveBeenCalled();
+    expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
   });
 
   it("routes a completed platform subscription checkout only to platform sync", async () => {
@@ -263,7 +297,7 @@ describe("platform membership dispatch", () => {
     expect(mocks.syncSubscriptionById).not.toHaveBeenCalled();
   });
 
-  it("does not send platform invoices to coach invoice recording even if coach metadata leaks in", async () => {
+  it("fresh-syncs paid platform invoices without coach invoice recording", async () => {
     const invoice = {
       id: "in_platform_synthetic",
       amount_paid: 2_495,
@@ -282,16 +316,46 @@ describe("platform membership dispatch", () => {
         },
       },
     };
-    prepareEvent("invoice.paid", invoice);
+    const event = prepareEvent("invoice.paid", invoice);
 
     const response = await postSignedWebhook();
 
     expect(response.status).toBe(200);
+    expect(mocks.syncPlatformSubscriptionById).toHaveBeenCalledWith(
+      "sub_platform_synthetic",
+      { id: event.id, created: event.created },
+    );
     expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
     expect(mocks.syncSubscription).not.toHaveBeenCalled();
     expect(mocks.syncSubscriptionById).not.toHaveBeenCalled();
     expect(mocks.recordPurchase).not.toHaveBeenCalled();
-    expect(mocks.syncPlatformSubscriptionById).not.toHaveBeenCalled();
+    expect(mocks.syncPlatformSubscriptionById).toHaveBeenCalledTimes(1);
+  });
+
+  it("fresh-syncs the current subscription after a platform invoice payment failure", async () => {
+    const invoice = {
+      id: "in_platform_failed_synthetic",
+      parent: {
+        type: "subscription_details",
+        quote_details: null,
+        subscription_details: {
+          subscription: "sub_platform_synthetic",
+          metadata: { kind: "platform_membership" },
+        },
+      },
+    };
+    const event = prepareEvent("invoice.payment_failed", invoice);
+
+    const response = await postSignedWebhook();
+
+    expect(response.status).toBe(200);
+    expect(mocks.syncPlatformSubscriptionById).toHaveBeenCalledWith(
+      "sub_platform_synthetic",
+      { id: event.id, created: event.created },
+    );
+    expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
+    expect(mocks.syncSubscription).not.toHaveBeenCalled();
+    expect(mocks.syncSubscriptionById).not.toHaveBeenCalled();
   });
 
   it("returns a retryable response when platform synchronization fails without coach dispatch", async () => {
@@ -333,6 +397,23 @@ describe("coach membership and armory dispatch", () => {
     expect(mocks.syncPlatformSubscriptionById).not.toHaveBeenCalled();
     expect(mocks.recordMembershipInvoice).not.toHaveBeenCalled();
     expect(mocks.recordPurchase).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "customer.subscription.paused",
+    "customer.subscription.resumed",
+  ])("does not route coach %s events through platform membership sync", async (type) => {
+    prepareEvent(type, {
+      id: "sub_coach_synthetic",
+      metadata: { kind: "membership", coach_id: "coach_synthetic" },
+    });
+
+    const response = await postSignedWebhook();
+
+    expect(response.status).toBe(200);
+    expect(mocks.syncPlatformSubscriptionById).not.toHaveBeenCalled();
+    expect(mocks.syncSubscription).not.toHaveBeenCalled();
+    expect(mocks.syncSubscriptionById).not.toHaveBeenCalled();
   });
 
   it("keeps coach subscription checkout on the existing coach helper", async () => {
@@ -464,6 +545,7 @@ describe("coach membership and armory dispatch", () => {
     const response = await postSignedWebhook();
 
     expect(response.status).toBe(200);
+    expect(mocks.handlePrintfulApparelRiskEvent).toHaveBeenCalledTimes(1);
     expect(mocks.recordRefundFromCharge).toHaveBeenCalledTimes(1);
     expect(mocks.recordRefundFromCharge).toHaveBeenCalledWith(charge);
     expect(mocks.syncPlatformSubscriptionById).not.toHaveBeenCalled();
@@ -481,6 +563,7 @@ describe("coach membership and armory dispatch", () => {
     const response = await postSignedWebhook();
 
     expect(response.status).toBe(500);
+    expect(mocks.handlePrintfulApparelRiskEvent).toHaveBeenCalledTimes(1);
     expect(mocks.recordRefundFromCharge).toHaveBeenCalledWith(charge);
     expect(mocks.syncPlatformSubscriptionById).not.toHaveBeenCalled();
     expect(mocks.syncSubscription).not.toHaveBeenCalled();
