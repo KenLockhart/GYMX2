@@ -91,6 +91,27 @@ async function removeFiles(paths: { bucket: string; path: string | null }[]) {
 export async function saveArmoryItem(_: ActionState, formData: FormData): Promise<ActionState> {
   const { profile } = await requireCoachOrAdmin();
   const kind = formData.get("kind");
+  const rawItemId = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  let before: Pick<ArmoryItem, "file_path" | "image_path" | "category" | "required_membership_tier"> | null = null;
+  if (rawItemId) {
+    const parsedId = idSchema.safeParse(rawItemId);
+    if (!parsedId.success) return { error: "We couldn't find that item." };
+    const { data } = await supabase
+      .from("armory_items")
+      .select("file_path, image_path, category, required_membership_tier")
+      .eq("id", parsedId.data)
+      .eq("coach_id", profile.id)
+      .maybeSingle<Pick<ArmoryItem, "file_path" | "image_path" | "category" | "required_membership_tier">>();
+    if (!data) return { error: "We couldn't find that item." };
+    before = data;
+  }
+  const category = String(formData.get("category") ?? "");
+  const physicalKind = kind === "product" || kind === "preview";
+  const printfulCategory = category === "gear" || category === "accessories";
+  const sizesText = physicalKind && printfulCategory
+    ? String(formData.get("sizes") ?? "")
+    : "";
   const price_cents = kind === "download" ? null : parsePrice(String(formData.get("price") ?? ""));
   if (Number.isNaN(price_cents)) {
     return {
@@ -100,14 +121,19 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
   // Gear only: a flat shipping fee (blank means free) and the sizes a buyer chooses from.
   const shipping_cents = (kind === "product" || kind === "preview") ? (parsePrice(String(formData.get("shipping") ?? "")) ?? 0) : 0;
   if (Number.isNaN(shipping_cents)) return { error: "Enter the shipping fee like 5.99, or 0 for free shipping." };
-  const sizes = (kind === "product" || kind === "preview") ? parseSizes(String(formData.get("sizes") ?? "")) : [];
+  const sizes = parseSizes(sizesText);
+  const hasSubmittedAudience = formData.has("required_membership_tier");
+  const submittedAudience = formData.get("required_membership_tier");
+  const requiredMembershipTier = !hasSubmittedAudience && before
+    ? before.required_membership_tier
+    : submittedAudience;
   const printful = validatePrintfulMappingInput({
     kind: typeof kind === "string" ? kind : "",
-    category: String(formData.get("category") ?? ""),
-    sizes: String(formData.get("sizes") ?? ""),
-    printful_sku: formData.get("printful_sku") ?? "",
-    printful_sync_variant_id: formData.get("printful_sync_variant_id") ?? "",
-    printful_variant_mappings: formData.get("printful_variant_mappings") ?? "",
+    category,
+    sizes: sizesText,
+    printful_sku: printfulCategory ? formData.get("printful_sku") ?? "" : "",
+    printful_sync_variant_id: printfulCategory ? formData.get("printful_sync_variant_id") ?? "" : "",
+    printful_variant_mappings: printfulCategory ? formData.get("printful_variant_mappings") ?? "" : "",
   });
   if (!printful.success) {
     return { error: "Check the Printful SKU and make sure every listed size has one complete mapping." };
@@ -115,8 +141,9 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
 
   const parsed = armoryItemSchema.safeParse({
     kind,
-    id: formData.get("id") ?? "",
-    category: formData.get("category"),
+    id: rawItemId,
+    category,
+    required_membership_tier: requiredMembershipTier,
     title: formData.get("title"),
     description: formData.get("description") ?? "",
     price_cents,
@@ -152,6 +179,9 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
   const fields = {
     kind: item.kind,
     category: item.category,
+    ...(hasSubmittedAudience
+      ? { required_membership_tier: item.required_membership_tier }
+      : {}),
     title: item.title,
     description: item.description,
     price_cents: item.kind === "download" ? null : item.price_cents,
@@ -176,15 +206,8 @@ export async function saveArmoryItem(_: ActionState, formData: FormData): Promis
     ...printful.value,
   };
 
-  const supabase = await createClient();
   let itemId = item.id;
   if (itemId) {
-    const { data: before } = await supabase
-      .from("armory_items")
-      .select("file_path, image_path, category")
-      .eq("id", itemId)
-      .eq("coach_id", profile.id)
-      .maybeSingle<Pick<ArmoryItem, "file_path" | "image_path" | "category">>();
     if (!before) return { error: "We couldn't find that item." };
     if (item.category === "other" && before.category !== "other") {
       return { error: "Legacy / Other is only available for existing legacy items." };

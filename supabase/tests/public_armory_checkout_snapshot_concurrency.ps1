@@ -257,10 +257,10 @@ values ('$coachId', 'snapshot-$runTag@example.test', '{"display_name":"Concurren
 update public.profiles set role = 'coach' where id = '$coachId';
 insert into public.armory_items (
   id, coach_id, kind, category, title, description, price_cents,
-  file_path, file_name, visible_to_all, shipping_cents
+  file_path, file_name, visible_to_all, shipping_cents, required_membership_tier
 ) values
-  ('$snapshotItemId', '$coachId', 'paid', 'ebook', 'Snapshot first', 'Concurrency fixture', 1000, '$snapshotOldPath', '$snapshotOldName', true, 0),
-  ('$editFirstItemId', '$coachId', 'paid', 'ebook', 'Edit first', 'Concurrency fixture', 1100, '$editOldPath', '$editOldName', true, 0);
+  ('$snapshotItemId', '$coachId', 'paid', 'ebook', 'Snapshot first', 'Concurrency fixture', 1000, '$snapshotOldPath', '$snapshotOldName', true, 0, 'everyone'),
+  ('$editFirstItemId', '$coachId', 'paid', 'ebook', 'Edit first', 'Concurrency fixture', 1100, '$editOldPath', '$editOldName', true, 0, 'everyone');
 commit;
 "@
   $null = Invoke-TargetSql -Sql $setupSql

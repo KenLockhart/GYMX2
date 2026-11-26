@@ -24,23 +24,23 @@ values ('60000000-0000-0000-0000-000000000002', 'acct_test123', true, true);
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"60000000-0000-0000-0000-000000000002","role":"authenticated"}';
 select lives_ok(
-  $$insert into public.armory_items (coach_id, kind, title, price_cents, file_path, file_name)
+  $$insert into public.armory_items (coach_id, kind, title, price_cents, file_path, file_name, required_membership_tier)
     values ('60000000-0000-0000-0000-000000000002', 'paid', 'Program',
-            1999, '60000000-0000-0000-0000-000000000002/program.pdf', 'program.pdf')$$,
+            1999, '60000000-0000-0000-0000-000000000002/program.pdf', 'program.pdf', 'everyone')$$,
   'a coach can list a paid download'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, price_cents, file_path, file_name)
+  $$insert into public.armory_items (coach_id, kind, title, price_cents, file_path, file_name, required_membership_tier)
     values ('60000000-0000-0000-0000-000000000002', 'paid', 'Too cheap', 50,
-            '60000000-0000-0000-0000-000000000002/cheap.pdf', 'cheap.pdf')$$,
+            '60000000-0000-0000-0000-000000000002/cheap.pdf', 'cheap.pdf', 'everyone')$$,
   '23514',
   null,
   'a paid download costs at least $1'
 );
 select throws_ok(
-  $$insert into public.armory_items (coach_id, kind, title, file_path, file_name)
+  $$insert into public.armory_items (coach_id, kind, title, file_path, file_name, required_membership_tier)
     values ('60000000-0000-0000-0000-000000000002', 'paid', 'No price',
-            '60000000-0000-0000-0000-000000000002/free.pdf', 'free.pdf')$$,
+            '60000000-0000-0000-0000-000000000002/free.pdf', 'free.pdf', 'everyone')$$,
   '23514',
   null,
   'a paid download needs a price'

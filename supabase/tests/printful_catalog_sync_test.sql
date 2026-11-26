@@ -115,6 +115,8 @@ set reserved_item_id=public.import_printful_armory_preview(product_local_id,'d10
     red_local_id=(select id from private.printful_catalog_variants where external_variant_id='8002');
 select is((select price_cents from private.printful_armory_drafts where item_id=(select reserved_item_id from printful_test_context)),
   3400,'private draft customer price starts at max exact cost plus twenty dollars');
+select is((select required_membership_tier from private.printful_armory_drafts where item_id=(select reserved_item_id from printful_test_context)),
+  'everyone','new managed drafts default to the Everyone audience');
 select is((select shipping_cents from private.printful_armory_drafts where item_id=(select reserved_item_id from printful_test_context)),
   0,'private draft defaults to free customer shipping');
 select ok(
@@ -130,20 +132,20 @@ select is(public.get_printful_armory_draft_upload_owner((select reserved_item_id
 -- Seed an ordinary row as the migration/test owner; authenticated callers only have
 -- narrow column grants, so the reserved-ID guard below is also exercised with the
 -- service role that backs application RPC writes.
-insert into public.armory_items(id,coach_id,kind,category,title,price_cents,buy_url)
-values('d1000000-0000-4000-8000-000000000099','d1000000-0000-4000-8000-000000000002','link','gear','Ordinary link',1000,'https://example.test/item');
+insert into public.armory_items(id,coach_id,kind,category,title,price_cents,buy_url,required_membership_tier)
+values('d1000000-0000-4000-8000-000000000099','d1000000-0000-4000-8000-000000000002','link','gear','Ordinary link',1000,'https://example.test/item','everyone');
 
 set local role authenticated;
 set local request.jwt.claims='{"sub":"d1000000-0000-4000-8000-000000000002","role":"authenticated"}';
 select throws_ok($$select item_id from private.printful_armory_drafts$$,'42501',null,'members cannot read private draft tables');
 select throws_ok(
-  $$insert into public.armory_items(id,coach_id,kind,category,title,price_cents,visible_to_all,sizes,shipping_cents)
-    values((select reserved_item_id from printful_test_context),'d1000000-0000-4000-8000-000000000002','preview','gear','Bypass',3400,true,array['Blue / M'],0)$$,
+  $$insert into public.armory_items(id,coach_id,kind,category,title,price_cents,visible_to_all,sizes,shipping_cents,required_membership_tier)
+    values((select reserved_item_id from printful_test_context),'d1000000-0000-4000-8000-000000000002','preview','gear','Bypass',3400,true,array['Blue / M'],0,'everyone')$$,
   '42501',null,'direct authenticated preview insertion cannot claim an unpublished reserved UUID'
 );
 select throws_ok(
-  $$insert into public.armory_items(id,coach_id,kind,category,title,price_cents,visible_to_all,sizes,shipping_cents)
-    values((select reserved_item_id from printful_test_context),'d1000000-0000-4000-8000-000000000002','product','gear','Bypass',3400,true,array['Blue / M'],0)$$,
+  $$insert into public.armory_items(id,coach_id,kind,category,title,price_cents,visible_to_all,sizes,shipping_cents,required_membership_tier)
+    values((select reserved_item_id from printful_test_context),'d1000000-0000-4000-8000-000000000002','product','gear','Bypass',3400,true,array['Blue / M'],0,'everyone')$$,
   '42501',null,'direct insertion cannot make a reserved UUID sellable'
 );
 reset role;
@@ -178,11 +180,22 @@ select is(public.apply_printful_catalog_snapshot(
 
 select is(public.update_printful_armory_preview(
   (select reserved_item_id from printful_test_context),'d1000000-0000-4000-8000-000000000002',
-  'Reviewed Training Tee','Approved synthetic description','d1000000-0000-4000-8000-000000000001/tee.webp',3844,600,true),
+  'Reviewed Training Tee','Approved synthetic description','d1000000-0000-4000-8000-000000000001/tee.webp',3844,600,true,'premium'),
   true,'another admin can curate without changing the original owner');
+select is((select required_membership_tier from private.printful_armory_drafts where item_id=(select reserved_item_id from printful_test_context)),
+  'premium','curation saves the selected audience on the private draft');
+select is(public.import_printful_armory_preview(
+  (select product_local_id from printful_test_context),'d1000000-0000-4000-8000-000000000001'),
+  (select reserved_item_id from printful_test_context),'reimport after the latest catalog refresh keeps the same managed item');
+select is((select required_membership_tier from private.printful_armory_drafts where item_id=(select reserved_item_id from printful_test_context)),
+  'premium','repeat import preserves the saved Premium audience');
+select is((public.get_printful_catalog_admin_snapshot() #>> '{products,0,importedRequiredMembershipTier}'),
+  'premium','service admin snapshot returns the saved audience using the imported* property');
+select ok(to_regprocedure('public.update_printful_armory_preview(uuid,uuid,text,text,text,integer,integer,boolean)') is null,
+  'unsafe legacy curation RPC overload is absent');
 select throws_ok($$select public.update_printful_armory_preview(
   (select reserved_item_id from printful_test_context),'d1000000-0000-4000-8000-000000000002',
-  'Wrong owner image','Approved synthetic description','d1000000-0000-4000-8000-000000000002/tee.webp',3844,600,true)$$,
+  'Wrong owner image','Approved synthetic description','d1000000-0000-4000-8000-000000000002/tee.webp',3844,600,true,'everyone')$$,
   '22023',null,'draft cannot claim an image uploaded under another owner');
 select lives_ok($query$do $force$
   begin
@@ -203,12 +216,13 @@ select is(public.publish_printful_armory_preview((select reserved_item_id from p
 select ok((select coach_id='d1000000-0000-4000-8000-000000000001'::uuid and kind='preview' and category='gear'
   and visible_to_all and price_cents=3844 and shipping_cents=600 and not made_to_order
   and delivery_min_weeks is null and delivery_max_weeks is null and sizes=array['Blue / M','Green / M']::text[]
+  and required_membership_tier='premium'
   and printful_sku is null and printful_sync_variant_id is null and printful_variant_mappings='[]'::jsonb
   from public.armory_items where id=(select reserved_item_id from printful_test_context)),
   'publish recomputes current labels, preserves curation and omits provider IDs');
 select throws_ok($$select public.update_printful_armory_preview(
   (select reserved_item_id from printful_test_context),'d1000000-0000-4000-8000-000000000002',
-  'Reviewed Training Tee','Approved synthetic description',null,3844,600,true)$$,
+  'Reviewed Training Tee','Approved synthetic description',null,3844,600,true,'premium')$$,
   'P0001',null,'published preview cannot be saved without an image');
 select throws_ok($$update public.armory_items set kind='product' where id=(select reserved_item_id from printful_test_context)$$,
   '23514',null,'a managed preview cannot be converted by direct SQL');

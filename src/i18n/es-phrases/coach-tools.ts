@@ -6,6 +6,14 @@ export const coachTools: Record<string, string> = {
   "Display only: members can view this product, but cannot purchase it.": "Solo mostrar: los miembros pueden ver este producto, pero no comprarlo.",
   "Coming soon · Not for sale": "Próximamente · No está a la venta",
   "Sizes": "Tallas",
+  "Membership access": "Acceso por membresía",
+  Everyone: "Todos",
+  "Premium members": "Miembros Premium",
+  "This controls membership access. The listing visibility setting still controls who can find this item.":
+    "Esto controla el acceso por membresía. La opción de visibilidad sigue determinando quién puede encontrar este artículo.",
+  "This item is not available for guest checkout.":
+    "Este artículo no está disponible para pagar como invitado.",
+  "Sign in to continue": "Inicia sesión para continuar",
 
   "Affiliate program": "Programa de afiliados",
   "Earn by bringing people to GYMX2.": "Gana dinero trayendo personas a GYMX2.",

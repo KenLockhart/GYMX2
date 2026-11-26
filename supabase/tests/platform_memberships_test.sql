@@ -31,27 +31,27 @@ insert into public.platform_test_entitlements (
 );
 
 insert into public.armory_items (
-  coach_id, kind, category, title, buy_url, visible_to_all
+  coach_id, kind, category, title, buy_url, visible_to_all, required_membership_tier
 ) values
-  ('60000000-0000-0000-0000-000000000002', 'link', 'accessories', 'Resistance bands', 'https://shop.example.test/bands', true),
-  ('60000000-0000-0000-0000-000000000002', 'link', 'supplements', 'Protein', 'https://shop.example.test/protein', true),
-  ('60000000-0000-0000-0000-000000000002', 'link', 'doctor_network', 'Doctor network', 'https://shop.example.test/doctors', true),
-  ('60000000-0000-0000-0000-000000000002', 'link', 'other', 'Old category item', 'https://shop.example.test/old', true);
+  ('60000000-0000-0000-0000-000000000002', 'link', 'accessories', 'Resistance bands', 'https://shop.example.test/bands', true, 'everyone'),
+  ('60000000-0000-0000-0000-000000000002', 'link', 'supplements', 'Protein', 'https://shop.example.test/protein', true, 'premium'),
+  ('60000000-0000-0000-0000-000000000002', 'link', 'doctor_network', 'Doctor network', 'https://shop.example.test/doctors', true, 'premium'),
+  ('60000000-0000-0000-0000-000000000002', 'link', 'other', 'Old category item', 'https://shop.example.test/old', true, 'everyone');
 
 insert into public.armory_items (
-  coach_id, kind, category, title, price_cents, file_path, file_name, visible_to_all
+  coach_id, kind, category, title, price_cents, file_path, file_name, visible_to_all, required_membership_tier
 ) values (
   '60000000-0000-0000-0000-000000000002', 'paid', 'doctor_network',
   'Purchased care guide', 1999,
-  '60000000-0000-0000-0000-000000000002/guide.pdf', 'guide.pdf', true
+  '60000000-0000-0000-0000-000000000002/guide.pdf', 'guide.pdf', true, 'premium'
 );
 
 insert into public.armory_items (
-  coach_id, kind, category, title, price_cents, file_path, file_name, visible_to_all
+  coach_id, kind, category, title, price_cents, file_path, file_name, visible_to_all, required_membership_tier
 ) values (
   '60000000-0000-0000-0000-000000000001', 'paid', 'other',
   'Purchased legacy guide', 999,
-  '60000000-0000-0000-0000-000000000001/legacy-guide.pdf', 'legacy-guide.pdf', true
+  '60000000-0000-0000-0000-000000000001/legacy-guide.pdf', 'legacy-guide.pdf', true, 'everyone'
 );
 
 insert into public.purchases (

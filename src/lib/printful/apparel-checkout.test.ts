@@ -69,6 +69,7 @@ function checkoutContext(revision: unknown, productRevision: unknown = 10, varia
       priceCents: 3192,
       shippingCents: 0,
       visibleToAll: true,
+      requiredMembershipTier: "everyone",
       curationApprovedAt: "2026-11-24T15:00:00.000Z",
       publishedAt: "2026-11-24T15:00:00.000Z",
     },
@@ -178,6 +179,32 @@ describe("startPrintfulApparelCheckout RPC revision boundary", () => {
 
   it("rejects a changed scalar revision after the provider read before estimating or creating an intent", async () => {
     mocks.contextResults = [checkoutContext(10), checkoutContext(11, 11, 11)];
+
+    const result = await startCheckout();
+
+    expect(result).toEqual({ ok: false, reason: "variant_unavailable" });
+    expect(mocks.readProduct).toHaveBeenCalledOnce();
+    expect(mocks.estimateCosts).not.toHaveBeenCalled();
+    expect(mocks.rpc.mock.calls.some(([name]) => name === "create_printful_apparel_checkout_intent")).toBe(false);
+  });
+
+  it("rejects Premium-only draft apparel before a guest order can be created", async () => {
+    const premiumContext = checkoutContext(10);
+    premiumContext.draft.requiredMembershipTier = "premium";
+    mocks.contextResults = [premiumContext];
+
+    const result = await startCheckout();
+
+    expect(result).toEqual({ ok: false, reason: "variant_unavailable" });
+    expect(mocks.readProduct).not.toHaveBeenCalled();
+    expect(mocks.estimateCosts).not.toHaveBeenCalled();
+    expect(mocks.rpc.mock.calls.some(([name]) => name === "create_printful_apparel_checkout_intent")).toBe(false);
+  });
+
+  it("rejects an Everyone-to-Premium draft change after the provider read", async () => {
+    const premiumContext = checkoutContext(10);
+    premiumContext.draft.requiredMembershipTier = "premium";
+    mocks.contextResults = [checkoutContext(10), premiumContext];
 
     const result = await startCheckout();
 

@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type Stripe from "stripe";
 import type { Locale } from "@/i18n/config";
-import { isPremiumCategory, MIN_PAID_PRICE_CENTS, platformFeeCents } from "@/lib/armory";
+import { canAccessArmoryAudience, MIN_PAID_PRICE_CENTS, platformFeeCents } from "@/lib/armory";
 import { isPublicArmorySale } from "@/lib/armory-commerce-core";
 import { findPrintfulVariantMapping, validatePrintfulMappingInput } from "@/lib/printful-mapping";
 import { bindArmoryCheckoutSession } from "@/lib/armory-checkout-binding";
@@ -21,6 +21,7 @@ type CheckoutItem = Pick<
   | "coach_id"
   | "kind"
   | "category"
+  | "required_membership_tier"
   | "title"
   | "price_cents"
   | "file_path"
@@ -34,7 +35,7 @@ type CheckoutItem = Pick<
 > & { updated_at: string };
 
 const ITEM_FIELDS =
-  "id, coach_id, kind, category, title, price_cents, file_path, file_name, sizes, shipping_cents, visible_to_all, printful_sku, printful_sync_variant_id, printful_variant_mappings, updated_at";
+  "id, coach_id, kind, category, required_membership_tier, title, price_cents, file_path, file_name, sizes, shipping_cents, visible_to_all, printful_sku, printful_sync_variant_id, printful_variant_mappings, updated_at";
 const PUBLIC_FIELDS =
   "id, coach_id, kind, category, title, price_cents, sizes, shipping_cents";
 
@@ -125,10 +126,15 @@ export async function createArmoryCheckout(input: {
   if (memberId && !authorizedMemberRead && !isPublicArmorySale(item)) {
     return { error: "This item can't be bought right now." };
   }
-  if (isPremiumCategory(item.category)) {
-    if (!memberId || !(await platformHasTier(memberId, "premium"))) {
-      return { error: "Premium membership required to buy this item." };
+  const hasPremium = item.required_membership_tier === "premium" && memberId
+    ? await platformHasTier(memberId, "premium")
+    : false;
+  const buyerTier = hasPremium ? "premium" : memberId ? "regular" : null;
+  if (!canAccessArmoryAudience(item.required_membership_tier, buyerTier)) {
+    if (item.required_membership_tier !== "premium") {
+      return { error: "This item can't be bought right now." };
     }
+    return { error: "Premium membership required to buy this item." };
   }
 
   const isProduct = item.kind === "product";

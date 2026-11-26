@@ -27,7 +27,7 @@ export const lists: Record<string, string> = {
   "Choose a paid platform membership to use GYMX2.":
     "Elige una membresía de pago para usar GYMX2.",
   "Premium membership unlocks the Premium Armory categories for shoppers.":
-    "La membresía Premium desbloquea las categorías Premium de la Armería.",
+    "La membresía Premium desbloquea los artículos de la Armería marcados como Premium.",
   "Choose a paid platform membership to continue using member features.":
     "Elige una membresía de pago para seguir usando las funciones para miembros.",
   "We couldn't verify your membership status. Please refresh and try again.":
@@ -102,7 +102,9 @@ export const lists: Record<string, string> = {
   Other: "Otros",
   "Legacy / Other": "Anterior / Otros",
   Supplements: "Suplementos",
+  Peptides: "Péptidos",
   "Doctor Network": "Red médica",
+  Partners: "Socios",
   "Premium membership required to buy this item.":
     "Necesitas la membresía Premium para comprar este artículo.",
   Digital: "Digital",

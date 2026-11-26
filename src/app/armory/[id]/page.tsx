@@ -11,15 +11,16 @@ import { getLocale, getTr } from "@/i18n/server";
 import { getCurrentAccount } from "@/lib/auth";
 import {
   categoryLabel,
+  canAccessArmoryAudience,
   deliveryEstimate,
   formatMoney,
   formatPrice,
   isDisplayOnly,
-  isPremiumCategory,
   orderStatusLabel,
   publicImageUrl,
 } from "@/lib/armory";
 import { confirmCheckoutSession } from "@/lib/purchases";
+import { isPublicArmorySale } from "@/lib/armory-commerce-core";
 import { getPlatformEntitlement } from "@/lib/platform-membership-server";
 import { stripePublishableKey, isStripeTestMode } from "@/lib/stripe";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -31,7 +32,7 @@ import { removeArmoryItem } from "@/app/(app)/armory/actions";
 type PrivateDetail = Pick<
   ArmoryItem,
   | "id" | "coach_id" | "kind" | "category" | "title" | "description"
-  | "price_cents" | "buy_url" | "file_name" | "image_path" | "visible_to_all"
+  | "required_membership_tier" | "price_cents" | "buy_url" | "file_name" | "image_path" | "visible_to_all"
   | "sizes" | "shipping_cents" | "made_to_order" | "delivery_min_weeks"
   | "delivery_max_weeks" | "created_at"
 > & { coach: { id: string; display_name: string; role: string } | null };
@@ -39,9 +40,9 @@ type PrivateDetail = Pick<
 type DetailItem = PrivateDetail | (PublicArmoryItem & { file_name: null; visible_to_all: true; coach: null });
 
 const PRIVATE_DETAIL_FIELDS =
-  "id, coach_id, kind, category, title, description, price_cents, buy_url, file_name, image_path, visible_to_all, sizes, shipping_cents, made_to_order, delivery_min_weeks, delivery_max_weeks, created_at, coach:profiles!coach_id(id, display_name, role)";
+  "id, coach_id, kind, category, title, description, required_membership_tier, price_cents, buy_url, file_name, image_path, visible_to_all, sizes, shipping_cents, made_to_order, delivery_min_weeks, delivery_max_weeks, created_at, coach:profiles!coach_id(id, display_name, role)";
 const PUBLIC_DETAIL_FIELDS =
-  "id, coach_id, seller_label, kind, category, title, description, price_cents, buy_url, sizes, shipping_cents, image_path, made_to_order, delivery_min_weeks, delivery_max_weeks, created_at";
+  "id, coach_id, seller_label, kind, category, required_membership_tier, title, description, price_cents, buy_url, sizes, shipping_cents, image_path, made_to_order, delivery_min_weeks, delivery_max_weeks, created_at";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -125,8 +126,18 @@ export default async function ArmoryItemPage({
     refunded_at: string | null;
   }[];
   const hasBought = myOrders.some((order) => !order.refunded_at);
-  const canReadPremiumItem = hasPremium || owner || admin || (item.kind === "paid" && hasBought);
-  if (isPremiumCategory(item.category) && !canReadPremiumItem) notFound();
+  const requiredMembershipTier = "required_membership_tier" in item
+    ? item.required_membership_tier
+    : "everyone";
+  const publicProjection = "seller_label" in item;
+  const publicSale = isPublicArmorySale(item);
+  const hasPurchasedPaidAccess = item.kind === "paid" && hasBought;
+  const canReadItemAudience = owner || admin || hasPurchasedPaidAccess ||
+    canAccessArmoryAudience(
+      requiredMembershipTier,
+      hasPremium ? "premium" : account ? "regular" : null,
+    );
+  if (!canReadItemAudience) notFound();
 
   const image = publicImageUrl(getSupabaseEnv().url, item.image_path);
   const price = formatPrice(item.price_cents);
@@ -156,6 +167,7 @@ export default async function ArmoryItemPage({
             <div>
               <p className="text-sm font-semibold uppercase tracking-widest text-accent"><T>{categoryLabel(item.category)}</T></p>
               <h1 className="mt-1 text-4xl">{item.title}</h1>
+              {requiredMembershipTier === "premium" && <p className="mt-1 text-sm font-semibold text-accent"><T>Premium</T></p>}
               {!owner && <p className="mt-2 text-muted"><T>From</T> {sellerLabel}</p>}
             </div>
 
@@ -181,14 +193,17 @@ export default async function ArmoryItemPage({
                     <p role="status" className="rounded-lg border border-accent bg-surface p-3 text-sm"><T>Coming soon · Not for sale</T></p>
                     {item.sizes.length > 0 && <p className="text-sm text-muted"><T>Sizes</T>: {item.sizes.join(", ")}</p>}
                   </div>
+                ) : publicProjection && !publicSale ? (
+                  <p role="status" className="rounded-lg border border-border bg-surface p-3 text-sm">
+                    <T>This item is not available for guest checkout.</T>{" "}
+                    {!account && <Link href="/login" className="text-link"><T>Sign in to continue</T></Link>}
+                  </p>
                 ) : owner || admin ? (
                   <p className="text-sm text-muted">
                     {item.sizes.length > 0 ? tr("Sizes: {p0} · ", { p0: item.sizes.join(", ") }) : ""}
                     {owner && <>{salesCount ?? 0} {salesCount === 1 ? tr("order") : tr("orders")} · </>}
                     <Link href="/armory/sales" className="text-link">{owner ? tr("See orders to ship") : tr("See all orders")}</Link>
                   </p>
-                ) : isPremiumCategory(item.category) && !hasPremium ? (
-                  <p className="rounded-lg border border-accent bg-surface p-3 text-sm"><T>Premium membership is required to buy this item.</T>{" "}<Link href="/membership?plan=premium" className="text-link"><T>View Premium</T></Link></p>
                 ) : account ? (
                   <>
                     <BuyPanel itemId={item.id} sizes={item.sizes} buttonLabel={hasBought ? tr("Order another") : tr("Buy now")} publishableKey={stripePublishableKey()} />
@@ -213,8 +228,11 @@ export default async function ArmoryItemPage({
                     {item.file_name && <p className="text-xs text-muted">{item.file_name}</p>}
                     {owner && <p className="text-sm text-muted">{salesCount ?? 0} {salesCount === 1 ? tr("sale") : tr("sales")} · <Link href="/armory/sales" className="text-link"><T>See your sales</T></Link></p>}
                   </>
-                ) : isPremiumCategory(item.category) && !hasPremium ? (
-                  <p className="rounded-lg border border-accent bg-surface p-3 text-sm"><T>Premium membership is required to buy this item.</T>{" "}<Link href="/membership?plan=premium" className="text-link"><T>View Premium</T></Link></p>
+                ) : publicProjection && !publicSale ? (
+                  <p role="status" className="rounded-lg border border-border bg-surface p-3 text-sm">
+                    <T>This item is not available for guest checkout.</T>{" "}
+                    {!account && <Link href="/login" className="text-link"><T>Sign in to continue</T></Link>}
+                  </p>
                 ) : account ? (
                   <>
                     <p className="text-2xl font-semibold">{price}</p>

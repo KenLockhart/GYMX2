@@ -6,8 +6,8 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('90000000-0000-0000-0000-000000000004', 'refund-buyer@example.test', '{"display_name":"Buyer"}');
 update public.profiles set role = 'coach' where id = '90000000-0000-0000-0000-000000000002';
 
-insert into public.armory_items (id, coach_id, kind, category, title, price_cents, shipping_cents)
-values ('90000000-0000-0000-0000-0000000000a1', '90000000-0000-0000-0000-000000000002', 'product', 'gear', 'Tee', 3000, 500);
+insert into public.armory_items (id, coach_id, kind, category, title, price_cents, shipping_cents, required_membership_tier)
+values ('90000000-0000-0000-0000-0000000000a1', '90000000-0000-0000-0000-000000000002', 'product', 'gear', 'Tee', 3000, 500, 'everyone');
 insert into public.purchases (id, item_id, member_id, seller_id, item_title, amount_cents, fee_cents, stripe_session_id,
                               shipping_cents, fulfillment_status)
 values ('90000000-0000-0000-0000-0000000000b1', '90000000-0000-0000-0000-0000000000a1',

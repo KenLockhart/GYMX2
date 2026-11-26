@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArmoryPublicHeader } from "@/components/armory-public-header";
-import { categoryLabel, deliveryEstimate, formatPrice, isCategory, isDisplayOnly, isPremiumCategory, ARMORY_CATEGORIES, publicImageUrl } from "@/lib/armory";
+import { categoryLabel, deliveryEstimate, formatPrice, isCategory, isDisplayOnly, ARMORY_CATEGORIES, publicImageUrl } from "@/lib/armory";
 import { getCurrentAccount } from "@/lib/auth";
 import { getPlatformEntitlement } from "@/lib/platform-membership-server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -17,14 +17,14 @@ export async function generateMetadata(): Promise<Metadata> {
 type SignedInCatalogItem = Pick<
   ArmoryItem,
   | "id" | "coach_id" | "kind" | "category" | "title" | "description"
-  | "price_cents" | "buy_url" | "sizes" | "shipping_cents" | "image_path"
+  | "required_membership_tier" | "price_cents" | "buy_url" | "sizes" | "shipping_cents" | "image_path"
   | "visible_to_all" | "made_to_order" | "delivery_min_weeks" | "delivery_max_weeks" | "created_at"
 > & { coach: { display_name: string; role: string } | null };
 
 type CatalogItem = PublicArmoryItem | SignedInCatalogItem;
 
 const SAFE_MEMBER_COLUMNS =
-  "id, coach_id, kind, category, title, description, price_cents, buy_url, sizes, shipping_cents, image_path, visible_to_all, made_to_order, delivery_min_weeks, delivery_max_weeks, created_at, coach:profiles!coach_id(display_name, role)";
+  "id, coach_id, kind, category, title, description, required_membership_tier, price_cents, buy_url, sizes, shipping_cents, image_path, visible_to_all, made_to_order, delivery_min_weeks, delivery_max_weeks, created_at, coach:profiles!coach_id(display_name, role)";
 
 export default async function PublicArmoryPage({
   searchParams,
@@ -35,8 +35,6 @@ export default async function PublicArmoryPage({
   const entitlement = account
     ? await getPlatformEntitlement(account.profile.id)
     : null;
-  const tier = entitlement?.ok ? entitlement.entitlement?.tier ?? null : null;
-  const hasPremium = tier === "premium";
   const canManage = account?.profile.role === "coach" || account?.profile.role === "admin";
   const requested = (await searchParams).category;
   const category = isCategory(requested) && (requested !== "other" || canManage)
@@ -65,7 +63,7 @@ export default async function PublicArmoryPage({
   } else {
     let query = supabase
       .from("public_armory_catalog")
-      .select("id, coach_id, seller_label, kind, category, title, description, price_cents, buy_url, sizes, shipping_cents, image_path, made_to_order, delivery_min_weeks, delivery_max_weeks, created_at")
+      .select("id, coach_id, seller_label, kind, category, required_membership_tier, title, description, price_cents, buy_url, sizes, shipping_cents, image_path, made_to_order, delivery_min_weeks, delivery_max_weeks, created_at")
       .order("created_at", { ascending: false })
       .limit(200);
     if (category && category !== "other") query = query.eq("category", category);
@@ -75,12 +73,9 @@ export default async function PublicArmoryPage({
     items = (result.data ?? []) as unknown as PublicArmoryItem[];
   }
 
-  const visibleItems = items.filter((item) => {
-    // Signed-in private rows arrive only through the existing authenticated RLS query;
-    // anonymous and unsubscribed readers use the allowlisted public projection instead.
-    if (!isPremiumCategory(item.category) || hasPremium) return true;
-    return Boolean(account && (account.profile.role === "admin" || item.coach_id === account.profile.id));
-  });
+  // Authenticated rows are already filtered by audience and visibility in RLS;
+  // anonymous rows come from the Everyone-only public projection.
+  const visibleItems = items;
   const publicBaseUrl = getSupabaseEnv().url;
   return (
     <>
@@ -105,27 +100,17 @@ export default async function PublicArmoryPage({
         <nav className="flex flex-wrap gap-2 text-sm" aria-label={tr("Filter by category")}>
           <Link href="/armory" className={`rounded-full border px-3 py-1 ${!category ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-raised"}`}><T>All</T></Link>
           {categories.map((option) => {
-            const locked = isPremiumCategory(option.value) && !hasPremium;
-            const managementPreview = canManage;
             return (
               <Link
                 key={option.value}
-                href={locked && !managementPreview ? "/membership?plan=premium" : `/armory?category=${option.value}`}
+                href={`/armory?category=${option.value}`}
                 className={`rounded-full border px-3 py-1 ${category === option.value ? "border-accent bg-accent text-accent-foreground" : "border-border hover:bg-surface-raised"}`}
               >
                 <T>{option.label}</T>
-                {locked && <span className="ml-2 text-xs text-muted"><T>Premium</T></span>}
               </Link>
             );
           })}
         </nav>
-
-        {category && isPremiumCategory(category) && !hasPremium && !canManage && (
-          <p className="rounded-lg border border-accent bg-surface p-4 text-sm">
-            <T>Premium membership is required to browse this category.</T>{" "}
-            <Link href="/membership?plan=premium" className="text-link"><T>View Premium</T></Link>
-          </p>
-        )}
 
         {error ? (
           <p role="alert" className="text-danger"><T>We couldn&apos;t load the Armory. Please refresh and try again.</T></p>
@@ -158,6 +143,9 @@ export default async function PublicArmoryPage({
                     <div className="space-y-1 p-3">
                       <p className="text-xs font-semibold uppercase tracking-widest text-accent"><T>{categoryLabel(item.category)}</T></p>
                       <h2 className="font-semibold">{item.title}</h2>
+                      {"required_membership_tier" in item && item.required_membership_tier === "premium" && (
+                        <p className="text-xs font-semibold text-accent"><T>Premium</T></p>
+                      )}
                       <p className="text-sm text-muted"><T>From</T> {sellerLabel}</p>
                       {price && <p className="font-semibold">{price}</p>}
                       {item.kind === "product" && item.shipping_cents > 0 && <p className="text-xs text-muted">+ {tr("{p0} shipping", { p0: formatPrice(item.shipping_cents) ?? "" })}</p>}

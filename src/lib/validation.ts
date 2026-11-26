@@ -1,5 +1,5 @@
 import { VIDEO_CATEGORIES } from "./video-library";
-import { ARMORY_CATEGORY_VALUES } from "./armory";
+import { ARMORY_AUDIENCE_VALUES, ARMORY_CATEGORY_VALUES } from "./armory";
 import { z } from "zod";
 
 const email = z
@@ -201,6 +201,9 @@ const armoryDescription = z
 const armoryCategory = z.enum(ARMORY_CATEGORY_VALUES, {
   error: "Choose a category.",
 });
+const armoryAudience = z.enum(ARMORY_AUDIENCE_VALUES, {
+  error: "Choose who can access this item.",
+});
 const blankToNull = z.literal("").transform(() => null);
 const optionalDeliveryWeeks = z.union([
   blankToNull,
@@ -221,6 +224,7 @@ export const armoryItemSchema = z
       kind: z.literal("link"),
       id: z.union([blankToNull, z.uuid()]),
       category: armoryCategory,
+      required_membership_tier: armoryAudience,
       title: armoryTitle,
       description: armoryDescription,
       price_cents: z.number().int().min(0).max(10_000_000).nullable(),
@@ -238,6 +242,7 @@ export const armoryItemSchema = z
       kind: z.literal("download"),
       id: z.union([blankToNull, z.uuid()]),
       category: armoryCategory,
+      required_membership_tier: armoryAudience,
       title: armoryTitle,
       description: armoryDescription,
       file_path: z
@@ -256,6 +261,7 @@ export const armoryItemSchema = z
       kind: z.literal("paid"),
       id: z.union([blankToNull, z.uuid()]),
       category: armoryCategory,
+      required_membership_tier: armoryAudience,
       title: armoryTitle,
       description: armoryDescription,
       price_cents: z
@@ -279,6 +285,7 @@ export const armoryItemSchema = z
       kind: z.literal("product"),
       id: z.union([blankToNull, z.uuid()]),
       category: armoryCategory,
+      required_membership_tier: armoryAudience,
       title: armoryTitle,
       description: armoryDescription,
       price_cents: z
@@ -306,6 +313,7 @@ export const armoryItemSchema = z
       kind: z.literal("preview"),
       id: z.union([blankToNull, z.uuid()]),
       category: armoryCategory,
+      required_membership_tier: armoryAudience,
       title: armoryTitle,
       description: armoryDescription,
       price_cents: z

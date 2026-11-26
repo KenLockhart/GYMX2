@@ -91,6 +91,7 @@ export type ArmoryItem = {
   sizes: string[];
   shipping_cents: number;
   category: string;
+  required_membership_tier: "everyone" | "premium";
   title: string;
   description: string;
   price_cents: number | null;
@@ -118,6 +119,7 @@ export type PublicArmoryItem = Pick<
   | "coach_id"
   | "kind"
   | "category"
+  | "required_membership_tier"
   | "title"
   | "description"
   | "price_cents"

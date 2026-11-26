@@ -18,6 +18,7 @@ import {
   parseSizes,
   PLATFORM_FEE_PERCENT,
   describeSize,
+  type ArmoryAudience,
   type ArmoryKind,
 } from "@/lib/armory";
 import {
@@ -32,6 +33,7 @@ export type ArmoryFormValues = {
   id: string;
   kind: ArmoryKind;
   category: string;
+  required_membership_tier: ArmoryAudience;
   title: string;
   description: string;
   price: string;
@@ -177,6 +179,9 @@ export function ArmoryForm({
   const tr = useTr();
   const [kind, setKind] = useState<ArmoryKind>(initial.kind);
   const [category, setCategory] = useState(initial.category);
+  const [requiredMembershipTier, setRequiredMembershipTier] = useState<ArmoryAudience>(
+    initial.required_membership_tier,
+  );
   const [madeToOrder, setMadeToOrder] = useState(initial.made_to_order);
   const [sizesText, setSizesText] = useState(initial.sizes);
   const [printfulSku, setPrintfulSku] = useState(initial.printful_sku ?? "");
@@ -211,6 +216,7 @@ export function ArmoryForm({
       <input type="hidden" name="kind" value={kind} />
       {physicalKind && (
         <>
+          {!printfulCategory && <input type="hidden" name="sizes" value="" />}
           <input
             type="hidden"
             name="printful_sku"
@@ -331,6 +337,22 @@ export function ArmoryForm({
           ))}
         </select>
       </label>
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium"><T>Membership access</T></span>
+        <select
+          name="required_membership_tier"
+          value={requiredMembershipTier}
+          onChange={(event) => setRequiredMembershipTier(event.target.value as ArmoryAudience)}
+          className="field-input"
+          required
+        >
+          <option value="everyone"><T>Everyone</T></option>
+          <option value="premium"><T>Premium members</T></option>
+        </select>
+        <p className="text-xs text-muted">
+          <T>This controls membership access. The listing visibility setting still controls who can find this item.</T>
+        </p>
+      </label>
       <Field
         label={tr("Title")}
         name="title"
@@ -390,18 +412,20 @@ export function ArmoryForm({
               )}
             />
           </div>
-          <Field
-            label={tr("Sizes (optional)")}
-            name="sizes"
-            maxLength={4096}
-            placeholder={DEFAULT_SIZES}
-            value={sizesText}
-            onChange={(event) => setSizesText(event.target.value)}
-            hint={tr(
-              "Separate with commas. Buyers must pick one. Leave blank if there's only one version.",
-            )}
-          />
-          {printfulCategory ? (
+          {printfulCategory && (
+            <Field
+              label={tr("Sizes (optional)")}
+              name="sizes"
+              maxLength={4096}
+              placeholder={DEFAULT_SIZES}
+              value={sizesText}
+              onChange={(event) => setSizesText(event.target.value)}
+              hint={tr(
+                "Separate with commas. Buyers must pick one. Leave blank if there's only one version.",
+              )}
+            />
+          )}
+          {printfulCategory && (
           <fieldset className="space-y-3 rounded-lg border border-border p-4">
             <legend className="px-1 text-sm font-semibold">
               <T>Printful reference</T>
@@ -478,10 +502,6 @@ export function ArmoryForm({
               <T>Color options need separate listings.</T>
             </p>
           </fieldset>
-          ) : (
-            <p className="text-sm text-muted">
-              <T>Printful references are available for Gear and Accessories listings.</T>
-            </p>
           )}
           <label className="flex items-start gap-3 text-sm">
             <input
