@@ -95,7 +95,7 @@ describe("homepage", () => {
     expect(html).toContain("Your journey starts here.");
     expect(html).toContain("More than a platform. A community.");
     expect(html).toContain("Your passion deserves a place to grow.");
-    expect(html).toContain("Your next chapter starts with GymX2.");
+    expect(html).toContain("Find your coach. Share your craft. Join GYMX2.");
   });
 
   it("keeps promotional people and scenes clearly illustrative and account media private", () => {

@@ -259,9 +259,27 @@ export function HomepagePage() {
 
         <section className="homepage-section homepage-closing" id="about" aria-labelledby="closing-title">
           <p className="homepage-eyebrow">YOUR PASSION HAS A PLACE HERE</p>
-          <h2 id="closing-title">Your next chapter starts with GymX2.</h2>
+          <h2 id="closing-title">Find your people. Develop your potential.</h2>
           <p>
-            GymX2 connects coaches, instructors and learners across sport, dance, movement and physical performance.
+            Getting better takes practice. It also takes people who can see what you’re working toward, help you understand what to work on, and encourage you to keep going.
+          </p>
+          <p>
+            GYMX2 connects learners with coaches, instructors, and creators across sport, fitness, dance, and movement. Whether you’re learning the fundamentals, refining your technique, or returning to something you love, we’re here to help you find guidance that fits your goals.
+          </p>
+          <p>
+            We believe good coaching starts with understanding the person. Your experience, ambitions, and starting point all matter. Through lessons, programs, and direct connection, GYMX2 gives you ways to learn from people whose approach speaks to you and put that learning into practice.
+          </p>
+          <p>
+            For coaches and creators, it’s a place to share the craft you’ve spent years developing. Teach the details. Explain the why. Build relationships with people who want to learn what you know.
+          </p>
+          <p>
+            Our purpose is simple: make it easier for people to find each other and work toward meaningful progress. That might mean a more consistent swing, the confidence to try a new class, or finally understanding a movement that never quite clicked.
+          </p>
+          <p>
+            Whatever brings you here, there’s room for your goals and the work ahead.
+          </p>
+          <p>
+            <strong>Find your coach. Share your craft. Join GYMX2.</strong>
           </p>
           <div className="homepage-hero-actions homepage-closing-actions">
             <Link href="/signup" className="homepage-button homepage-button-primary">
