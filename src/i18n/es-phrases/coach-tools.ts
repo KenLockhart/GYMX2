@@ -1,8 +1,12 @@
 // Coach tools: affiliate, Armory selling and payouts, check-ins, insights, members, reports,
 // memberships, coach profile editor, credentials and intro times.
 export const coachTools: Record<string, string> = {
-  "Display gear only": "Solo mostrar artículos físicos",
+  "Display product only": "Mostrar solo el producto",
   "Show a physical product without allowing purchases.": "Muestra un producto físico sin permitir compras.",
+  "Physical products. Buyers provide a shipping address and select a size when available.":
+    "Productos físicos. Los compradores proporcionan una dirección de envío y seleccionan una talla cuando esté disponible.",
+  "Physical products. Buyers provide a shipping address and select a size when available. You keep the shipping fee.":
+    "Productos físicos. Los compradores proporcionan una dirección de envío y seleccionan una talla cuando esté disponible. Conservas el costo de envío.",
   "Display only: members can view this product, but cannot purchase it.": "Solo mostrar: los miembros pueden ver este producto, pero no comprarlo.",
   "Coming soon · Not for sale": "Próximamente · No está a la venta",
   "Sizes": "Tallas",

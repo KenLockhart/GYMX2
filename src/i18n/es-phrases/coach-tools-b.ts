@@ -56,7 +56,7 @@ export const coachToolsB: Record<string, string> = {
   "Upload a file members download here.":
     "Sube un archivo que los miembros descargan aquí.",
   "Sell a digital file": "Vender un archivo digital",
-  "Sell gear": "Vender equipo",
+  "Sell a product": "Vender un producto",
   "Not verified: see note": "Sin verificar: ve la nota",
   Basics: "Lo básico",
   Qualifications: "Certificaciones",
