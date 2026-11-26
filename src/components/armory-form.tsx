@@ -259,7 +259,7 @@ export function ArmoryForm({
             [
               [
                 "preview",
-                "Display gear only",
+                "Display product only",
                 "Show a physical product without allowing purchases.",
               ],
               [
@@ -286,13 +286,13 @@ export function ArmoryForm({
               ],
               [
                 "product",
-                "Sell gear",
+                "Sell a product",
                 payouts === "platform"
                   ? tr(
-                      "Shirts and other physical items. Buyers pick a size and give an address; you ship it.",
+                      "Physical products. Buyers provide a shipping address and select a size when available.",
                     )
                   : tr(
-                      "Shirts and other physical items. Buyers pick a size and give an address; you ship it and keep the shipping fee.",
+                      "Physical products. Buyers provide a shipping address and select a size when available. You keep the shipping fee.",
                     ),
               ],
             ] as const
